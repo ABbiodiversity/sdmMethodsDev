@@ -5,6 +5,8 @@
 ![Lifecycle](https://img.shields.io/badge/Lifecycle-Experimental-orange)
 ![Languages](https://img.shields.io/badge/Languages-R-blue)
 
+<img src="docs/images/science_centre_logo_unofficial.png" alt="ABMI Science Centre (Unofficial)" width="185">
+
 > [!IMPORTANT]
 > This repository is developed by and for the Science Centre at the Alberta Biodiversity Monitoring
 Institute (ABMI). It is intended for internal use.
