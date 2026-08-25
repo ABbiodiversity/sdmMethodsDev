@@ -6,7 +6,7 @@
 ![Languages](https://img.shields.io/badge/Languages-R-blue)
 
 > [!IMPORTANT]
-> This package is developed by and for the Science Centre at the Alberta Biodiversity Monitoring
+> This repository is developed by and for the Science Centre at the Alberta Biodiversity Monitoring
 Institute (ABMI). It is intended for internal use.
 > 
 
