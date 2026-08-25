@@ -55,3 +55,6 @@ vignettes/*.pdf
 4_writing/**
 !4_writing/**/
 !4_writing/**/.gitkeep
+
+# Local agent instructions (not tracked)
+AGENTS.md
