@@ -50,11 +50,3 @@ vignettes/*.pdf
 3_output/**
 !3_output/**/
 !3_output/**/.gitkeep
-
-# Ignore everything in 4_writing except folder structure
-4_writing/**
-!4_writing/**/
-!4_writing/**/.gitkeep
-
-# Local agent instructions (not tracked)
-AGENTS.md
