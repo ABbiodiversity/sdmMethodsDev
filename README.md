@@ -55,7 +55,6 @@ This repository is for methods research and development. It is not for the final
 ```
 sdm_methods_dev/
 ├── README.md
-├── .Rprofile
 │
 ├── 0_data/                        # read-only inputs; nothing written here by code
 │   ├── manifest.md                # dataset version, paths, checksums
