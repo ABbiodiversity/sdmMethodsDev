@@ -50,3 +50,5 @@ vignettes/*.pdf
 3_output/**
 !3_output/**/
 !3_output/**/.gitkeep
+
+AGENTS.md
