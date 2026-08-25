@@ -73,12 +73,12 @@ sdm_methods_dev/
 │   │   ├── data_split.R
 │   │   ├── covar_attach.R
 │   │   └── eval_metrics.R
-│   ├── modules/                   # taxon-specific, standard interface
-│   │   ├── birds/                 # prepare.R, offsets.R, fit.R, module.yml
+│   ├── modules/                   # taxon-specific
+│   │   ├── birds/                 
 │   │   ├── mammals/
 │   │   └── plants/
 │   └── experiments/
-│       ├── exp_000_description/
+│       ├── exp_000_parity_v2/
 │       │   ├── README.md
 │       │   ├── run.R
 │       │   ├── 01_script.R
@@ -88,12 +88,12 @@ sdm_methods_dev/
 │       └── exp_002_description/
 │
 ├── 2_pipeline/                    # intermediates, cached; gitignored
-│   ├── exp_000_description/
+│   ├── exp_000_parity_v2/
 │   │   └── logs/                  # log files
 │   └── exp_001_description/
 │
 └── 3_output/                      # deliverables; committed
-    ├── exp_000_description/
+    ├── exp_000_parity_v2/
     │   ├── figures/
     │   ├── tables/
     │   └── report.md
