@@ -5,6 +5,10 @@
 ![Lifecycle](https://img.shields.io/badge/Lifecycle-Experimental-orange)
 ![Languages](https://img.shields.io/badge/Languages-R-blue)
 
+> [!IMPORTANT]
+> This package is developed by and for the Science Centre at the Alberta Biodiversity Monitoring
+Institute (ABMI). It is intended for internal use.
+> 
 
 Shared pipeline and static cross-taxa test dataset for methods R&D on ABMI
 species models.
