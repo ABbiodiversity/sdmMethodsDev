@@ -40,6 +40,7 @@ vignettes/*.pdf
 0_data/**
 !0_data/**/
 !0_data/**/.gitkeep
+!0_data/**/*.R
 
 # Ignore everything in 2_pipeline except folder structure
 2_pipeline/**
