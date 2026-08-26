@@ -41,6 +41,9 @@ vignettes/*.pdf
 !0_data/**/
 !0_data/**/.gitkeep
 
+# But track everything in 0_data/v2_scripts
+!0_data/v2_scripts/**
+
 # Ignore everything in 2_pipeline except folder structure
 2_pipeline/**
 !2_pipeline/**/
