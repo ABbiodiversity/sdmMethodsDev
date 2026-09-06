@@ -107,17 +107,25 @@ Species count is the only way to shorten a run: `boot.iter <- 1:100` and
 sdm_methods_dev/
 ├── README.md
 │
-├── 0_data/                        # read-only inputs; nothing written here by code
+├── 0_data/                        # read-only inputs; written only by 1_code/_setup/
 │   ├── manifest.md                # dataset version, paths, checksums
 │   ├── covariates/                # versioned catalogue (metadata; rasters on server)
 │   │   └── catalogue_v1.csv
-│   ├── test_dataset/              # frozen: response records, design, evaluation split
+│   ├── test_dataset/              # frozen: built by 1_code/_setup/01_
+│   │   ├── sites.csv              # one row per survey unit, all sources
+│   │   ├── vascular_plant.csv     # survey_unit_id + species columns
+│   │   ├── bryophyte.csv
+│   │   ├── lichen.csv
+│   │   ├── mite.csv
+│   │   └── mammal.csv
 │   └── v2_scripts/                # as-received from leads, unmodified
 │       ├── birds/
 │       ├── mammals/
 │       └── plants/
 │
 ├── 1_code/
+│   ├── _setup/                    # one-off; not run per experiment
+│   │   └── 01_harmonize_model_ready_v2.R
 │   ├── harness/                   # shared, taxon-agnostic
 │   │   ├── data_load.R
 │   │   ├── data_split.R
@@ -163,7 +171,9 @@ sdm_methods_dev/
 
 ### `0_data/`
 
-Read-only. Nothing in this folder is written by code in this repository.
+Read-only during experiments. The one exception is `1_code/_setup/`, which
+builds `test_dataset/` by hand and once per source snapshot; nothing in the
+harness, modules, or experiments writes here.
 
 `test_dataset/` holds the frozen cross-taxa dataset. Its contents do not
 change between experiments. Amendments require a version increment and a
@@ -194,6 +204,31 @@ and should be reviewed accordingly.
 the working directory set to its run root and mirrors output to a log; it
 also restores the runner's own objects afterwards, because every v2 script
 opens with `rm(list = ls())`. `stage_v2_inputs.R` builds the run root.
+
+`_setup/` holds one-off scripts that prepare the repository itself. Nothing
+here runs as part of an experiment: these are run by hand, once, when the
+repository or its dataset is first assembled or a source snapshot is
+replaced. They are numbered because they have a run order among themselves,
+and the leading underscore keeps them sorted clear of the run-time code.
+
+`_setup/01_harmonize_model_ready_v2.R` reads the six `model_ready_v2`
+snapshot files (four plant-group `.Rdata` files and the two mammal
+`SpTable` files) and writes them to `0_data/test_dataset/` as CSVs
+sharing one convention: `sites.csv` holds one row per survey unit with
+every identity, design and location field, and one CSV per taxon
+(`vascular_plant`, `bryophyte`, `lichen`, `mite`, `mammal`) holds
+`survey_unit_id` plus that taxon's species columns. Join any taxon CSV to
+`sites.csv` on `survey_unit_id`. The response only is carried; model
+covariates stay in the source objects.
+
+Mammal species names are resolved against `WildTrax Species Strings.RData`
+on the ABMI Mammals shared drive, so the North and South files reach the
+same column name by way of that lookup rather than a local naming rule. A
+species the lookup does not carry keeps its source spelling and is reported
+at run time; as of the 2024 snapshot that is `Raccoon` alone.
+
+Set `SDM_SNAPSHOT_V2` and `SDM_WT_SPECIES` to read the snapshot and the
+lookup from somewhere other than ABMI-DATA2 and the shared drive.
 
 `modules/` holds taxon-specific modelling code.
 Modules stay thin (just what is needed to run a model): experiment-specific logic
