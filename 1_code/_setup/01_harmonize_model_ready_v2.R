@@ -535,7 +535,12 @@ read_plant_taxon <- function(path, taxon) {
 #' Read One Mammal Snapshot File
 #'
 #' Reads the camera tibble `d` and harmonizes its species-season
-#' column names. NAs in the species cells are preserved.
+#' column names. The values are densities.
+#'
+#' The v2 script 02_process-data-files.R sets a season's
+#' densities to NA when that season has fewer than 10
+#' camera-days, so an NA records too little effort to estimate
+#' from.
 #'
 #' @param path Character. Path to a mammal .RData file.
 #' @param region Character. "north" or "south".
