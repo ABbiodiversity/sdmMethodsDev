@@ -6,37 +6,44 @@
 # outputs: none
 # notes:
 #   - Defines the species each taxon is modelled on. Sourced by
-#     run.R and passed to stage_v2_inputs(), which narrows the
-#     staged species queue to these names.
-#   - NULL models every species in the source data. A short
-#     vector is the smoke test - the v2 scripts hard-code 100
-#     bootstrap iterations, so species count is the only run
-#     length that can be varied without touching v2 code.
-#   - Names must match the species columns in the v2 data
-#     exactly. stage_v2_inputs() stops and lists any name it
-#     cannot find, so a typo fails before modelling starts.
-#   - The placeholder vectors below are illustrative. Replace
-#     them with real species codes before running.
+#     run.R and passed to the module scripts, which narrow the
+#     work queue to these names.
+#   - NULL models every species the snapshot declares as
+#     modelled, which is the parity setting: exp_000 has to cover
+#     what v2 covered.
+#   - A short vector is the smoke test. Species count and
+#     boot_iter are both adjustable now, but boot_iter has to
+#     stay at the v2 value for a parity run, so the species
+#     vector is what a trial run should shorten.
+#   - Names must match the species columns exactly.
+#     load_plant_model_data() stops and lists any name it cannot
+#     find, so a typo fails before modelling starts.
+#   - The names are those in lookup/modelled_species.csv, which
+#     is written from the snapshot's own veg.species.list and
+#     soil.species.list. To see the options for a taxon:
+#
+#     modelled <- read.csv(
+#       "0_data/test_dataset/lookup/modelled_species.csv"
+#     )
+#     head(modelled[modelled$taxon == "mite", ])
 # ---
 
 # 1. Species vectors ----
 
 ## 1.1 Bryophytes ----
-# NULL runs every bryophyte in the data.
+# 134 modelled species: 133 north, 32 south.
 bryophyte_species <- NULL
 
 ## 1.2 Lichens ----
+# 191 modelled species: 175 north, 55 south.
 lichen_species <- NULL
 
 ## 1.3 Soil mites ----
-# Placeholder - replace with species codes from the v2 mite data.
-mite_species <- c(
-  "species_code_1",
-  "species_code_2",
-  "species_code_3"
-)
+# 125 modelled species: 116 north, 34 south.
+mite_species <- NULL
 
 ## 1.4 Vascular plants ----
+# 486 modelled species: 353 north, 269 south.
 vascular_plant_species <- NULL
 
 # End of script ----

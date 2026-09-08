@@ -1,6 +1,6 @@
 # exp_000_parity_v2
 
-![Status](https://img.shields.io/badge/Status-Scaffolded-yellow)
+![Status](https://img.shields.io/badge/Status-Partially%20running-yellow)
 ![Languages](https://img.shields.io/badge/Languages-R-blue)
 
 The validation gate. Runs the v2.0 models through this repository's
@@ -9,8 +9,8 @@ v2.0 outputs.
 
 ## Question
 
-Does running the unmodified v2 scripts through this repository's
-harness and modules reproduce the v2.0 results?
+Does running the rewritten v2 modelling code, on the harmonized test
+dataset, through this repository's pipeline reproduce the v2.0 results?
 
 Everything downstream depends on the answer. Later experiments are
 compared against this one, so a difference here is a difference in the
@@ -20,9 +20,9 @@ plumbing, not in the method being tested.
 
 | Element | Value |
 | --- | --- |
-| Taxa | Set per run in `run.R` (`mites <- TRUE`, and so on) |
+| Taxa | Set per run in `run.R` section 1.4 (`mites <- TRUE`, and so on) |
 | Species | Set per taxon in `utils/species_lists.R`; `NULL` runs all |
-| Bootstraps | 100, hard-coded in the v2 scripts |
+| Bootstraps | `boot_iter` in `run.R`; must stay at the v2 value of `1:100` for parity |
 | Reference | The published v2.0 output — source still to be agreed |
 | Target | Not yet defined; to be agreed per taxon |
 
@@ -30,21 +30,30 @@ plumbing, not in the method being tested.
 
 | File | Purpose |
 | --- | --- |
-| `run.R` | Entry point. Taxon flags, staging, module calls |
+| `run.R` | Entry point. Paths, taxon flags, stage flags, run length |
 | `utils/species_lists.R` | The species vector for each taxon |
-| `01_collect_results.R` | Raw v2 output → flat summary tables |
+| `01_collect_results.R` | Model output → flat summary tables |
 | `02_compare_to_v2.R` | The parity comparison itself |
 | `03_build_report.R` | Tables and figures → `report.md` |
 
 ## How to run
 
-1. Set `SDM_V2_ROOT` to the v2 project holding the source data. It is
-   read only, and only while staging.
-2. Edit `utils/species_lists.R` to name the species to model. Start
-   short — the v2 scripts always run 100 bootstraps, so the species
-   count is the only way to shorten a run.
-3. Set the taxon flags in `run.R` section 1.4.
-4. Run `run.R` from the repository root.
+1. Build the test dataset first, if it is not already there — see
+   [Setup](../../../README.md#setup) in the repository README. A run needs
+   only `0_data/test_dataset/`, not the v2 project.
+2. Edit `run.R`:
+   - **1.3** where the run reads and writes. The defaults follow the
+     repository conventions; point `pipeline_dir` at a scratch disk for a
+     long run.
+   - **1.4** the taxon flags.
+   - **1.5** the stage flags. `02` needs what `01` wrote and `03` needs what
+     `02` wrote, so a stage can be run alone only once the ones before it
+     have run into the same `pipeline_dir`.
+   - **1.6** the run length. Leave it at the v2 values for parity.
+3. Name the species in `utils/species_lists.R`. `NULL` runs every modelled
+   species; a short vector is the smoke test, and is the right way to
+   shorten a trial run since `boot_iter` has to stay at `1:100`.
+4. Run from the repository root:
 
 ```r
 source("1_code/experiments/exp_000_parity_v2/run.R")
@@ -52,21 +61,37 @@ source("1_code/experiments/exp_000_parity_v2/run.R")
 
 ## Outputs
 
-Intermediates, per taxon, in `2_pipeline/exp_000_parity_v2/`:
+Intermediates, per taxon, in `pipeline_dir`
+(`2_pipeline/exp_000_parity_v2/` by default):
 
-- `<taxon>/` — the staged run root, plus the raw v2 model and
-  validation output. Gitignored; too large to commit.
-- `logs/` — one timestamped log per pipeline step.
+- `<taxon>/bootstrap/` — the per-species bootstrap site ids.
+- `<taxon>/models/` — the fitted climate, vegetation and soil
+  coefficients. Gitignored; 100 bootstraps by every species by three
+  model families is too large to commit.
+- `<taxon>/validation/` — the per-bootstrap fit measures.
+- `logs/` — one timestamped log per stage.
 
-Deliverables in `3_output/exp_000_parity_v2/`:
+Deliverables in `out_dir` (`3_output/exp_000_parity_v2/` by default):
 
 - `tables/`, `figures/`, `report.md` — committed, so comparisons
   across experiments can be made from the repository alone.
 
 ## Status
 
-Scaffolded. The taxon modules and staging run; `01`–`03` are
-placeholders pending two decisions:
+The climate and soil model sets run end to end. Three things are
+outstanding:
 
-- Where the v2.0 reference output comes from.
-- What the minimum acceptable parity target is, per taxon.
+- **The vegetation models cannot be fitted.** The prediction matrix in the
+  snapshot is missing four columns the v2 vegetation models are predicted
+  onto. See [Known gaps](../../../README.md#known-gaps) — it is one file
+  away from working, and `02_hierarchical_models.R` stops with the missing
+  columns named rather than failing partway through a run.
+- **The v2.0 reference source** is undecided: a frozen snapshot under
+  `0_data/` or the external v2 project.
+- **The parity target** is undefined, per taxon.
+
+`01`–`03` are placeholders pending the last two.
+
+Note that the v2 bootstrap draws without a fixed seed, so successive runs
+of identical code differ. `boot_seed` in `run.R` fixes the stream when a
+run needs to be repeatable; `NULL` reproduces v2.

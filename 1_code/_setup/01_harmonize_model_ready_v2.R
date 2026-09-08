@@ -22,6 +22,21 @@
 #     - lichen.csv          survey_unit_id + species columns
 #     - mite.csv            survey_unit_id + species columns
 #     - mammal.csv          survey_unit_id + species columns
+#   in 0_data/test_dataset/covariates/, per plant-group taxon:
+#     - <taxon>_climate.csv  survey_unit_id + climate covariates
+#     - <taxon>_veg.csv      survey_unit_id + north veg and HF
+#     - <taxon>_soil.csv     survey_unit_id + south soil and HF
+#   and for mammals, per region:
+#     - mammal_north_climate.csv, mammal_north_veg.csv
+#     - mammal_south_climate.csv, mammal_south_soil.csv
+#   in 0_data/test_dataset/lookup/:
+#     - veg_prediction_matrix.csv   north habitat prediction grid
+#     - soil_prediction_matrix.csv  south habitat prediction grid
+#     - modelled_species.csv        which species each model set
+#                                   is fitted for, per plant taxon
+#     - mammal_<region>_prediction_matrix.csv
+#     - mammal_modelled_species.csv
+#     - mammal_climate_predictions.csv
 # notes:
 #   Source files use two incompatible survey designs, so
 #   they are harmonized into one shared convention rather than
@@ -29,6 +44,46 @@
 #   that taxon's species columns, and every identity, design and
 #   location field is factored out into sites.csv. Join any taxon
 #   CSV to sites.csv on survey_unit_id.
+#
+#   The response tables above carry detections only. The
+#   covariate and lookup tables carry everything else the v2
+#   hierarchical models regress against, so the modelling code in
+#   1_code/modules/plants/ can run from 0_data/test_dataset/
+#   alone rather than reaching back to the snapshot.
+#
+#   Covariates are written per taxon rather than once, because
+#   the four files do not agree. Bryophyte, lichen and vascular
+#   plant share identical veg and soil values on shared survey
+#   units, but mite does not: its veg and soil blocks differ on
+#   nearly every column while its climate block matches exactly.
+#   That points at a different spatial support or HF vintage in
+#   the mite source, so the four are kept separate rather than
+#   reconciled here.
+#
+#   Mammal covariates come from the same two SpTable files as
+#   the mammal response, because those files are themselves the
+#   output of the v2 scripts in 0_data/v2_scripts/mammals/. Their
+#   embedded pred_matrix objects were checked against
+#   prediction-matrix_north.csv and Prediction matrix for ABMI
+#   South coefficients 2020.csv on the ABMI Mammals drive and are
+#   identical, so no separate lookup is needed for them.
+#
+#   Mammals are written per region rather than per taxon. North
+#   and south are separate models on overlapping deployments -
+#   512 location_project values appear in both files - so their
+#   covariates cannot be stacked into one table the way the
+#   response is.
+#
+#   Set SDM_V2_LOOKUP to the v2 project folder holding
+#   veg-prediction-matrix-CC_2024.csv and
+#   soil-prediction-matrix_2024.csv. Without it the prediction
+#   matrices fall back to the snapshot's veg.pm and soil.pm, and
+#   the vegetation models cannot be fitted - see section 1.5.
+#
+#   Future improvement - the plant-group files are read twice,
+#   once for the response and once for the covariates. That is
+#   simpler to follow than threading one environment through both
+#   readers, and this script runs once per snapshot.
 # ---
 
 # 1. Setup ----
@@ -54,6 +109,11 @@ snapshot_dir <- Sys.getenv(
 # every experiment then treats the result as fixed. The CSVs are
 # gitignored along with the rest of 0_data/.
 output_dir <- file.path(project_root, "0_data/test_dataset")
+
+# Covariates and lookups are split into their own folders so the
+# response tables stay the obvious contents of test_dataset/.
+covariate_dir <- file.path(output_dir, "covariates")
+lookup_dir <- file.path(output_dir, "lookup")
 
 ## 1.3 Name the source files ----
 # Plant-group files share one schema, mammal files another.
@@ -155,7 +215,123 @@ plant_site_cols <- c(
   "Protocol"
 )
 
-## 1.5 Name the WildTrax species lookup ----
+# Of those, the fields sites.csv already carries. They are
+# dropped from the climate covariate table so each value has one
+# home, and the model-data loader joins them back from sites.csv
+# under their v2 names.
+plant_site_cols_in_sites <- c(
+  "Lat",
+  "Long",
+  "Elevation",
+  "NR",
+  "NSR",
+  "LufName",
+  "Easting",
+  "Northing"
+)
+
+# And the ones that are products of other stored columns. They
+# are not written: the model-data loader recomputes them with the
+# same expressions 01a_data-standardization.R used.
+#
+# Storing them would be worse than redundant. A CSV holds about
+# 15 significant digits, so Northing lands within ~2e-9 of the
+# source value; squaring it lifts that to ~0.05 in absolute
+# terms. Written and read back independently, Northing2 would no
+# longer be exactly Northing * Northing, and a model fitting both
+# would see an inconsistent pair. Deriving keeps them consistent
+# with whatever precision the stored columns carry.
+plant_site_cols_derived <- c(
+  "Easting2",
+  "Northing2",
+  "EastingNorthing",
+  "MAPPET",
+  "MAT2",
+  "CMDMAT",
+  "MWMT2"
+)
+
+## 1.5 Name the mammal column blocks ----
+# The mammal files are one frame, `d`, holding design fields,
+# species-season columns and covariates. The species span is
+# given by the file's own first_sp_col/last_sp_col indices, and
+# the rest is split by naming the two non-habitat blocks; what
+# is left over is habitat. That is the same split-by-elimination
+# the plant-group reader uses, and section 6.6 checks that the
+# three blocks account for every column.
+
+# Design and identity fields. sites.csv already carries these,
+# so they are dropped from the covariate tables.
+mammal_site_cols <- c(
+  "project",
+  "location",
+  "SummerDays",
+  "WinterDays",
+  "Lat",
+  "Long",
+  "NearestSite",
+  "NR",
+  "NSR",
+  "LUF",
+  "Lured"
+)
+
+# Model covariates that are not habitat: climate, the aspen and
+# Peace River terms, the subregion factor, the deployment key the
+# climate predictions join on, and the seasonal model weights.
+# Not every column is in both files - pAspen and PeaceRiver are
+# south only, NSR1 north only.
+mammal_climate_cols <- c(
+  "AHM",
+  "PET",
+  "FFP",
+  "MAP",
+  "MAT",
+  "MCMT",
+  "MWMT",
+  "TrueLat",
+  "pAspen",
+  "NSR1",
+  "PeaceRiver",
+  "location_project",
+  "wt_summer",
+  "wt_winter"
+)
+
+## 1.6 Name the mammal climate predictions ----
+# The mammal habitat models take a climate offset rather than
+# fitting climate themselves: 03_basic-models.R reads this file
+# for both regions. It is produced by a separate climate
+# pipeline, so it is copied in rather than derived here.
+mammal_climate_pred_file <- Sys.getenv(
+  "SDM_MAMMAL_CLIMATE_PRED",
+  unset = paste0(
+    "G:/Shared drives/ABMI Mammals/Results/Habitat Modeling/",
+    "2024/Climate/Predictions/",
+    "All Species Climate Predictions.csv"
+  )
+)
+
+## 1.7 Name the v2 prediction-matrix lookups ----
+# The v2 modelling scripts do not use the veg.pm and soil.pm
+# objects carried in the snapshot. They read these two CSVs from
+# the v2 project instead, and the two are not the same: veg.pm is
+# missing the aggregate habitat columns - Peatland, Mineral,
+# Upland and CCR1234 - that four of the twelve vegetation models
+# are predicted onto.
+#
+# So the CSVs are preferred when SDM_V2_LOOKUP points at them,
+# and the snapshot objects are the fallback. Section 7.4 says
+# which was used, because a fallback run cannot fit the
+# vegetation models.
+v2_lookup_dir <- Sys.getenv("SDM_V2_LOOKUP", unset = NA_character_)
+
+v2_lookup_files <- c(
+  veg_prediction_matrix = "veg-prediction-matrix-CC_2024.csv",
+  soil_prediction_matrix = "soil-prediction-matrix_2024.csv"
+)
+
+## 1.8 Name the WildTrax species lookup ----
 # The naming authority for mammal species.
 wt_species_file <- Sys.getenv(
   "SDM_WT_SPECIES",
@@ -165,7 +341,7 @@ wt_species_file <- Sys.getenv(
   )
 )
 
-## 1.6 Check the inputs are reachable ----
+## 1.9 Check the inputs are reachable ----
 # Fail before any reading, so a disconnected drive is obvious.
 all_files <- c(
   file.path(snapshot_dir, c(plant_files, mammal_files)),
@@ -409,7 +585,9 @@ normalize_mammal_column <- function(x, native_sp, label) {
 #' @param taxon Character. Taxon slug, used in messages and in
 #'   the site table.
 #' @return A list with `species` (survey_unit_id + species
-#'   columns) and `sites` (one row per survey unit).
+#'   columns), `sites` (one row per survey unit), `climate` and
+#'   `habitat` (the two covariate blocks), `pred_matrix`, and
+#'   `species_lists` (the four sp_table vectors as one frame).
 #'
 #' @example # Example usage of the function
 #' # out <- read_plant_taxon("mite-model-data.Rdata", "mite")
@@ -530,7 +708,144 @@ read_plant_taxon <- function(path, taxon) {
   return(list(species = species, sites = sites))
 }
 
-## 2.7 read_mammal_region() ----
+## 2.7 read_plant_covariates() ----
+
+#' Read One Plant-Group File's Covariate and Lookup Blocks
+#'
+#' Companion to `read_plant_taxon()`, which takes the response.
+#' This takes what the v2 hierarchical models regress against:
+#' the climate block, the north vegetation and HF block, the
+#' south soil and HF block, the two habitat prediction matrices,
+#' and the lists naming which species each model set is fitted
+#' for.
+#'
+#' The habitat blocks are found by difference rather than by
+#' position. `climate.data` is identity + species + climate, so
+#' whatever `veg.data` holds that `climate.data` does not is the
+#' vegetation block, and likewise for soil. That reproduces the
+#' positional spans the v2 scripts hard-code - `[403:489]` for
+#' bryophytes, `[448:534]`, `[328:414]` and `[1408:1494]` for the
+#' other three - without depending on column order staying put.
+#'
+#' @param path Character. Path to a plant-group .Rdata file.
+#' @param taxon Character. Taxon slug, used in messages.
+#' @return A list with `climate`, `veg` and `soil` (each
+#'   survey_unit_id + that block's columns), `veg_pm` and
+#'   `soil_pm` (the prediction matrices), and `species_lists`
+#'   (taxon, species, in_veg_models, in_soil_models).
+#'
+#' @example # Example usage of the function
+#' # out <- read_plant_covariates("mite-model-data.Rdata", "mite")
+#' # dim(out$veg)
+read_plant_covariates <- function(path, taxon) {
+  env <- load_rdata(path)
+  clim <- env$climate.data
+  clim_cols <- names(clim)
+
+  # Step 1: Take the climate block, minus the fields sites.csv
+  # already carries, in the order plant_site_cols declares.
+  climate_cols <- setdiff(
+    intersect(plant_site_cols, clim_cols),
+    c(plant_site_cols_in_sites, plant_site_cols_derived)
+  )
+
+  climate <- data.frame(
+    survey_unit_id = as.character(clim$SiteYearQu),
+    clim[, climate_cols, drop = FALSE],
+    stringsAsFactors = FALSE
+  )
+
+  # Step 2: Take each habitat block by difference from
+  # climate.data, which leaves the covariates behind and drops
+  # the identity, species and climate columns both frames share.
+  take_block <- function(frame) {
+    block_cols <- setdiff(names(frame), clim_cols)
+
+    data.frame(
+      survey_unit_id = as.character(frame$SiteYearQu),
+      frame[, block_cols, drop = FALSE],
+      stringsAsFactors = FALSE
+    )
+  }
+
+  veg <- take_block(env$veg.data)
+  soil <- take_block(env$soil.data)
+
+  # Step 3: The v2 coefficient template is the first 87 columns
+  # of this block, taken positionally. A snapshot that reordered
+  # or shortened it would silently rename every vegetation
+  # coefficient, so the width is checked rather than assumed.
+  if (ncol(veg) - 1 < 87) {
+    stop(
+      taxon,
+      ": vegetation block has ",
+      ncol(veg) - 1,
+      " columns; the coefficient template needs at least 87.",
+      call. = FALSE
+    )
+  }
+
+  # Step 4: All three frames must describe the same survey units
+  # in the same order, or the tables cannot be recombined on
+  # survey_unit_id downstream.
+  if (
+    !identical(climate$survey_unit_id, veg$survey_unit_id) ||
+      !identical(climate$survey_unit_id, soil$survey_unit_id)
+  ) {
+    stop(
+      taxon,
+      ": climate, veg and soil frames do not share one survey ",
+      "unit ordering.",
+      call. = FALSE
+    )
+  }
+
+  # Step 5: Record which species each model set is fitted for.
+  # These are subsets of the response columns, and the v2 scripts
+  # read them straight out of the .Rdata, so they have to travel
+  # with the dataset or the work queue cannot be rebuilt.
+  modelled <- union(env$veg.species.list, env$soil.species.list)
+
+  # The two lists are separately ordered, and the v2 scripts walk
+  # each in its own order. A single stacked table would lose that,
+  # so each species carries its position in whichever lists hold
+  # it, and the loader sorts on those rather than on the row
+  # order of this file.
+  species_lists <- data.frame(
+    taxon = taxon,
+    species = modelled,
+    in_veg_models = modelled %in% env$veg.species.list,
+    in_soil_models = modelled %in% env$soil.species.list,
+    veg_order = match(modelled, env$veg.species.list),
+    soil_order = match(modelled, env$soil.species.list),
+    stringsAsFactors = FALSE
+  )
+
+  message(
+    "  ",
+    taxon,
+    ": ",
+    ncol(climate) - 1,
+    " climate, ",
+    ncol(veg) - 1,
+    " veg, ",
+    ncol(soil) - 1,
+    " soil covariates; ",
+    nrow(species_lists),
+    " modelled species"
+  )
+
+  return(list(
+    climate = climate,
+    veg = veg,
+    soil = soil,
+    veg_pm = env$veg.pm,
+    soil_pm = env$soil.pm,
+    species_lists = species_lists
+  ))
+}
+
+## 2.8 read_mammal_region() ----
 
 #' Read One Mammal Snapshot File
 #'
@@ -633,6 +948,90 @@ read_mammal_region <- function(path, region, native_sp) {
     stringsAsFactors = FALSE
   )
 
+  # Step 5: Split the covariates off the same frame. The species
+  # span is already known, and the two non-habitat blocks are
+  # named in section 1.5, so habitat is what is left. The unit
+  # ids are reused rather than rebuilt: make_unique_ids() numbers
+  # duplicate deployments, and a second call would have to
+  # reproduce that numbering exactly.
+  take_block <- function(wanted) {
+    present <- intersect(wanted, names(d))
+
+    data.frame(
+      survey_unit_id = unit_id,
+      d[, present, drop = FALSE],
+      check.names = FALSE,
+      stringsAsFactors = FALSE
+    )
+  }
+
+  climate <- take_block(mammal_climate_cols)
+
+  habitat_cols <- setdiff(
+    names(d),
+    c(mammal_site_cols, mammal_climate_cols, species_cols)
+  )
+  habitat <- take_block(habitat_cols)
+
+  # The four blocks must partition `d` exactly. They are built by
+  # difference, so an overlap or a gap would quietly move a
+  # column into the wrong table.
+  accounted <- length(species_cols) + length(habitat_cols) +
+    length(intersect(mammal_site_cols, names(d))) +
+    length(intersect(mammal_climate_cols, names(d)))
+
+  if (accounted != ncol(d)) {
+    stop(
+      "mammal ",
+      region,
+      ": the design, climate, species and habitat blocks cover ",
+      accounted,
+      " of ",
+      ncol(d),
+      " columns.",
+      call. = FALSE
+    )
+  }
+
+  # Step 6: Record the work queue. Mammals model each season
+  # separately and at two occurrence thresholds - sp_table_* are
+  # the species with at least 20 detections, which get the full
+  # habitat model, and sp_table_*_ua those with at least 3, which
+  # get the use-availability model. One row per species-season,
+  # with its position in each list it belongs to.
+  season_lists <- list(
+    summer = list(
+      modelled = env$sp_table_summer,
+      ua = env$sp_table_summer_ua
+    ),
+    winter = list(
+      modelled = env$sp_table_winter,
+      ua = env$sp_table_winter_ua
+    )
+  )
+
+  species_lists <- do.call(rbind, lapply(
+    names(season_lists),
+    function(season) {
+      lists <- season_lists[[season]]
+      all_species <- union(lists$modelled, lists$ua)
+
+      data.frame(
+        region = region,
+        season = season,
+        species_season = all_species,
+        species = normalize_mammal_column(
+          all_species, native_sp, paste0("mammal ", region)
+        ),
+        in_models = all_species %in% lists$modelled,
+        in_ua_models = all_species %in% lists$ua,
+        model_order = match(all_species, lists$modelled),
+        ua_order = match(all_species, lists$ua),
+        stringsAsFactors = FALSE
+      )
+    }
+  ))
+
   message(
     "  mammal ",
     region,
@@ -640,10 +1039,21 @@ read_mammal_region <- function(path, region, native_sp) {
     nrow(species),
     " units x ",
     length(species_cols),
-    " species-season columns"
+    " species-season columns; ",
+    ncol(climate) - 1,
+    " climate, ",
+    ncol(habitat) - 1,
+    " habitat covariates"
   )
 
-  return(list(species = species, sites = sites))
+  return(list(
+    species = species,
+    sites = sites,
+    climate = climate,
+    habitat = habitat,
+    pred_matrix = as.data.frame(env$pred_matrix),
+    species_lists = species_lists
+  ))
 }
 
 # 3. Read the sources ----
@@ -662,7 +1072,24 @@ plant_parts <- lapply(
 )
 names(plant_parts) <- names(plant_files)
 
-## 3.2 Read the mammal files ----
+## 3.2 Read the plant-group covariates and lookups ----
+# A second pass over the same four files. The response and the
+# covariates are kept in separate readers because they answer
+# separate questions, and this script runs once per snapshot.
+message("Reading plant-group covariates ...")
+
+covariate_parts <- lapply(
+  names(plant_files),
+  function(taxon) {
+    read_plant_covariates(
+      file.path(snapshot_dir, plant_files[[taxon]]),
+      taxon
+    )
+  }
+)
+names(covariate_parts) <- names(plant_files)
+
+## 3.3 Read the mammal files ----
 # The WildTrax strings are loaded once and passed to both
 # regions, so each resolves its names against the same authority.
 message("Reading mammal files ...")
@@ -849,6 +1276,129 @@ for (taxon in names(species_tables)) {
   }
 }
 
+## 6.3 Covariates must cover the response, unit for unit ----
+# A survey unit with a detection but no covariates would be
+# dropped silently at model time, so the two are required to
+# describe exactly the same set.
+for (taxon in names(covariate_parts)) {
+  response_ids <- species_tables[[taxon]]$survey_unit_id
+
+  for (block in c("climate", "veg", "soil")) {
+    block_ids <- covariate_parts[[taxon]][[block]]$survey_unit_id
+
+    if (!setequal(response_ids, block_ids)) {
+      stop(
+        taxon,
+        ": the ",
+        block,
+        " covariates and the response cover different survey ",
+        "units (",
+        length(setdiff(response_ids, block_ids)),
+        " missing, ",
+        length(setdiff(block_ids, response_ids)),
+        " extra).",
+        call. = FALSE
+      )
+    }
+  }
+}
+
+## 6.4 Modelled species must exist as response columns ----
+# veg.species.list and soil.species.list are the work queue. A
+# name that is not a column would fail per bootstrap inside a
+# tryCatch, so it is caught here instead.
+for (taxon in names(covariate_parts)) {
+  declared <- covariate_parts[[taxon]]$species_lists$species
+  available <- setdiff(
+    names(species_tables[[taxon]]),
+    "survey_unit_id"
+  )
+  unknown <- setdiff(declared, available)
+
+  if (length(unknown) > 0) {
+    stop(
+      taxon,
+      ": ",
+      length(unknown),
+      " modelled species are not response columns:\n  ",
+      paste(utils::head(unknown, 10), collapse = "\n  "),
+      call. = FALSE
+    )
+  }
+}
+
+## 6.5 The prediction matrices must agree across taxa ----
+# They are written once rather than per taxon, which is only
+# sound while all four files carry the same grid.
+for (matrix_name in c("veg_pm", "soil_pm")) {
+  reference <- covariate_parts[[1]][[matrix_name]]
+
+  for (taxon in names(covariate_parts)) {
+    written <- covariate_parts[[taxon]][[matrix_name]]
+
+    if (!identical(written, reference)) {
+      stop(
+        "The ",
+        matrix_name,
+        " prediction matrix in ",
+        taxon,
+        " differs from ",
+        names(covariate_parts)[1],
+        "; it can no longer be written once for all taxa.",
+        call. = FALSE
+      )
+    }
+  }
+}
+
+## 6.6 Mammal habitat must be cover proportions ----
+# The habitat block is what is left once the design, climate and
+# species columns are named, so a new unnamed column would land
+# in it silently. The reader has already checked that the blocks
+# partition the frame; this checks that nothing non-numeric
+# arrived, which is the shape a stray design field would have.
+for (region in names(mammal_parts)) {
+  part <- mammal_parts[[region]]
+
+  habitat_values <- part$habitat[
+    , setdiff(names(part$habitat), "survey_unit_id"),
+    drop = FALSE
+  ]
+
+  non_numeric <- names(habitat_values)[
+    !vapply(habitat_values, is.numeric, logical(1))
+  ]
+
+  if (length(non_numeric) > 0) {
+    stop(
+      "mammal ",
+      region,
+      ": non-numeric column(s) fell into the habitat block: ",
+      paste(non_numeric, collapse = ", "),
+      "\nName them in mammal_site_cols or mammal_climate_cols.",
+      call. = FALSE
+    )
+  }
+}
+
+## 6.7 Mammal species lists must be response columns ----
+for (region in names(mammal_parts)) {
+  declared <- mammal_parts[[region]]$species_lists$species
+  unknown <- setdiff(declared, names(mammal_species))
+
+  if (length(unknown) > 0) {
+    stop(
+      "mammal ",
+      region,
+      ": ",
+      length(unknown),
+      " modelled species are not response columns:\n  ",
+      paste(utils::head(unknown, 10), collapse = "\n  "),
+      call. = FALSE
+    )
+  }
+}
+
 # 7. Write the CSVs ----
 # One file per taxon plus the site table, all sharing the
 # survey_unit_id key.
@@ -880,6 +1430,267 @@ message(
   ncol(sites),
   " cols"
 )
+
+## 7.3 Write the plant-group covariate tables ----
+# Three per taxon, each keyed on survey_unit_id like the response
+# tables, so a model-data frame is rebuilt by joining rather than
+# by trusting column positions.
+dir.create(covariate_dir, recursive = TRUE, showWarnings = FALSE)
+
+for (taxon in names(covariate_parts)) {
+  for (block in c("climate", "veg", "soil")) {
+    path <- file.path(
+      covariate_dir,
+      paste0(taxon, "_", block, ".csv")
+    )
+    fwrite(covariate_parts[[taxon]][[block]], path, na = "")
+
+    message(
+      "Wrote covariates/",
+      basename(path),
+      ": ",
+      nrow(covariate_parts[[taxon]][[block]]),
+      " rows x ",
+      ncol(covariate_parts[[taxon]][[block]]),
+      " cols"
+    )
+  }
+}
+
+## 7.4 Write the shared lookups ----
+# Section 6.5 has already confirmed the two prediction matrices
+# are the same in all four files, so they are written once.
+dir.create(lookup_dir, recursive = TRUE, showWarnings = FALSE)
+
+prediction_matrices <- list(
+  veg_prediction_matrix = covariate_parts[[1]]$veg_pm,
+  soil_prediction_matrix = covariate_parts[[1]]$soil_pm
+)
+
+# Take the v2 CSVs when they are reachable. They are what the v2
+# scripts read, and the snapshot objects are missing columns the
+# vegetation models need.
+for (matrix_name in names(prediction_matrices)) {
+  if (is.na(v2_lookup_dir)) {
+    next
+  }
+
+  source_csv <- file.path(
+    v2_lookup_dir, v2_lookup_files[[matrix_name]]
+  )
+
+  if (file.exists(source_csv)) {
+    prediction_matrices[[matrix_name]] <- as.data.frame(
+      fread(source_csv)
+    )
+    message("  using ", source_csv)
+  } else {
+    warning(
+      "SDM_V2_LOOKUP is set but ",
+      source_csv,
+      " was not found; falling back to the snapshot copy.",
+      call. = FALSE
+    )
+  }
+}
+
+for (matrix_name in names(prediction_matrices)) {
+  path <- file.path(lookup_dir, paste0(matrix_name, ".csv"))
+  fwrite(prediction_matrices[[matrix_name]], path, na = "")
+
+  message(
+    "Wrote lookup/",
+    basename(path),
+    ": ",
+    nrow(prediction_matrices[[matrix_name]]),
+    " rows x ",
+    ncol(prediction_matrices[[matrix_name]]),
+    " cols"
+  )
+}
+
+# The four aggregate columns the vegetation models predict onto.
+# Their absence is what separates the snapshot's veg.pm from the
+# CSV the v2 scripts read, so it is reported here rather than
+# found later by check_prediction_terms().
+veg_aggregates <- c("Peatland", "Mineral", "Upland", "CCR1234")
+absent_aggregates <- setdiff(
+  veg_aggregates,
+  colnames(prediction_matrices$veg_prediction_matrix)
+)
+
+if (length(absent_aggregates) > 0) {
+  message(
+    "  note: the vegetation prediction matrix has no column for ",
+    paste(absent_aggregates, collapse = ", "),
+    ".\n  The vegetation models cannot be fitted until ",
+    v2_lookup_files[["veg_prediction_matrix"]],
+    "\n  from the v2 project is available. Set SDM_V2_LOOKUP to ",
+    "the folder holding it\n  and re-run this script. The ",
+    "climate and soil models are unaffected."
+  )
+}
+
+modelled_species <- do.call(
+  rbind,
+  lapply(covariate_parts, function(x) x$species_lists)
+)
+rownames(modelled_species) <- NULL
+
+modelled_path <- file.path(lookup_dir, "modelled_species.csv")
+fwrite(modelled_species, modelled_path, na = "")
+
+message(
+  "Wrote lookup/modelled_species.csv: ",
+  nrow(modelled_species),
+  " rows x ",
+  ncol(modelled_species),
+  " cols"
+)
+
+## 7.5 Write the mammal covariate tables ----
+# Per region, not per taxon. North and south are separate models
+# on overlapping deployments, so their covariates cannot be
+# stacked the way the response is. The habitat block is named
+# veg in the north and soil in the south, matching the plant
+# convention and the model each one feeds.
+mammal_habitat_names <- c(north = "veg", south = "soil")
+
+for (region in names(mammal_parts)) {
+  blocks <- list(
+    climate = mammal_parts[[region]]$climate,
+    habitat = mammal_parts[[region]]$habitat
+  )
+
+  names(blocks)[2] <- mammal_habitat_names[[region]]
+
+  for (block in names(blocks)) {
+    path <- file.path(
+      covariate_dir,
+      paste0("mammal_", region, "_", block, ".csv")
+    )
+    fwrite(blocks[[block]], path, na = "")
+
+    message(
+      "Wrote covariates/",
+      basename(path),
+      ": ",
+      nrow(blocks[[block]]),
+      " rows x ",
+      ncol(blocks[[block]]),
+      " cols"
+    )
+  }
+}
+
+## 7.6 Write the mammal lookups ----
+# The prediction matrices are per region and were checked against
+# the CSVs on the ABMI Mammals drive, so they are taken from the
+# snapshot rather than copied in.
+for (region in names(mammal_parts)) {
+  path <- file.path(
+    lookup_dir,
+    paste0("mammal_", region, "_prediction_matrix.csv")
+  )
+  fwrite(mammal_parts[[region]]$pred_matrix, path, na = "")
+
+  message(
+    "Wrote lookup/",
+    basename(path),
+    ": ",
+    nrow(mammal_parts[[region]]$pred_matrix),
+    " rows x ",
+    ncol(mammal_parts[[region]]$pred_matrix),
+    " cols"
+  )
+}
+
+# Mammals get their own species table rather than rows in
+# modelled_species.csv: their work queue is season by occurrence
+# threshold, which the plant north/south schema has no room for.
+mammal_modelled <- do.call(
+  rbind,
+  lapply(mammal_parts, function(x) x$species_lists)
+)
+rownames(mammal_modelled) <- NULL
+
+mammal_modelled_path <- file.path(
+  lookup_dir, "mammal_modelled_species.csv"
+)
+fwrite(mammal_modelled, mammal_modelled_path, na = "")
+
+message(
+  "Wrote lookup/mammal_modelled_species.csv: ",
+  nrow(mammal_modelled),
+  " rows x ",
+  ncol(mammal_modelled),
+  " cols"
+)
+
+# The climate offset the mammal habitat models take. It is
+# produced by a separate climate pipeline, so it is copied in
+# with survey_unit_id added, keyed the way the rest of the
+# dataset is. A deployment with no climate prediction keeps the
+# NA the v2 join would have produced.
+if (file.exists(mammal_climate_pred_file)) {
+  climate_pred <- as.data.frame(
+    fread(mammal_climate_pred_file), stringsAsFactors = FALSE
+  )
+
+  unit_lookup <- do.call(rbind, lapply(
+    names(mammal_parts),
+    function(region) {
+      data.frame(
+        survey_unit_id =
+          mammal_parts[[region]]$climate$survey_unit_id,
+        location_project =
+          mammal_parts[[region]]$climate$location_project,
+        stringsAsFactors = FALSE
+      )
+    }
+  ))
+
+  climate_pred <- merge(
+    unit_lookup, climate_pred,
+    by = "location_project", all.x = TRUE, sort = FALSE
+  )
+
+  climate_pred <- climate_pred[
+    , c(
+      "survey_unit_id", "location_project",
+      setdiff(
+        names(climate_pred),
+        c("survey_unit_id", "location_project")
+      )
+    )
+  ]
+
+  climate_pred_path <- file.path(
+    lookup_dir, "mammal_climate_predictions.csv"
+  )
+  fwrite(climate_pred, climate_pred_path, na = "")
+
+  uncovered <- sum(is.na(climate_pred[[3]]))
+
+  message(
+    "Wrote lookup/mammal_climate_predictions.csv: ",
+    nrow(climate_pred),
+    " rows x ",
+    ncol(climate_pred),
+    " cols; ",
+    uncovered,
+    " deployment(s) have no climate prediction"
+  )
+} else {
+  warning(
+    "Mammal climate predictions not found at ",
+    mammal_climate_pred_file,
+    "; the mammal habitat models cannot be fitted without them. ",
+    "Set SDM_MAMMAL_CLIMATE_PRED.",
+    call. = FALSE
+  )
+}
+
 message("Output written to ", output_dir)
 
 # End of script ----
