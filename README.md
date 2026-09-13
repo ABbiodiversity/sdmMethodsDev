@@ -452,7 +452,7 @@ on that basis.
 2. Extend `1_code/_setup/01_harmonize_model_ready_v2.R` to write that
    taxon's covariates and lookups into `0_data/test_dataset/`, and
    `02_validate_test_dataset.R` to trace them back to the snapshot.
-3. Add `1_code/modules/<taxon>/`, modelled on `plants/`: a
+3. Add `1_code/modules/<taxon>/`, modelled on `lichens/`: a
    `load_model_data.R` that rebuilds the frames the scripts expect, the
    numbered stages, and `functions/` for the v2 function files.
 4. Take every path as a parameter, with a documented default. A stage

@@ -46,14 +46,14 @@
 #' # Example usage of the function
 #' run_step(
 #'   label = "02: Hierarchical models (mites)",
-#'   script = "1_code/modules/plants/02_hierarchical_models.R",
+#'   script = "1_code/modules/lichens/02_hierarchical_models.R",
 #'   log_dir = log_path
 #' )
 #'
 #' # Run without writing a log file
 #' run_step(
 #'   label = "02: Hierarchical models (mites)",
-#'   script = "1_code/modules/plants/02_hierarchical_models.R",
+#'   script = "1_code/modules/lichens/02_hierarchical_models.R",
 #'   log_dir = NULL
 #' )
 run_step <- function(label, script, log_dir = NULL) {

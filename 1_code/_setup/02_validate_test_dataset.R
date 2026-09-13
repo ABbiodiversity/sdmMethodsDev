@@ -11,26 +11,40 @@
 #     - lichen.csv
 #     - mite.csv
 #     - mammal.csv
-#     - covariates/<taxon>_{climate,veg,soil}.csv
-#     - covariates/mammal_<region>_{climate,veg|soil}.csv
+#     - bird.csv
+#     - bird_offsets.csv
+#     - covariates.csv
+#     - lookup/covariate_columns.csv
 #     - lookup/veg_prediction_matrix.csv
 #     - lookup/soil_prediction_matrix.csv
 #     - lookup/modelled_species.csv
 #     - lookup/mammal_<region>_prediction_matrix.csv
 #     - lookup/mammal_modelled_species.csv
 #     - lookup/mammal_climate_predictions.csv
+#     - lookup/bird_modelled_species.csv
+#     - lookup/bird_bootstrap_ids.csv
+#     - lookup/bird_factor_levels.csv
 #   from 0_data/data_snapshots/model_ready_v2/ on ABMI-DATA2:
 #     - the four plant-group .Rdata files
 #     - the two mammal SpTable .RData files
+#   from the BirdModels shared drive, read-only:
+#     - Data/Archive/2025/Stratified.Rdata
 # outputs:
 #   - none; every result is printed to the console
 # notes:
 #   Two passes over the harmonized dataset. Section 2 describes
-#   it: sizes, coverage, value ranges, and whether the two-file
-#   layout joins the way it is meant to. Section 3 traces every
+#   it: sizes, coverage, value ranges, and whether the tables
+#   join the way they are meant to. Section 3 traces every
 #   written value back to the snapshot it came from: responses in
-#   3.3 and 3.4, plant-group covariates in 3.5, and mammal
-#   covariates and lookups in 3.6.
+#   3.3 to 3.5, covariates in 3.6, and lookups in 3.7 to 3.9.
+#
+#   Covariates now live in one master table keyed on
+#   survey_unit_id and taxon, not in a file per taxon and block.
+#   Section 3.6 rebuilds each block from it using
+#   lookup/covariate_columns.csv, which maps every master column
+#   back to the block and the v2 spelling it came from. That is
+#   also what catches a column being dropped or renamed, since a
+#   block is only checked against the map's own account of it.
 #
 #   Covariate values are compared on relative difference, not
 #   absolute. A CSV carries about 15 significant digits, so UTMY
@@ -67,7 +81,18 @@ taxa <- c(
   "bryophyte",
   "lichen",
   "mite",
-  "mammal"
+  "mammal",
+  "bird"
+)
+
+# The bird data package, read-only on the BirdModels drive.
+bird_data_file <- Sys.getenv(
+  "SDM_BIRD_DATA",
+  unset = paste0(
+    "G:/.shortcut-targets-by-id/",
+    "17Ymt13eHfKvIiuoMl6x-Kn74Z2uVbbzS/BirdModels/Data/",
+    "Archive/2025/Stratified.Rdata"
+  )
 )
 
 ## 1.3 Read the harmonized CSVs ----
@@ -77,6 +102,17 @@ sp <- lapply(taxa, function(x) {
   fread(file.path(data_dir, paste0(x, ".csv")))
 })
 names(sp) <- taxa
+
+# The master covariate table and the map that says which block
+# and which v2 name each of its columns came from.
+covariates <- fread(
+  file.path(data_dir, "covariates.csv"),
+  na.strings = ""
+)
+
+col_map <- fread(
+  file.path(data_dir, "lookup", "covariate_columns.csv")
+)
 
 # 2. Describe the harmonized dataset ----
 # What the six files hold, and whether they hold together.
@@ -96,6 +132,33 @@ print(data.table(
   )
 ))
 
+## 2.1b Master covariate table ----
+# One row per survey unit and taxon, not per survey unit. The
+# plant files disagree on the same quadrat, so taxon is part of
+# the key; see the header of 01_harmonize_model_ready_v2.R.
+cat("\ncovariates.csv:", nrow(covariates), "rows x",
+  ncol(covariates), "cols\n")
+print(covariates[, .N, by = taxon])
+
+# Columns are the union across taxa, so each taxon fills its own
+# blocks and leaves the rest empty.
+cat("\nnon-empty covariate columns per taxon:\n")
+for (tx in unique(covariates$taxon)) {
+  sub <- covariates[taxon == tx]
+  filled <- sum(vapply(
+    sub, function(x) as.numeric(!all(is.na(x))), numeric(1)
+  ))
+  cat(sprintf(
+    "  %-15s %6d rows, %3d of %3d columns used\n",
+    tx, nrow(sub), filled - 2, ncol(covariates) - 2
+  ))
+}
+
+# Which columns were suffixed because two blocks share a name.
+cat("\ncolumns suffixed by block:",
+  sum(col_map$source_column != col_map$master_column),
+  "of", nrow(col_map), "\n")
+
 ## 2.2 Site table ----
 # Structure of sites.csv
 str(sites)
@@ -103,6 +166,7 @@ str(sites)
 # One row per design; each leaves the other's fields empty
 print(head(sites[survey_design == "plant_quadrant"], 3))
 print(head(sites[survey_design == "mammal_camera"], 3))
+print(head(sites[survey_design == "bird_point_count"], 3))
 
 # Survey units by design and region
 print(sites[, .N, by = .(survey_design, region)])
@@ -143,12 +207,14 @@ for (tx in taxa) {
 }
 
 ## 2.4 Response values per taxon ----
-# Plants are 0/1 presence-absence, with no NAs.
-# Mammals are densities. A mammal NA is not a missing
-# record either. The v2 script 02_process-data-files.R
-# sets a season's densities to NA when that season has
-# fewer than 10 camera-days, so NA means too little
-# effort to estimate from.
+# Three response scales, one per design.
+#   Plants are 0/1 presence-absence, with no NAs.
+#   Mammals are densities. A mammal NA is not a missing record:
+#   the v2 script 02_process-data-files.R sets a season's
+#   densities to NA when that season has fewer than 10
+#   camera-days, so NA means too little effort to estimate from.
+#   Birds are integer point counts, paired with a QPAD log
+#   offset per survey and species in bird_offsets.csv.
 # fill is the share of observed cells with a detection.
 for (tx in taxa) {
   m <- as.matrix(sp[[tx]][, -1])
@@ -595,121 +661,194 @@ derived_terms <- list(
   MWMT2 = function(d) d$MWMT * d$MWMT
 )
 
-for (taxon in names(plant_files)) {
-  src <- read_source(plant_files[[taxon]])
-  clim <- src$climate.data
-  rownames(clim) <- clim$SiteYearQu
+#' Check One Taxon's Covariate Blocks Against Their Source
+#'
+#' Rebuilds each block from the master table using the column
+#' map, then compares it to the frame it came from. The map is
+#' what makes this possible: a master column may be suffixed
+#' with its block, so the v2 spelling cannot be recovered from
+#' the header alone.
+#'
+#' @param taxon_label Character. Value in covariates$taxon.
+#' @param source_frames Named list of source data frames, one
+#'   per block, named as the map names the blocks.
+#' @param source_ids Character. The survey_unit_id each source
+#'   row corresponds to, in source row order. NULL where the
+#'   source has no key that survives into the dataset, as for
+#'   mammals, whose repeated deployments are disambiguated with
+#'   a numbered suffix; the rows are then compared by position
+#'   and the row count is asserted instead.
+#' @param label Character. Name used in the check output.
+#' @return Invisibly NULL. Records checks through note().
+#'
+#' @example # Example usage of the function
+#' # check_covariates("mite", frames, ids, "mite")
+check_covariates <- function(taxon_label, source_frames,
+                             source_ids, label) {
+  sub <- as.data.frame(covariates[taxon == taxon_label])
 
-  blocks <- list(
-    climate = clim,
-    veg = src$veg.data,
-    soil = src$soil.data
+  note(
+    label,
+    "covariate rows present",
+    nrow(sub) > 0,
+    paste(nrow(sub), "rows")
   )
 
-  for (block in names(blocks)) {
-    csv_path <- file.path(
-      data_dir, "covariates", paste0(taxon, "_", block, ".csv")
+  if (nrow(sub) == 0) {
+    return(invisible(NULL))
+  }
+
+  # Step 1: Line the rows up with the source before any value is
+  # compared, by key where there is one and by position where
+  # there is not
+  n_source <- nrow(source_frames[[1]])
+
+  if (is.null(source_ids)) {
+    note(
+      label,
+      "covariate row count matches source",
+      nrow(sub) == n_source,
+      paste(nrow(sub), "vs", n_source, "source rows")
     )
 
-    if (!file.exists(csv_path)) {
-      note(taxon, paste(block, "covariates written"), FALSE,
-           "file not found")
-      next
+    if (nrow(sub) != n_source) {
+      return(invisible(NULL))
     }
 
-    csv <- as.data.frame(fread(csv_path, na.strings = ""))
-    source_frame <- blocks[[block]]
-
-    # Every written column must exist in the source, and the
-    # survey units must line up before values are compared.
-    cols <- setdiff(names(csv), "survey_unit_id")
-    absent <- setdiff(cols, names(source_frame))
+    row_order <- seq_len(nrow(sub))
+  } else {
+    row_order <- match(sub$survey_unit_id, source_ids)
 
     note(
-      taxon,
-      paste(block, "columns exist in source"),
-      length(absent) == 0,
-      if (length(absent) > 0) {
-        paste(utils::head(absent, 5), collapse = ", ")
-      } else {
-        paste(length(cols), "columns")
-      }
-    )
-
-    if (length(absent) > 0) {
-      next
-    }
-
-    row_order <- match(
-      csv$survey_unit_id, as.character(source_frame$SiteYearQu)
-    )
-
-    note(
-      taxon,
-      paste(block, "keys resolve in source"),
+      label,
+      "covariate keys resolve in source",
       !anyNA(row_order),
-      paste(nrow(csv), "rows")
+      paste(sum(is.na(row_order)), "unresolved")
     )
 
     if (anyNA(row_order)) {
+      return(invisible(NULL))
+    }
+  }
+
+  # Step 2: One pass per block the map records for this taxon
+  for (blk in names(source_frames)) {
+    m <- col_map[taxon == taxon_label & block == blk]
+    source_frame <- source_frames[[blk]]
+
+    if (nrow(m) == 0) {
+      note(label, paste(blk, "block recorded in the map"), FALSE)
       next
     }
 
-    numeric_cols <- cols[
-      vapply(source_frame[, cols], is.numeric, logical(1))
-    ]
-
-    cmp <- compare_blocks_rel(
-      csv[, numeric_cols],
-      source_frame[row_order, numeric_cols]
-    )
+    absent_master <- setdiff(m$master_column, names(sub))
+    absent_source <- setdiff(m$source_column, names(source_frame))
 
     note(
-      taxon,
-      paste(block, "numeric values match source"),
-      isTRUE(cmp$n == 0),
-      sprintf("max rel diff %.2e", cmp$max_diff)
-    )
-
-    # Non-numeric columns must round-trip exactly.
-    other_cols <- setdiff(cols, numeric_cols)
-    mismatched <- other_cols[
-      !vapply(
-        other_cols,
-        function(one) {
-          identical(
-            as.character(csv[[one]]),
-            as.character(source_frame[row_order, one])
-          )
-        },
-        logical(1)
-      )
-    ]
-
-    note(
-      taxon,
-      paste(block, "non-numeric values match"),
-      length(mismatched) == 0,
-      if (length(mismatched) > 0) {
-        paste(mismatched, collapse = ", ")
+      label,
+      paste(blk, "columns present both sides"),
+      length(absent_master) == 0 && length(absent_source) == 0,
+      if (length(c(absent_master, absent_source)) > 0) {
+        paste(
+          utils::head(c(absent_master, absent_source), 5),
+          collapse = ", "
+        )
       } else {
-        paste(length(other_cols), "columns")
+        paste(nrow(m), "columns")
       }
     )
+
+    if (length(absent_master) > 0 || length(absent_source) > 0) {
+      next
+    }
+
+    # Step 3: Split by type. Numbers are compared on relative
+    # difference, everything else has to round-trip exactly.
+    is_num <- vapply(
+      m$source_column,
+      function(one) is.numeric(source_frame[[one]]),
+      logical(1)
+    )
+
+    if (any(is_num)) {
+      cmp <- compare_blocks_rel(
+        sub[, m$master_column[is_num], drop = FALSE],
+        source_frame[row_order, m$source_column[is_num],
+          drop = FALSE
+        ]
+      )
+
+      note(
+        label,
+        paste(blk, "numeric values match source"),
+        isTRUE(cmp$n == 0),
+        sprintf(
+          "%d cols, max rel diff %.2e", sum(is_num), cmp$max_diff
+        )
+      )
+    }
+
+    other <- which(!is_num)
+    mismatched <- character(0)
+
+    for (i in other) {
+      got <- as.character(sub[[m$master_column[i]]])
+      src <- source_frame[row_order, m$source_column[i]]
+
+      # A timestamp is stored formatted, not as POSIXct, so that
+      # a CSV round trip cannot shift it by a time zone.
+      if (inherits(src, "POSIXct")) {
+        src <- format(src)
+      }
+
+      if (!identical(got, as.character(src))) {
+        mismatched <- c(mismatched, m$source_column[i])
+      }
+    }
+
+    if (length(other) > 0) {
+      note(
+        label,
+        paste(blk, "non-numeric values match"),
+        length(mismatched) == 0,
+        if (length(mismatched) > 0) {
+          paste(mismatched, collapse = ", ")
+        } else {
+          paste(length(other), "columns")
+        }
+      )
+    }
   }
+
+  invisible(NULL)
+}
+
+for (taxon in names(plant_files)) {
+  src <- read_source(plant_files[[taxon]])
+  clim <- src$climate.data
+
+  check_covariates(
+    taxon,
+    list(
+      climate = clim,
+      veg = src$veg.data,
+      soil = src$soil.data
+    ),
+    as.character(clim$SiteYearQu),
+    taxon
+  )
 
   # The seven derived terms are not stored. Confirm each rebuilds
   # from the stored columns to the value the snapshot holds.
-  clim_csv <- as.data.frame(fread(
-    file.path(
-      data_dir, "covariates", paste0(taxon, "_climate.csv")
-    ),
-    na.strings = ""
-  ))
+  #
+  # The filter value is held in its own variable: `taxon` is also
+  # a column of the master table, and data.table would resolve
+  # both sides of `taxon == taxon` to the column and keep every
+  # row.
+  this_taxon <- taxon
+  clim_csv <- as.data.frame(covariates[taxon == this_taxon])
 
-  sites_csv <- as.data.frame(fread(
-    file.path(data_dir, "sites.csv"), na.strings = ""
-  ))
+  sites_csv <- as.data.frame(sites)
 
   rebuild <- merge(
     clim_csv,
@@ -833,90 +972,20 @@ for (region in names(mammal_files)) {
   d <- as.data.frame(env$d, stringsAsFactors = FALSE)
   label <- paste("mammal", region)
 
-  for (block in c("climate", mammal_habitat_name[[region]])) {
-    csv_path <- file.path(
-      data_dir, "covariates",
-      paste0("mammal_", region, "_", block, ".csv")
-    )
+  # Mammal covariates carry a taxon of mammal_<region>, because
+  # north and south are separate models on overlapping
+  # deployments. The habitat block is called veg in the north and
+  # soil in the south, matching the model each one feeds.
+  habitat <- mammal_habitat_name[[region]]
+  frames <- list(d, d)
+  names(frames) <- c("climate", habitat)
 
-    if (!file.exists(csv_path)) {
-      note(label, paste(block, "covariates written"), FALSE,
-           "file not found")
-      next
-    }
-
-    csv <- as.data.frame(fread(csv_path, na.strings = ""))
-    cols <- setdiff(names(csv), "survey_unit_id")
-    absent <- setdiff(cols, names(d))
-
-    note(
-      label,
-      paste(block, "columns exist in source"),
-      length(absent) == 0,
-      if (length(absent) > 0) {
-        paste(utils::head(absent, 5), collapse = ", ")
-      } else {
-        paste(length(cols), "columns")
-      }
-    )
-
-    if (length(absent) > 0) {
-      next
-    }
-
-    # The reader writes rows in source order, so the two frames
-    # line up without a join. Anything else means the ids were
-    # rebuilt rather than reused.
-    note(
-      label,
-      paste(block, "row count matches source"),
-      nrow(csv) == nrow(d),
-      paste(nrow(csv), "rows")
-    )
-
-    if (nrow(csv) != nrow(d)) {
-      next
-    }
-
-    numeric_cols <- cols[
-      vapply(d[, cols, drop = FALSE], is.numeric, logical(1))
-    ]
-
-    cmp <- compare_blocks_rel(
-      csv[, numeric_cols], d[, numeric_cols]
-    )
-
-    note(
-      label,
-      paste(block, "numeric values match source"),
-      isTRUE(cmp$n == 0),
-      sprintf("max rel diff %.2e", cmp$max_diff)
-    )
-
-    other_cols <- setdiff(cols, numeric_cols)
-    mismatched <- other_cols[
-      !vapply(
-        other_cols,
-        function(one) {
-          identical(
-            as.character(csv[[one]]), as.character(d[[one]])
-          )
-        },
-        logical(1)
-      )
-    ]
-
-    note(
-      label,
-      paste(block, "non-numeric values match"),
-      length(mismatched) == 0,
-      if (length(mismatched) > 0) {
-        paste(mismatched, collapse = ", ")
-      } else {
-        paste(length(other_cols), "columns")
-      }
-    )
-  }
+  check_covariates(
+    paste0("mammal_", region),
+    frames,
+    NULL,
+    label
+  )
 
   # The prediction matrix travels with the snapshot rather than
   # being copied from the ABMI Mammals drive, because the two
@@ -1037,6 +1106,178 @@ if (file.exists(climate_pred_path) &&
     "predictions available",
     FALSE,
     "file not found; set SDM_MAMMAL_CLIMATE_PRED"
+  )
+}
+
+## 3.6.2 Bird response, offsets and covariates ----
+# Birds come from one file rather than the snapshot. Its three
+# frames are stored row-aligned on surveyid, so the key is
+# rebuilt the same way 01_harmonize_model_ready_v2.R does.
+if (file.exists(bird_data_file)) {
+  benv <- new.env()
+  load(bird_data_file, envir = benv)
+
+  bcovs <- as.data.frame(benv$covs)
+  bkey <- paste0("bird|", as.integer(bcovs$surveyid))
+
+  bird_csv <- fread(file.path(data_dir, "bird.csv"))
+  bird_spp <- setdiff(names(bird_csv), "survey_unit_id")
+
+  note(
+    "bird",
+    "keys match source, in order",
+    identical(bird_csv$survey_unit_id, bkey),
+    paste(nrow(bird_csv), "surveys")
+  )
+
+  cmp <- compare_blocks(
+    bird_csv[, ..bird_spp], benv$bird[, bird_spp]
+  )
+  note(
+    "bird",
+    "counts match source",
+    isTRUE(cmp$n == 0),
+    sprintf("%d cells, max diff %.1g", cmp$n, cmp$max_diff)
+  )
+
+  # Counts feed a Poisson model, so they have to be whole and
+  # non-negative for the fit to mean anything.
+  bird_counts <- as.matrix(bird_csv[, ..bird_spp])
+  note(
+    "bird",
+    "counts are non-negative whole numbers",
+    !anyNA(bird_counts) &&
+      all(bird_counts >= 0) &&
+      all(bird_counts %% 1 == 0),
+    paste("max", max(bird_counts))
+  )
+
+  # Offsets are response-shaped: one per survey and species, and
+  # the model cannot run without the pair.
+  off_csv <- fread(file.path(data_dir, "bird_offsets.csv"))
+
+  note(
+    "bird",
+    "offsets share the response layout",
+    identical(names(off_csv), names(bird_csv)) &&
+      identical(off_csv$survey_unit_id, bkey),
+    paste(ncol(off_csv) - 1, "species")
+  )
+
+  cmp <- compare_blocks(
+    off_csv[, ..bird_spp], benv$off[, bird_spp]
+  )
+  note(
+    "bird",
+    "offsets match source",
+    isTRUE(cmp$n == 0),
+    sprintf("%d cells, max diff %.1g", cmp$n, cmp$max_diff)
+  )
+
+  note(
+    "bird",
+    "every count has an offset",
+    !anyNA(as.matrix(off_csv[, ..bird_spp])),
+    paste(sum(is.na(as.matrix(off_csv[, ..bird_spp]))), "NA")
+  )
+
+  check_covariates(
+    "bird",
+    list(
+      climate = bcovs,
+      veg = bcovs,
+      soil = bcovs,
+      design = bcovs
+    ),
+    bkey,
+    "bird"
+  )
+
+  ## 3.6.3 Bird lookups ----
+  bird_modelled <- fread(
+    file.path(data_dir, "lookup", "bird_modelled_species.csv")
+  )
+
+  note(
+    "bird",
+    "modelled species round-trip",
+    nrow(bird_modelled) == nrow(benv$birdlist) &&
+      setequal(bird_modelled$species, benv$birdlist$species),
+    paste(
+      nrow(bird_modelled), "rows,",
+      length(unique(bird_modelled$species)), "species"
+    )
+  )
+
+  note(
+    "bird",
+    "modelled species are response columns",
+    all(unique(bird_modelled$species) %in% bird_spp),
+    paste(
+      length(setdiff(unique(bird_modelled$species), bird_spp)),
+      "missing"
+    )
+  )
+
+  # The source names the bootstrap columns "1" to "100", which a
+  # CSV header cannot be told apart from a row of data. They are
+  # renamed on write, so the check is on shape and values.
+  boot_csv <- fread(
+    file.path(data_dir, "lookup", "bird_bootstrap_ids.csv")
+  )
+
+  note(
+    "bird",
+    "bootstrap draws match source",
+    identical(dim(boot_csv), dim(as.data.frame(benv$boot))) &&
+      all(as.matrix(boot_csv) == as.matrix(benv$boot)),
+    paste(nrow(boot_csv), "x", ncol(boot_csv))
+  )
+
+  bird_design_ids <- covariates[taxon == "bird"]$surveyid
+
+  note(
+    "bird",
+    "bootstrap draws resolve to a survey",
+    all(unique(unlist(boot_csv)) %in% bird_design_ids),
+    paste(
+      length(setdiff(unique(unlist(boot_csv)), bird_design_ids)),
+      "orphan draws"
+    )
+  )
+
+  # Factor levels have to travel separately: read back from a
+  # CSV a factor takes alphabetical levels, which moves the
+  # reference level and renames every coefficient.
+  levels_csv <- fread(
+    file.path(data_dir, "lookup", "bird_factor_levels.csv")
+  )
+
+  factor_cols <- names(bcovs)[
+    vapply(bcovs, is.factor, logical(1))
+  ]
+
+  levels_ok <- all(vapply(
+    factor_cols,
+    function(one) {
+      got <- levels_csv[column == one][order(level_order)]$level
+      identical(got, levels(bcovs[[one]]))
+    },
+    logical(1)
+  ))
+
+  note(
+    "bird",
+    "factor levels kept in source order",
+    levels_ok,
+    paste(factor_cols, collapse = ", ")
+  )
+} else {
+  note(
+    "bird",
+    "data package reachable",
+    FALSE,
+    "file not found; set SDM_BIRD_DATA"
   )
 }
 
