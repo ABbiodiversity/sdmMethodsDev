@@ -355,6 +355,19 @@ apply_factor_levels <- function(frame, data_dir, taxon) {
     ordered_levels <- rows$level[order(rows$level_order)]
 
     values <- as.character(frame[[column]])
+
+    # Every harmonized table is written with `na = ""`, so a
+    # missing factor value reads back as a blank string rather
+    # than NA. Left alone it survives as an extra level, and the
+    # guard below then rejects the whole run over a level that
+    # is not a level at all - which is what a blank `soilc`
+    # does to 194 of the 91,001 southern bird surveys.
+    #
+    # v2 never sees this: it reads the same values as NA and
+    # glm's default na.action drops those rows. Restoring the
+    # NA here reproduces that, rather than inventing a rule.
+    values[!nzchar(trimws(values))] <- NA_character_
+
     unknown <- setdiff(stats::na.omit(unique(values)), ordered_levels)
 
     if (length(unknown) > 0) {

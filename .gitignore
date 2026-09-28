@@ -55,5 +55,12 @@ vignettes/*.pdf
 !3_output/**/
 !3_output/**/.gitkeep
 
+# ...but keep the run records. They are the committed artefact
+# of a run: the stores they describe are gitignored, so when
+# those are gone the record is what is left. Small, text, and
+# built to be diffed between experiments.
+!3_output/**/run_record.md
+!3_output/**/run_record.txt
+
 AGENTS.md
 CLAUDE.md

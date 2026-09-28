@@ -46,6 +46,7 @@ load_harness <- function(
     "eval_metrics.R",
     "predict_grid.R",
     "result.R",
+    "run_record.R",
     "run_model.R",
     file.path("utils", "step_runner.R")
   )

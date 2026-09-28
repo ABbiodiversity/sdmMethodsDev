@@ -279,6 +279,10 @@ run_collect <- TRUE
 run_compare <- TRUE
 run_report <- TRUE
 
+# Named write_record rather than run_record, which would shadow
+# the function it calls.
+write_record <- TRUE
+
 # 2. Fit ----
 # One spec per taxon, each writing a result store per region.
 
@@ -344,6 +348,71 @@ if (run_report) {
   source(file.path(exp_code_dir, "03_build_report.R"))
 }
 
+## 3.4 Write the run record ----
+# The one committed artefact of the run. Everything else under
+# 2_pipeline/ and 3_output/ is gitignored, so when the stores
+# are cleared this is what is left to say what happened.
+#
+# The config below is what makes two records comparable, so it
+# holds settings rather than paths: an absolute directory
+# differs between machines and would diff on every line without
+# meaning anything. Volatile values belong in the record's own
+# Provenance section, which run_record() writes.
+if (write_record) {
+  stage_engines <- function(field) {
+    sort(unique(unlist(lapply(
+      specs[run_taxa],
+      function(one) {
+        vapply(one$stages, function(st) st[[field]], character(1))
+      }
+    ))))
+  }
+
+  record_config <- list(
+    taxa = sort(run_taxa),
+    focal_species = if (is.null(focal_species)) {
+      "all"
+    } else {
+      sort(paste0(names(focal_species), "=", focal_species))
+    },
+    species_n = if (is.null(focal_species)) {
+      NA_integer_
+    } else {
+      length(focal_species)
+    },
+    n_bootstraps = n_bootstraps,
+    v2_bootstraps = v2_bootstraps,
+    stage_models = if (is.null(stage_models)) {
+      "spec defaults (v2 candidate sets)"
+    } else {
+      sort(names(stage_models))
+    },
+    engines = stage_engines("engine"),
+    selection = stage_engines("selection"),
+    data_dir = basename(data_dir)
+  )
+
+  # Failures belong in the record. Coverage says what was
+  # produced; without this, a run that lost half its jobs and
+  # one that lost none look alike wherever the survivors agree.
+  if (!is.null(run_log)) {
+    ok_n <- sum(run_log$status == "ok", na.rm = TRUE)
+
+    record_config$jobs_total <- as.integer(nrow(run_log))
+    record_config$jobs_ok <- as.integer(ok_n)
+    record_config$jobs_not_ok <- as.integer(nrow(run_log) - ok_n)
+  }
+
+  record_file <- run_record(
+    pipeline_dir = pipeline_dir,
+    out_file = file.path(out_dir, "run_record.md"),
+    exp_id = exp_id,
+    config = record_config
+  )
+
+  cat("Run record: ", record_file, "\n", sep = "")
+}
+
 # 4. Experiment complete ----
 experiment_time <- format(round(Sys.time() - experiment_start, 1))
 cat("\n========================================\n")
@@ -352,5 +421,7 @@ cat("Total run time: ", experiment_time, "\n", sep = "")
 cat("========================================\n")
 cat("Intermediates are in ", pipeline_dir, "\n", sep = "")
 cat("Deliverables are in ", out_dir, "\n", sep = "")
+cat("The run record is the committed artefact; everything ",
+    "else here is gitignored.", "\n", sep = "")
 
 # End of script ----
