@@ -166,8 +166,10 @@ plant_group_spec <- function(
 
     resample = list(
       scheme = "spatial_block",
-      min_detections = 20L,
-      seed = NULL
+      min_detections = 20L
+      # No seed here. The experiment sets one base seed,
+      # `boot_seed` in run.R, and each species derives its own
+      # from it. Without one the draws are unseeded, as in v2.
     ),
 
     # The habitat stage runs, but not all of it: v2 overwrites 45

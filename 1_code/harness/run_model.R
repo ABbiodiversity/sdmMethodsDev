@@ -241,6 +241,12 @@ run_stage <- function(
 #'   read off the formulas, replacing a set changes what is
 #'   loaded too.
 #' @param metrics Character vector of metric names, or NULL.
+#' @param boot_seed Integer or NULL. The experiment's base seed.
+#'   Each species resamples under its own seed derived from it by
+#'   species_seed(). NULL falls back to the spec's
+#'   `resample$seed`, and when that is NULL too the draws are
+#'   unseeded, as in v2. Ignored by the precomputed scheme, whose
+#'   draws are stored rather than drawn.
 #' @param verbose Logical. Report progress per species.
 #' @return A data frame, one row per species, region and
 #'   iteration, recording what happened.
@@ -258,11 +264,18 @@ run_spec <- function(
   iterations = 1:100,
   stage_models = NULL,
   metrics = NULL,
+  boot_seed = NULL,
   verbose = TRUE
 ) {
   # An experiment's own candidate sets replace the spec's before
   # anything is read, so the covariates follow from them.
   spec <- apply_stage_models(spec, stage_models)
+
+  # One base seed governs the run. The experiment's wins over the
+  # spec's, so a run can seed every taxon from one setting.
+  base_seed <- boot_seed %||% spec$resample$seed
+  draws_seeded <- !is.null(base_seed) &&
+    spec$resample$scheme != "precomputed"
 
   if (is.null(regions)) {
     regions <- names(spec$regions)
@@ -419,7 +432,8 @@ run_spec <- function(
       # Step 4: Draws are species-specific where the scheme
       # depends on where that species was detected
       draws <- resample_for_species(
-        spec, model_data, frame, iterations, data_dir
+        spec, model_data, frame, iterations, data_dir,
+        seed = species_seed(base_seed, spec$taxon, one_species)
       )
 
       for (i in seq_along(iterations)) {
@@ -457,7 +471,16 @@ run_spec <- function(
       ),
       covariates = covariates,
       resample_scheme = spec$resample$scheme,
-      seed = spec$resample$seed %||% harness_seed(),
+      # The seed actually used, never a default that was not.
+      # Per-species seeds are derived from this base; see
+      # species_seed().
+      seed = if (draws_seeded) {
+        paste0(base_seed, " (per species, via species_seed())")
+      } else if (spec$resample$scheme == "precomputed") {
+        "not used (precomputed draws)"
+      } else {
+        "unseeded"
+      },
       grid = region_spec$grid %||% NA_character_,
       models_overridden = spec$models_overridden %||% NA_character_,
       spec_notes = spec$notes %||% NA_character_
@@ -659,15 +682,24 @@ run_one_draw <- function(
 #' @param frame The one-species frame.
 #' @param iterations Integer vector.
 #' @param data_dir Character.
+#' @param seed Integer or NULL. This species' seed, from
+#'   species_seed(). Replaces any seed in the spec; NULL leaves
+#'   the draw unseeded.
 #' @return A list of character vectors of survey unit ids.
 #'
 #' @example # Example usage of the function
-#' # resample_for_species(spec, md, frame, 1:10, data_dir)
+#' # resample_for_species(spec, md, frame, 1:10, data_dir,
+#' #                      seed = 123L)
 resample_for_species <- function(
-  spec, model_data, frame, iterations, data_dir
+  spec, model_data, frame, iterations, data_dir, seed = NULL
 ) {
   scheme <- spec$resample$scheme
-  args <- spec$resample[setdiff(names(spec$resample), "scheme")]
+
+  # The spec's seed is a base, not a species seed, so it is
+  # dropped here and the derived one passed instead.
+  args <- spec$resample[
+    setdiff(names(spec$resample), c("scheme", "seed"))
+  ]
 
   if (scheme == "precomputed") {
     return(do.call(resample_precomputed, c(
@@ -681,9 +713,12 @@ resample_for_species <- function(
 
   if (scheme == "spatial_block") {
     return(do.call(resample_spatial_block, c(
+      # `seed = NULL` is passed through deliberately: it means
+      # unseeded, not the resampler's harness_seed() default.
       list(
         frame = model_data$covariates, iterations = iterations,
-        response = frame[[spec$response_name %||% "response"]]
+        response = frame[[spec$response_name %||% "response"]],
+        seed = seed
       ),
       args
     )))
@@ -692,7 +727,7 @@ resample_for_species <- function(
   do.call(resample_units, c(
     list(
       scheme = scheme, frame = model_data$covariates,
-      iterations = iterations
+      iterations = iterations, seed = seed
     ),
     args
   ))

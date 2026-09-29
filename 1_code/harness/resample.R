@@ -32,6 +32,14 @@
 #     behaviour that does not reproduce itself. Pass NULL to
 #     restore the v2 behaviour explicitly. See the parity ledger
 #     in docs/framework_design.md.
+#   - An experiment sets one base seed. Each species draws from
+#     its own seed, derived from that base and the species name
+#     by species_seed(), so species are resampled independently
+#     as in v2, and a species' draws do not change when others
+#     are added to or removed from a run.
+#   - Seeding never leaks. with_seed() restores the caller's
+#     random state on exit, so resampling does not change what
+#     any later random call in the session produces.
 # ---
 
 # 1. Setup ----
@@ -39,7 +47,9 @@
 ## 1.1 Load packages ----
 library(data.table) # lookup table reading (version: 1.16.4)
 
-# 2. harness_seed() ----
+# 2. Seeding ----
+
+## 2.1 harness_seed() ----
 
 #' The Default Random Seed
 #'
@@ -58,6 +68,93 @@ library(data.table) # lookup table reading (version: 1.16.4)
 #' # harness_seed()
 harness_seed <- function() {
   20260909L
+}
+
+## 2.2 species_seed() ----
+
+#' Derive One Species' Seed from the Experiment's Base Seed
+#'
+#' Resetting every species to the same seed would give every
+#' species the same draws, which v2 did not do and which
+#' correlates results across species. Deriving a seed per species
+#' keeps one number in charge of the run while giving each
+#' species its own stream.
+#'
+#' The species key is hashed with a polynomial rolling hash, taken
+#' modulo a prime below the integer maximum, and added to the
+#' base. Every intermediate value stays below 2^53, so the
+#' arithmetic is exact in double precision and the result is the
+#' same on every platform.
+#'
+#' Region is deliberately not part of the key. v2 draws once per
+#' species across the province, and a species should keep the
+#' same draws whichever regions a run includes.
+#'
+#' @param base Integer or NULL. The experiment's base seed. NULL
+#'   leaves the draw unseeded, which is what v2 did.
+#' @param taxon Character. Taxon slug.
+#' @param species Character. Species name.
+#' @return An integer seed, or NULL when `base` is NULL.
+#'
+#' @example # Example usage of the function
+#' # species_seed(20260909L, "lichen", "Physcia.adscendens")
+#' # species_seed(NULL, "lichen", "Physcia.adscendens") # NULL
+species_seed <- function(base, taxon, species) {
+  if (is.null(base)) {
+    return(NULL)
+  }
+
+  if (!is.numeric(base) || length(base) != 1L || is.na(base)) {
+    stop("A base seed must be a single number.", call. = FALSE)
+  }
+
+  modulus <- 2147483629 # largest prime below .Machine$integer.max
+  hash <- 0
+
+  for (code in utf8ToInt(paste(taxon, species, sep = "::"))) {
+    hash <- (hash * 31 + code) %% modulus
+  }
+
+  as.integer((base + hash) %% modulus)
+}
+
+## 2.3 with_seed() ----
+
+#' Evaluate Code Under a Seed, Then Restore the Random State
+#'
+#' set.seed() changes the session's random state for everything
+#' that follows. Restoring it on exit keeps resampling from
+#' changing any later random call, and makes the result depend
+#' only on the seed given here.
+#'
+#' @param seed Integer or NULL. NULL evaluates the code without
+#'   seeding.
+#' @param code An expression. Evaluated lazily, after the seed is
+#'   set.
+#' @return The value of `code`.
+#'
+#' @example # Example usage of the function
+#' # with_seed(42, sample(10))
+with_seed <- function(seed, code) {
+  if (is.null(seed)) {
+    return(code)
+  }
+
+  env <- globalenv()
+  had_state <- exists(".Random.seed", envir = env, inherits = FALSE)
+  old_state <- if (had_state) get(".Random.seed", envir = env)
+
+  on.exit({
+    if (had_state) {
+      assign(".Random.seed", old_state, envir = env)
+    } else if (exists(".Random.seed", envir = env, inherits = FALSE)) {
+      rm(".Random.seed", envir = env)
+    }
+  }, add = TRUE)
+
+  set.seed(seed)
+
+  code
 }
 
 # 3. spatial_blocks() ----
@@ -221,10 +318,6 @@ resample_spatial_block <- function(
     }
   }
 
-  if (!is.null(seed)) {
-    set.seed(seed)
-  }
-
   units <- as.character(frame$survey_unit_id)
   blocks <- spatial_blocks(
     frame[[long_column]], frame[[lat_column]]
@@ -241,7 +334,9 @@ resample_spatial_block <- function(
     )
   }
 
-  lapply(iterations, function(i) {
+  # Every draw comes from one stream under `seed`, so a species'
+  # draws depend only on its seed and the iterations requested.
+  with_seed(seed, lapply(iterations, function(i) {
     # Step 1: Iteration 1 is the complete data, as in v2
     if (i == 1L) {
       return(units)
@@ -267,7 +362,7 @@ resample_spatial_block <- function(
       "is probably too rare to bootstrap at this threshold.",
       call. = FALSE
     )
-  })
+  }))
 }
 
 # 6. resample_spatial_cv() ----
@@ -297,10 +392,6 @@ resample_spatial_cv <- function(
   lat_column = "lat",
   seed = harness_seed()
 ) {
-  if (!is.null(seed)) {
-    set.seed(seed)
-  }
-
   units <- as.character(frame$survey_unit_id)
   blocks <- spatial_blocks(
     frame[[long_column]], frame[[lat_column]]
@@ -318,7 +409,9 @@ resample_spatial_cv <- function(
 
   # Step 1: Deal whole blocks into folds, so no fold shares a
   # block with another
-  assignment <- sample(rep_len(seq_len(folds), length(present)))
+  assignment <- with_seed(
+    seed, sample(rep_len(seq_len(folds), length(present)))
+  )
   fold_of_block <- assignment[match(blocks, present)]
 
   lapply(seq_len(folds), function(k) {

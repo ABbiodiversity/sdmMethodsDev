@@ -20,7 +20,8 @@
 #     output.
 #   - The only file to edit. Sections 1.3 to 1.7 are the whole
 #     configuration: where the run reads and writes, which taxa
-#     and regions, which focal species, and how many draws.
+#     and regions, which focal species, how many draws, and the
+#     random seed.
 #   - Coverage is the climate stage. No taxon's habitat stage is
 #     reproduced yet - each needs machinery the harness does not
 #     have - and each spec records why in its notes. The report
@@ -273,8 +274,22 @@ if (n_bootstraps < v2_bootstraps) {
 
 iterations <- seq_len(n_bootstraps)
 
+## 1.6b Set the random seed ----
+# One number governs every random draw in the run. Each species
+# resamples under its own seed, derived from this one and its
+# name, so species are drawn independently as in v2 and a
+# species' draws do not change when the focal set does.
+#
+# v2 set no seed, so its draws cannot be matched either way; the
+# comparison is distributional. Seeding makes this side of it
+# repeatable: the same seed and settings give the same stores.
+# NULL leaves the draws unseeded, which is what v2 did.
+#
+# Birds are unaffected. Their draws are the stored v2 ids.
+boot_seed <- 20260909L
+
 ## 1.7 Set the stages to run ----
-run_models <- TRUE
+run_models <- FALSE
 run_collect <- TRUE
 run_compare <- TRUE
 run_report <- TRUE
@@ -310,7 +325,8 @@ if (run_models) {
       run_dir = file.path(pipeline_dir, taxon),
       species = focal_species,
       iterations = iterations,
-      stage_models = stage_models
+      stage_models = stage_models,
+      boot_seed = boot_seed
     )
   }
 
@@ -382,6 +398,7 @@ if (write_record) {
     },
     n_bootstraps = n_bootstraps,
     v2_bootstraps = v2_bootstraps,
+    boot_seed = if (is.null(boot_seed)) "unseeded" else boot_seed,
     stage_models = if (is.null(stage_models)) {
       "spec defaults (v2 candidate sets)"
     } else {
@@ -421,7 +438,11 @@ cat("Total run time: ", experiment_time, "\n", sep = "")
 cat("========================================\n")
 cat("Intermediates are in ", pipeline_dir, "\n", sep = "")
 cat("Deliverables are in ", out_dir, "\n", sep = "")
-cat("The run record is the committed artefact; everything ",
-    "else here is gitignored.", "\n", sep = "")
+cat(
+  "The run record is the committed artefact; everything ",
+  "else here is gitignored.",
+  "\n",
+  sep = ""
+)
 
 # End of script ----
