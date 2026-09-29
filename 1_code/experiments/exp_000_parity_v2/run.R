@@ -365,9 +365,10 @@ if (run_report) {
 }
 
 ## 3.4 Write the run record ----
-# The one committed artefact of the run. Everything else under
-# 2_pipeline/ and 3_output/ is gitignored, so when the stores
-# are cleared this is what is left to say what happened.
+# Committed with the report and summary tables. The stores in
+# 2_pipeline/ and the per-species tables are gitignored, so when
+# the stores are cleared this is what is left to say what
+# happened.
 #
 # The config below is what makes two records comparable, so it
 # holds settings rather than paths: an absolute directory
@@ -439,8 +440,8 @@ cat("========================================\n")
 cat("Intermediates are in ", pipeline_dir, "\n", sep = "")
 cat("Deliverables are in ", out_dir, "\n", sep = "")
 cat(
-  "The run record is the committed artefact; everything ",
-  "else here is gitignored.",
+  "Committed: run_record.md, report.md and the summary ",
+  "tables. Commit them only after a full run.",
   "\n",
   sep = ""
 )

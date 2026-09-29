@@ -1,0 +1,13 @@
+taxon,region,species,draws,has_coefficients,has_grid
+bird,north,2,5,TRUE,FALSE
+bird,south,2,5,TRUE,FALSE
+bryophyte,north,2,5,TRUE,FALSE
+bryophyte,south,2,5,TRUE,FALSE
+lichen,north,2,5,TRUE,FALSE
+lichen,south,2,5,TRUE,FALSE
+mammal,north,2,5,TRUE,FALSE
+mammal,south,0,0,FALSE,FALSE
+mite,north,2,5,TRUE,TRUE
+mite,south,2,5,TRUE,TRUE
+vascular_plant,north,2,5,TRUE,TRUE
+vascular_plant,south,2,5,TRUE,FALSE

@@ -1,0 +1,8 @@
+taxon,region,terms_compared,species,in_band_pct,reachable_terms,reachable_in_band_pct,median_standardized_difference
+lichen,north,82,2,41.5,66,47,0.852
+mammal,north,0,0,,0,,
+mite,north,80,2,10,64,9.4,2.486
+vascular_plant,north,80,2,16.2,64,17.2,2.275
+lichen,south,38,2,18.4,38,18.4,2.492
+mite,south,36,2,47.2,36,47.2,1.16
+vascular_plant,south,36,2,27.8,36,27.8,1.641
