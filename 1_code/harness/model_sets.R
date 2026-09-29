@@ -41,13 +41,17 @@
 #' # names(model_sets())
 #' # model_sets()$climate_bird_mammal_v2
 model_sets <- function() {
-  # The bird and mammal climate set. Four variables - frost free
-  # period, mean annual precipitation, climatic moisture deficit
-  # and continentality - in eight combinations.
+  # The mammal climate set, which is also the climate part of the
+  # bird one. Four variables - frost free period, mean annual
+  # precipitation, climatic moisture deficit and continentality -
+  # in eight combinations.
   #
-  # Mammals do not store CMD or TD. TD is derived on load from
-  # MWMT and MCMT; CMD has to be sourced before a mammal climate
-  # stage can run this set in full. See the parity ledger.
+  # Mammals fit it in full: the camera climate the harmonizer
+  # joins carries CMD and TD. Birds in v2 also fit each of the
+  # eight with linear and with quadratic spatial terms, 25
+  # candidates in all, which this set does not include; see the
+  # bird spec's v2_coverage.
+  #
   # The null is a candidate, not just the base: v2 averages over
   # `climate.list` including the intercept-only model it starts
   # from, so leaving it out would shift every weight.
@@ -63,8 +67,9 @@ model_sets <- function() {
     ". ~ . + MAP + FFP + TD + CMD"
   )
 
-  # The subset of the above that mammals can fit today, without
-  # CMD. Five of the nine v2 models, the null included.
+  # The subset of the above without CMD, five of the nine models.
+  # No spec uses it since the camera climate supplied CMD; kept
+  # for an experiment on a dataset that lacks CMD.
   climate_mammal_available <- c(
     ". ~ .",
     ". ~ . + FFP",

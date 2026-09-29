@@ -22,10 +22,8 @@
 #     configuration: where the run reads and writes, which taxa
 #     and regions, which focal species, how many draws, and the
 #     random seed.
-#   - Coverage is the climate stage. No taxon's habitat stage is
-#     reproduced yet - each needs machinery the harness does not
-#     have - and each spec records why in its notes. The report
-#     states coverage rather than implying more.
+#   - What each taxon reproduces of v2 is stated once, in its
+#     spec's `v2_coverage`, and the report prints it from there.
 #   - Parity here is distributional, not numerical. v2 seeds
 #     nothing, so v2 does not reproduce against itself; two v2
 #     runs give different coefficients. The comparison is

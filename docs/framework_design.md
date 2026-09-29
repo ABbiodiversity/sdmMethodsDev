@@ -347,24 +347,25 @@ model-averaged coefficients and a per-species AUC to
 
 Two findings from adapting it:
 
-- **The mammal and bird climate sets are the same set.** Written
-  separately by different authors, they arrived at the same eight
-  combinations of the same four variables. `model_sets.R` carries one
-  `climate_bird_mammal_v2` covering both; the mammal script's explicit
-  null is the harness's base formula.
-- **Mammals store neither `CMD` nor `TD`.** The climate pipeline joined
-  them from `abmi-camera-climate_2023.Rdata` on `S:/`, which is not the
-  SpTable file the test dataset was built from, and is not currently
-  mounted.
-  - `TD` is **derived** on load as `MWMT - MCMT`, verified against the
-    vascular plant table to 0.1 °C, the storage precision of the
-    normals.
+- **The mammal and bird climate sets share eight combinations, not
+  the whole set.** Written separately by different authors, both use
+  the same eight combinations of the same four variables, and
+  `model_sets.R` carries them as `climate_bird_mammal_v2`. The bird
+  pipeline also fits each of the eight with linear and with quadratic
+  spatial terms, 25 candidates in all; those are not in the harness
+  yet, and need `Easting` and `Northing`, which the bird covariates
+  lack. See the bird spec's `v2_coverage`.
+- **Mammal `CMD` and `TD` — resolved.** They were missing from the
+  SpTable file the test dataset was first built from. The harmonizer
+  now joins the mammal climate from `abmi-camera-climate_2023.Rdata`,
+  the file the v2 climate pipeline fitted against, and mammals fit the
+  full nine-model set. Two findings from the search still hold:
+  - `TD` equals `MWMT - MCMT`, verified against the vascular plant
+    table to 0.1 °C, the storage precision of the normals.
   - `CMD` is **not derivable**. The mammal script glosses it as
     "PET − MAP, ≥ 0", but checked against the plant table that formula
     is off by up to 195 mm (r = 0.975): climatic moisture deficit is a
-    monthly sum, not an annual difference. It must be sourced before
-    mammals can fit the full set. `climate_mammal_available` is the
-    four-model subset that runs today.
+    monthly sum, not an annual difference.
 
 **4. Plants are regularized; mammals and birds are not. — Decided:
 `bayesglm` is a registered engine.** Plants fit with `arm::bayesglm`,

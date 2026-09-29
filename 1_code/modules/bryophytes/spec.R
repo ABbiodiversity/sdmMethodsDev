@@ -11,16 +11,17 @@
 #     lichens get it; soil mites and vascular plants do not. The
 #     asymmetry is v2's and is preserved here for parity, with
 #     `use_protocol` exposed so an experiment can equalize it.
-#   - Bryophytes are the one plant-group taxon whose v2 reference
-#     had to be regenerated. The published file is unusable twice
-#     over: every species and draw in it is an error object
-#     reading `could not find function "model.avg"`, and the
-#     bootstrap-id file held 3 draws where the other three taxa
-#     hold 100. 03_rerun_bryophyte_v2_reference.R rebuilt both,
-#     writing to 2_pipeline/v2_reference/ rather than over the
-#     network copy. The gate searches there first.
-#   - The regenerated reference covers the climate stage only, so
-#     bryophyte habitat terms are still uncompared.
+#   - The published bryophyte model file is unusable twice over:
+#     every species and draw in it is an error object reading
+#     `could not find function "model.avg"`, and the bootstrap-id
+#     file held 3 draws where the other three taxa hold 100.
+#   - Two usable references exist instead. v2's own COEFS.RData
+#     holds complete bryophyte arrays, and _setup/05 takes the
+#     bryophyte rows of v2_results.csv from it.
+#     _setup/03_rerun_bryophyte_v2_reference.R also regenerated
+#     the climate stage into 2_pipeline/v2_reference/.
+#   - 02_compare_to_v2.R reads neither yet, so bryophytes are not
+#     compared. Moving the gate onto v2_results.csv fixes that.
 #   - Anything true of every plant-group taxon belongs in
 #     _shared/plant_group.R, not here.
 # ---
@@ -47,8 +48,8 @@ bryophyte_spec <- function(use_protocol = NULL) {
     protocol_in_v2 = TRUE,
     use_protocol = use_protocol,
     reference_note = paste0(
-      "The v2 reference for this taxon is regenerated, not ",
-      "published, and covers the climate stage only."
+      "The published v2 model file is unusable; the v2 ",
+      "reference is COEFS.RData, via v2_results.csv."
     )
   )
 }

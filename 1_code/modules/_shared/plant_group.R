@@ -19,8 +19,10 @@
 #     adding a branch to a shared one.
 #   - The underscore prefix marks this as shared machinery rather
 #     than a taxon, matching _setup/ and _deprecated/.
-#   - Parity coverage is the climate stage plus the habitat stage
-#     less its age splines. See docs/taxon_quirks.md.
+#   - What this spec reproduces of v2 is stated once, in
+#     `v2_coverage` below. The report is generated from it, so
+#     change it here when the harness changes, and nowhere else.
+#     Per-quirk detail is in docs/taxon_quirks.md.
 # ---
 
 # 1. Setup ----
@@ -172,21 +174,42 @@ plant_group_spec <- function(
       # from it. Without one the draws are unseeded, as in v2.
     ),
 
-    # The habitat stage runs, but not all of it: v2 overwrites 45
-    # of the 87 vegetation effects with GAM age splines over
-    # stand age, which the harness does not fit. See the notes.
-    habitat_v2_ready = "partial",
+    # What this spec reproduces of v2, per stage. The single
+    # source of truth for coverage: the report reads it.
+    v2_coverage = list(
+      climate = v2_status(
+        "partial",
+        paste(
+          "The v2 58-model set, bayesglm, full AICc averaging.",
+          "Fitted separately on each region's units; v2 fits it",
+          "once, province-wide."
+        )
+      ),
+      habitat = v2_status(
+        "partial",
+        paste(
+          "IVW on the prediction grid and v2's footprint pooling.",
+          "Not implemented: the age splines, which overwrite 45",
+          "of the 87 vegetation effects, and cutblock convergence",
+          "for classes 2 to 4. Takes the per-region climate."
+        )
+      ),
+      resampling = v2_status(
+        "partial",
+        paste(
+          "Spatial-block bootstrap with the 20-detection redraw",
+          "rule, drawn within each region; v2 draws once per",
+          "species across the province."
+        )
+      )
+    ),
+
     use_protocol = use_protocol,
     protocol_is_v2 = identical(use_protocol, protocol_in_v2),
 
+    # Facts about this taxon's configuration. Coverage is in
+    # v2_coverage, not here.
     notes = paste0(
-      "v2 climate stage, and the habitat stage less its age ",
-      "splines. v2 refits the five aged stand types - white ",
-      "spruce, pine, deciduous, mixedwood and black spruce, nine ",
-      "age classes each - with GAM splines over stand age and ",
-      "overwrites 45 of the 87 vegetation effects with them, so ",
-      "those 45 will not match. The other 42, the intercept, ",
-      "climate and the soil effects are reproduced. ",
       "Protocol ", if (use_protocol) "fitted" else "not fitted",
       if (identical(use_protocol, protocol_in_v2)) {
         " (the v2 setting for this taxon)."

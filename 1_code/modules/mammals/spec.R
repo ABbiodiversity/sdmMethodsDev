@@ -12,12 +12,15 @@
 #     MammalModels: nine binomial GLMs over FFP, MAP, CMD and TD,
 #     averaged by AICc weight. That pipeline is adapted here as a
 #     fitted stage, so a bioclimatic question can be asked of
-#     mammals at all. `climate_source` selects which.
-#   - Mammals store neither CMD nor TD. TD is derived on load as
-#     MWMT - MCMT, verified to 0.1 C. CMD is not derivable - the
-#     v2 gloss "PET - MAP" is off by up to 195 mm - and its
-#     source is not mounted, so the fitted stage runs a
-#     four-model subset. See the parity ledger.
+#     mammals at all. `climate_source` selects which, but only
+#     "fitted" is implemented: nothing reads the prediction file
+#     yet.
+#   - The climate block, CMD and TD included, comes from
+#     abmi-camera-climate_2023.Rdata, the file v2 fitted against,
+#     joined by the harmonizer. The fitted stage runs the full
+#     nine-model v2 set.
+#   - What this spec reproduces of v2 is stated once, in
+#     `v2_coverage`. The report is generated from it.
 #   - North and south are separate models on overlapping
 #     deployments, and their covariates disagree, so the two are
 #     separate covariate keys rather than a filter on one table.
@@ -174,6 +177,17 @@ mammal_spec <- function(
   season <- match.arg(season)
   part <- match.arg(part)
 
+  # Said here rather than discovered as a missing `Climate`
+  # column once the run is loading data.
+  if (climate_source == "precomputed") {
+    stop(
+      "climate_source = \"precomputed\" is not implemented: ",
+      "nothing reads mammal_climate_predictions.csv yet. Use ",
+      "\"fitted\".",
+      call. = FALSE
+    )
+  }
+
   # The abundance half fits the same candidates with Climate
   # dropped - v2's note is that climate effects on abundance
   # given presence are minimal - plus a null carrying only
@@ -315,31 +329,50 @@ mammal_spec <- function(
 
     climate_source = climate_source,
     part = part,
-    habitat_v2_ready = FALSE,
 
+    # What this spec reproduces of v2, per stage. The single
+    # source of truth for coverage: the report reads it.
+    v2_coverage = list(
+      climate = v2_status(
+        "partial",
+        paste(
+          "The full v2 9-model set, glm, AICc averaged, fitted",
+          "as a stage and bootstrapped. v2 fits it once, in a",
+          "separate pipeline, and reads back a prediction."
+        )
+      ),
+      habitat = v2_status(
+        "partial",
+        paste(
+          "North only, one half of the hurdle per run (presence",
+          "or abundance). Not implemented: age splines, cutblock",
+          "convergence, the assembled total abundance, and the",
+          "south candidate sets."
+        )
+      ),
+      resampling = v2_status(
+        "partial",
+        paste(
+          "Spatial-block bootstrap. v2 fits the habitat stage",
+          "once, so only iteration 1, the full data, is like for",
+          "like."
+        )
+      ),
+      season = v2_status(
+        "partial",
+        paste(
+          "One season per run. v2's `.all` references average",
+          "summer and winter, so both must be run and averaged",
+          "before comparing."
+        )
+      )
+    ),
+
+    # Facts about this run's configuration. Coverage is in
+    # v2_coverage, not here.
     notes = paste0(
-      "Climate ", climate_source,
-      if (climate_source == "fitted") {
-        " (the full 9-model v2 set)."
-      } else {
-        " (v2 default: read from mammal_climate_predictions.csv)."
-      },
-      " Habitat stage not yet reproduced: it needs AICc",
-      " Habitat: both halves of the hurdle, north only.",
-      " v2 fits a Gamma abundance-given-presence model beside",
-      " it and multiplies the two for total abundance. Both",
-      " halves are reproduced and each is compared against its",
-      " own reference: presence against Coef.pa.all, abundance",
-      " against Coef.agp.all. Their product is not assembled,",
-      " because v2 calibrates the product rather than the",
-      " halves.",
-      " Note that v2 does not bootstrap this stage - it fits",
-      " once per species and season - so the like-for-like",
-      " comparison is iteration 1, the full-data fit. Against",
-      " that it correlates 0.98 with a median absolute",
-      " difference of 0.03 on the probability scale. The",
-      " residual is most likely the climate offset, which is",
-      " fitted from 4 of the 9 v2 models until CMD is sourced."
+      "Climate fitted with the full 9-model v2 set. Season: ",
+      season, ". Hurdle part: ", part, ". Tier: ", tier, "."
     )
   )
 }

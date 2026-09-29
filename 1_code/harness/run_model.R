@@ -483,6 +483,14 @@ run_spec <- function(
       },
       grid = region_spec$grid %||% NA_character_,
       models_overridden = spec$models_overridden %||% NA_character_,
+      v2_coverage = if (is.null(spec$v2_coverage)) {
+        NA_character_
+      } else {
+        paste0(
+          names(spec$v2_coverage), ": ",
+          vapply(spec$v2_coverage, `[[`, character(1), "status")
+        )
+      },
       spec_notes = spec$notes %||% NA_character_
     ))
   }
@@ -746,6 +754,80 @@ resample_for_species <- function(
 #' # NULL %||% "default"
 `%||%` <- function(a, b) {
   if (is.null(a)) b else a
+}
+
+## 8.2 v2_status() ----
+
+#' State How Much of One v2 Stage a Spec Reproduces
+#'
+#' The entries of a spec's `v2_coverage`. The status vocabulary
+#' is fixed, so a typo fails when the spec is built rather than
+#' reading as a fourth category in the report.
+#'
+#' @param status Character. "reproduced", "partial" or
+#'   "not reproduced".
+#' @param note Character. What is and is not reproduced, and why.
+#' @return A list of `status` and `note`.
+#'
+#' @example # Example usage of the function
+#' # v2_status("partial", "No age splines.")
+v2_status <- function(status, note) {
+  allowed <- c("reproduced", "partial", "not reproduced")
+
+  if (!is.character(status) || length(status) != 1L ||
+        !status %in% allowed) {
+    stop(
+      "v2 status must be one of: ",
+      paste(allowed, collapse = ", "), ".",
+      call. = FALSE
+    )
+  }
+
+  if (!is.character(note) || length(note) != 1L ||
+        !nzchar(note)) {
+    stop("A v2 status needs a one-line note.", call. = FALSE)
+  }
+
+  list(status = status, note = note)
+}
+
+## 8.3 spec_coverage() ----
+
+#' Tabulate What a Set of Specs Reproduces of v2
+#'
+#' Flattens each spec's `v2_coverage` into one table, which is
+#' what the report prints. Coverage is stated once, in the specs,
+#' and read from there.
+#'
+#' @param specs A named list of specs.
+#' @return A data frame of taxon, stage, status and note.
+#'
+#' @example # Example usage of the function
+#' # spec_coverage(list(lichen = lichen_spec()))
+spec_coverage <- function(specs) {
+  rows <- lapply(names(specs), function(key) {
+    coverage <- specs[[key]]$v2_coverage
+
+    if (is.null(coverage) || length(coverage) == 0) {
+      return(data.frame(
+        taxon = key, stage = NA_character_,
+        status = "not stated",
+        note = "The spec has no v2_coverage.",
+        stringsAsFactors = FALSE
+      ))
+    }
+
+    data.frame(
+      taxon = key,
+      stage = names(coverage),
+      status = vapply(coverage, `[[`, character(1), "status"),
+      note = vapply(coverage, `[[`, character(1), "note"),
+      stringsAsFactors = FALSE,
+      row.names = NULL
+    )
+  })
+
+  do.call(rbind, rows)
 }
 
 # End of script ----

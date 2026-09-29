@@ -79,15 +79,19 @@ prediction for plants, and a calibrated probability for mammals.
 | QPAD offset | A log-offset per survey and species, from `bird_offsets.csv`. It must appear **inside** the formula as `offset(offset)`, not as a `predict()` argument | OK |
 | Poisson counts | Fitted on raw counts, no binarization | OK |
 | Climate selection | `model.avg(climate.list, rank = "AICc")`, full average, null model included in the set | OK |
+| Climate candidate set | 25 models: the null, eight climate combinations, and each of the eight with `Easting + Northing + Easting:Northing` and again with `I(Easting^2) + I(Northing^2)` added (`06.ModelClimate.R`) | PART the harness fits the null and the eight; the spatial 16 need `Easting` and `Northing`, which the bird covariates lack |
+| Climate scope | Fitted on every survey in the draw, province-wide; the region filter applies only to landcover | GAP the harness fits climate per region |
+| Carrying climate forward | The averaged prediction on the response scale, `exp(link)`, joins the landcover model as a covariate | GAP the harness carries it on the link scale |
+| Landcover weights | `weights = vegw` in the north and `soilw` in the south (`07.ModelLandcover.R`) | GAP not applied |
 | Landcover selection | Staged forward BIC over named groups, not a flat candidate set | OK |
-| The BIC rule | Within each stage, keep models with `Delta_BIC <= 2` and `K > 1`, then take the **smallest** of those. Not the lowest BIC | OK |
+| The BIC rule | Within each stage, keep models with `Delta_BIC <= 2` and `K > 1`, then take the **smallest** of those. Not the lowest BIC. Always advance to that model | PART the harness advances only when it improves on the current model's BIC |
 | The groups | North has six: Hab, Age, CC, Contrast, ARU, Water. South has four: Hab, Contrast, ARU, Water | OK |
 | Age terms | 13 candidates in the Age group alone, built from `wtAge`, `wtAge2` and `wtAge05` crossed with `isCon`, `isUpCon`, `isBogFen`, `isMix`, `isPine` and `isWSpruce` | OK |
 | Bootstrap ids | Precomputed and keyed on `surveyid`, not on row index | OK |
 | Factor levels | `vegc` 22, `soilc` 17, `method` 4, `block` 60. Stored order matters, since a level absent from one bootstrap sample must not renumber the rest | OK |
 | Column suffixes | Six columns arrive suffixed `_veg` or `_soil` and are rewritten by `term_map()` | OK |
 | No coordinates | 0 of 215,758 rows in `sites.csv` carry latitude or longitude | GAP blocks spatial resampling and every spatial term |
-| No reference output | Nothing reachable to compare against. Birds can be run but not gated | GAP |
+| Reference output | The packaged `Birds2024.RData` is absent from the drive. `_setup/04` rebuilds it from the per-draw CSVs, on the standardized term template, and `_setup/05` carries it into `v2_results.csv` | PART rebuilt, but the gate does not read it and the harness stores raw `glm` term names |
 
 **The offset trap.** Passing the offset as an argument rather than
 in the formula does not error. `predict()` recycles it, silently. It
@@ -118,8 +122,10 @@ AUC would have been silently invalid. Fixed with `as.numeric()`.
 | GAM age splines | A binomial spline in the square root of stand age, basis dimension 4, with the site-level prediction as an offset and cover times season weight as the weight. Five stand types plus three pooled frames, so eight fits | GAP |
 | Age groupings | Three strategies compared by summed AIC, corrected by -8, -4 and 0 for the extra variance parameters | GAP |
 | Cutblock convergence | Fixed recovery weights, not fitted. Conifer 0.500, 0.849, 0.960 and deciduous or mixedwood 0.705, 0.912, 0.970 at age classes 2, 3 and 4. Applied to total abundance only, never to presence | GAP |
-| No bootstrapping | The habitat stage fits once, so like-for-like comparison is iteration 1 rather than a distribution | OK handled in the gate |
-| Climate is external | Fitted by a separate pipeline and read back as a single covariate, not fitted alongside habitat | OK |
+| No bootstrapping | The habitat stage fits once, so like-for-like comparison is iteration 1 rather than a distribution | GAP the harness bootstraps it, and the gate does not yet restrict mammals to iteration 1 |
+| Climate is external | Fitted by a separate pipeline and read back as a single covariate, not fitted alongside habitat | PART the harness fits v2's 9-model set as a stage; reading the stored prediction (`climate_source = "precomputed"`) is not implemented |
+| Seasons in the reference | The published `.all` tables average the summer and winter fits | GAP a run fits one season; both must be run and averaged before comparing |
+| South habitat | A separate south candidate set on soil types | GAP not specified; every south draw fails |
 | Regions overlap | North and south are separate models sharing 512 deployments | OK |
 | Climate extraction | From `abmi-camera-climate_2023.Rdata`, a different extraction from the one in the species table. At matched deployments the two disagree by up to 531 mm of `MAP` | OK |
 
@@ -144,10 +150,11 @@ other.
 | Carrying climate forward | The averaged coefficient vector applied to the data and passed through the logistic, so the habitat stage sees a probability. Not the best model's link prediction | OK |
 | Footprint pooling | `HardLin` borrows from `UrbInd` by inverse-variance weighting on the logit scale. `EnSoftLin`, `EnSeismic` and `TrSoftLin` borrow from a young-regeneration composite with **fixed** weights 0.049, 0.0893, 0.434 and 0.396 over three cutblock regeneration classes and young black spruce | OK |
 | GAM age splines | A binomial spline in the square root of stand age, basis dimension 3, nine fits, intercept-only where detections are too few. Overwrites **45 of the 87** vegetation effects | GAP largest single parity gap |
-| Cutblock convergence | Settles the age-3 and age-4 cutblock classes | GAP |
+| Cutblock convergence | Moves cutblock age classes 2, 3 and 4 part of the way to the natural stand of the same age, with fixed weights, before the footprint pooling | GAP |
 | `Protocol` | Fitted for **bryophytes and lichens only**. Mites and vascular plants pass the protocol flag as false | OK |
-| Bootstrap | Spatial-block, resampling until 20 detections are reached, separately for the vegetation and soil frames | OK |
-| Derived climate | Seven products are computed and never stored | OK by design |
+| Climate scope | Fitted on every site in the draw, province-wide; the region filter applies only to the habitat stage | GAP the harness fits climate per region |
+| Bootstrap | Spatial-block over the whole province, once per species, redrawing until 20 detections are reached | PART the harness draws within each region |
+| Derived climate | Products of stored columns are computed on load and never stored | OK by design |
 
 **Why the derived products are not stored.** `fwrite` writes 15
 significant digits. Round-tripping a covariate and its square
@@ -162,10 +169,11 @@ was missing from the cluster workers' library path. Separately, the
 bryophyte bootstrap-id file holds only 3 draws where the other three
 plant taxa hold 100. Both sit upstream of the modelling, so the file
 cannot be salvaged, only regenerated.
-`1_code/_setup/03_rerun_bryophyte_v2_reference.R` does that, and has
-been run: 134 of 134 species, 100 draws each, no failures. The gate
-now reads the regenerated file for bryophytes and the published one
-for the other three plant taxa.
+`1_code/_setup/03_rerun_bryophyte_v2_reference.R` does that for the
+climate stage, and has been run: 134 of 134 species, 100 draws each,
+no failures. Separately, v2's `COEFS.RData` holds complete bryophyte
+arrays, and `_setup/05` builds the bryophyte rows of `v2_results.csv`
+from it. The gate reads neither yet, so bryophytes are not compared.
 
 ## Shared across all three
 
@@ -175,7 +183,8 @@ Not taxon quirks, but they shape what parity can mean.
   not reproduce against itself. Parity is therefore distributional:
   the v2 value is scored on whether it falls inside the run's p10 to
   p90 band, plus a standardized difference. Asking for matching
-  numbers would be asking for something v2 cannot do.
+  numbers would be asking for something v2 cannot do. The harness
+  seeds from `boot_seed` in `run.R`, so its own side repeats.
 - **Global-environment coupling.** Cluster workers see variables by
   export, not by scope. A loop variable inside a closure is
   invisible to a worker, which is why the protocol flag had to be
@@ -200,6 +209,8 @@ surprise at the comparison step.
 ## See also
 
 - `docs/framework_design.md`, the architecture and the parity ledger
-- `1_code/experiments/exp_000_parity_v2/README.md`, current parity
-  numbers and what blocks the gate
+- `v2_coverage` in each spec under `1_code/modules/`, the per-stage
+  summary of this table that the report prints
+- `1_code/experiments/exp_000_parity_v2/README.md`, what the gate
+  compares and what blocks it
 - `0_data/v2_scripts/README.md`, provenance of the frozen snapshots

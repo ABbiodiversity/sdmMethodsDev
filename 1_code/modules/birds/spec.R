@@ -10,20 +10,21 @@
 #     comparable across survey protocol and detectability. The
 #     offset is not optional: without it a bird model is fitting
 #     effort as much as abundance.
-#   - Two stages. Climate is eight candidate formulas over FFP,
-#     MAP, CMD and TD - the same set the mammal pipeline arrived
-#     at independently. Landcover is staged forward selection:
-#     groups of formulas, each fitted as an update to the
-#     previous group's winner, keeping the smallest model within
-#     2 BIC of the best.
+#   - Two stages. Climate is model-averaged by AICc. Landcover is
+#     staged forward selection: groups of formulas, each fitted
+#     as an update to the previous group's winner, keeping the
+#     smallest model within 2 BIC of the best.
+#   - The climate set here is v2's eight climate combinations
+#     plus the null. v2 also fits each with linear and with
+#     quadratic spatial terms, 25 candidates in all
+#     (06.ModelClimate.R). Birds carry no Easting or Northing in
+#     the test dataset, so those cannot be fitted until the
+#     harmonizer adds them.
 #   - Bootstrap ids are precomputed and stored against surveyid
 #     rather than survey_unit_id, so the draw is translated
 #     through the design block.
-#   - Parity coverage is the climate stage. The landcover model
-#     groups in 00.NorthModels.R and 00.SouthModels.R are large
-#     and reference derived terms - wtAge, isCon, fcc2 - that the
-#     harmonized covariates do not carry, so the landcover stage
-#     is not yet reproducible.
+#   - What this spec reproduces of v2 is stated once, in
+#     `v2_coverage`. The report is generated from it.
 # ---
 
 # 1. Setup ----
@@ -101,16 +102,42 @@ bird_spec <- function() {
       id_column = "surveyid"
     ),
 
-    habitat_v2_ready = TRUE,
+    # What this spec reproduces of v2, per stage. The single
+    # source of truth for coverage: the report reads it.
+    v2_coverage = list(
+      climate = v2_status(
+        "partial",
+        paste(
+          "AICc averaging as v2, but over 9 candidates where v2",
+          "fits 25; the spatial ones need Easting and Northing,",
+          "which the test dataset lacks for birds. Carried on the",
+          "link scale; v2 carries exp(link). Fitted per region;",
+          "v2 fits it province-wide."
+        )
+      ),
+      landcover = v2_status(
+        "partial",
+        paste(
+          "Staged BIC over v2's groups. v2 weights the fits by",
+          "vegw or soilw, not applied here, and always advances",
+          "to a group's winner, where this advances only on an",
+          "improvement. Coefficients keep raw glm names; v2's",
+          "packaged ones use the standardized template."
+        )
+      ),
+      resampling = v2_status(
+        "reproduced",
+        "v2's 100 stored draws, keyed on surveyid."
+      )
+    ),
 
+    # Facts about this taxon's configuration. Coverage is in
+    # v2_coverage, not here.
     notes = paste0(
-      "v2 climate and landcover stages. An earlier note here ",
-      "said the landcover groups referenced terms the dataset ",
-      "did not carry; that was wrong. wtAge, isCon and fcc2 are ",
-      "all present. The columns appearing in both the north and ",
-      "south blocks were suffixed by the harmonizer, and the ",
-      "term map resolves them. No bird reference output is ",
-      "reachable, so birds can be run but not compared."
+      "QPAD offset inside the formula. The landcover groups' ",
+      "derived terms (wtAge, isCon, fcc2) are all present; ",
+      "columns in both the north and south blocks are ",
+      "suffixed by the harmonizer and resolved by term_map()."
     )
   )
 }

@@ -14,22 +14,27 @@
 #     - parity_climate.csv
 #     - parity_summary.csv
 # notes:
-#   - The gate itself. Compares this run's climate coefficients
-#     against the published v2 ones, per species and term.
+#   - The gate itself. Compares this run's final-stage
+#     coefficients - habitat or landcover - against the published
+#     v2 ones, per species and term. The climate stage is not
+#     stored, so it is not compared yet.
 #   - The comparison is distributional, not numerical. v2 seeds
 #     nothing, so two v2 runs differ; asking for matching numbers
 #     would be asking for something v2 cannot do even against
 #     itself. Each term is scored on whether the v2 median falls
 #     inside this run's 10th-to-90th percentile band across
 #     draws, and on the standardized difference between medians.
-#   - The bryophyte reference is unusable. Every species and
-#     every draw in bryophyte-species-models.Rdata is an error
-#     object, `could not find function "model.avg"` - MuMIn was
-#     not available to the cluster workers on the run that
-#     produced it. The other three plant taxa are complete. That
-#     file has to be re-run before bryophytes can be gated.
-#   - No bird reference is reachable, so birds are reported as
-#     uncovered rather than compared.
+#   - References are read from the network drives, not yet from
+#     0_data/v2_results/v2_results.csv. Two consequences:
+#     bryophytes are not compared, because the published model
+#     file is all error objects and the rebuilt references are
+#     not searched; and birds are not compared, because the bird
+#     reference is set to NULL below although _setup/04 has
+#     packaged one. Moving onto v2_results.csv fixes both.
+#   - Mammals are compared against their climate coefficients
+#     while the run's final stage is habitat, so no term joins.
+#   - Whatever cannot be reached is left in `notes`, which the
+#     report prints.
 #   - Expects exp_id, data_dir, pipeline_dir and out_dir from
 #     run.R.
 # ---
@@ -97,7 +102,7 @@ run_coefficients <- if (file.exists(summary_path)) {
 
 ## 2.1 read_plant_reference() ----
 
-#' Read One Plant Taxon's Published Climate Coefficients
+#' Read One Plant Taxon's Published v2 Coefficients
 #'
 #' @param taxon Character. Taxon slug.
 #' @param dir_path Character. Where the .Rdata files are.
@@ -330,6 +335,17 @@ if (!is.null(run_coefficients)) {
       next
     }
 
+    # A reference that was read but shares no term with the run
+    # is as uncompared as a missing one, and is said so rather
+    # than left as a row of zeros in the summary.
+    if (!any(is.finite(joined$v2_median))) {
+      notes[[label]] <- paste0(
+        label, ": a reference was read (",
+        paste(unique(reference$reference_object), collapse = ", "),
+        ") but no species and term matched it."
+      )
+    }
+
     # v2 overwrites the five aged stand types with GAM age
     # splines the harness does not fit, and settles the cutblock
     # age classes 3 and 4 by a convergence step it does not run
@@ -417,7 +433,7 @@ if (!is.null(parity)) {
     file.path(tables_dir, "parity_summary.csv"), na = ""
   )
 
-  cat("\nClimate-stage parity:\n")
+  cat("\nParity against v2 (final stage):\n")
   print(parity_summary)
 } else {
   cat("\nNo parity comparison produced.\n")
