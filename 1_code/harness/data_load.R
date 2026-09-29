@@ -346,49 +346,88 @@ apply_factor_levels <- function(frame, data_dir, taxon) {
 
   levels_table <- as.data.frame(fread(path))
 
-  for (column in unique(levels_table$column)) {
-    if (!column %in% names(frame)) {
-      next
-    }
+  # The lookup names columns as the source did. A column the
+  # harmonizer suffixed because it sits in more than one block -
+  # the bird `method`, stored as method_veg and method_soil - is
+  # loaded under its suffixed name, so the lookup is matched
+  # through covariate_columns.csv as well. Without this those
+  # columns fall back to alphabetical levels, which moves the
+  # reference level and every contrast.
+  map_path <- file.path(data_dir, "lookup", "covariate_columns.csv")
+  column_map <- if (file.exists(map_path)) {
+    map <- as.data.frame(fread(map_path))
+    map[map$taxon == taxon, c("source_column", "master_column")]
+  } else {
+    data.frame(source_column = character(0),
+               master_column = character(0))
+  }
 
-    rows <- levels_table[levels_table$column == column, ]
+  targets_of <- function(column) {
+    masters <- column_map$master_column[
+      column_map$source_column == column
+    ]
+    intersect(unique(c(column, masters)), names(frame))
+  }
+
+  for (source_column in unique(levels_table$column)) {
+    rows <- levels_table[levels_table$column == source_column, ]
     ordered_levels <- rows$level[order(rows$level_order)]
 
-    values <- as.character(frame[[column]])
-
-    # Every harmonized table is written with `na = ""`, so a
-    # missing factor value reads back as a blank string rather
-    # than NA. Left alone it survives as an extra level, and the
-    # guard below then rejects the whole run over a level that
-    # is not a level at all - which is what a blank `soilc`
-    # does to 194 of the 91,001 southern bird surveys.
-    #
-    # v2 never sees this: it reads the same values as NA and
-    # glm's default na.action drops those rows. Restoring the
-    # NA here reproduces that, rather than inventing a rule.
-    values[!nzchar(trimws(values))] <- NA_character_
-
-    unknown <- setdiff(stats::na.omit(unique(values)), ordered_levels)
-
-    if (length(unknown) > 0) {
-      stop(
-        taxon, ": `", column, "` holds ", length(unknown),
-        " level(s) the factor lookup does not list:
-  ",
-        paste(utils::head(unknown, 10), collapse = "
-  "),
-        "
-The lookup is stale; admitting them would change the",
-        "
-reference level and every contrast.",
-        call. = FALSE
+    for (column in targets_of(source_column)) {
+      frame[[column]] <- restore_factor(
+        frame[[column]], ordered_levels, taxon, column
       )
     }
-
-    frame[[column]] <- factor(values, levels = ordered_levels)
   }
 
   frame
+}
+
+## 7.1 restore_factor() ----
+
+#' Factor One Column to a Stored Level Order
+#'
+#' @param x A vector as read from CSV.
+#' @param ordered_levels Character vector of levels, reference
+#'   first.
+#' @param taxon,column Character. Named in any error.
+#' @return A factor.
+#'
+#' @example # Example usage of the function
+#' # restore_factor(c("PC", "eBird"), c("PC", "eBird"), "bird", "m")
+restore_factor <- function(x, ordered_levels, taxon, column) {
+  values <- as.character(x)
+
+  # Every harmonized table is written with `na = ""`, so a
+  # missing factor value reads back as a blank string rather
+  # than NA. Left alone it survives as an extra level, and the
+  # guard below then rejects the whole run over a level that
+  # is not a level at all - which is what a blank `soilc`
+  # does to 194 of the 91,001 southern bird surveys.
+  #
+  # v2 never sees this: it reads the same values as NA and
+  # glm's default na.action drops those rows. Restoring the
+  # NA here reproduces that, rather than inventing a rule.
+  values[!nzchar(trimws(values))] <- NA_character_
+
+  unknown <- setdiff(stats::na.omit(unique(values)), ordered_levels)
+
+  if (length(unknown) > 0) {
+    stop(
+      taxon, ": `", column, "` holds ", length(unknown),
+      " level(s) the factor lookup does not list:
+",
+      paste(utils::head(unknown, 10), collapse = "
+"),
+      "
+The lookup is stale; admitting them would change the",
+      "
+reference level and every contrast.",
+      call. = FALSE
+    )
+  }
+
+  factor(values, levels = ordered_levels)
 }
 
 # 8. build_model_data() ----
@@ -438,7 +477,7 @@ build_model_data <- function(
   weight_column = NULL,
   aliases = list(),
   site_columns = c(
-    "lat", "long", "nr", "nsr", "luf", "year",
+    "lat", "long", "easting", "northing", "nr", "nsr", "luf", "year",
     "lured", "location", "summer_days", "winter_days"
   )
 ) {

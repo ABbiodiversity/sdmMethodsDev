@@ -67,6 +67,24 @@ model_sets <- function() {
     ". ~ . + MAP + FFP + TD + CMD"
   )
 
+  # The bird climate set as 06.ModelClimate.R assembles it: the
+  # null, the eight climate combinations, each of the eight with
+  # a linear spatial trend and interaction, and each of those
+  # again with quadratic terms. 25 candidates, averaged at once.
+  # The spatial terms are in metres, as v2 fits them, which is
+  # why their coefficients run to 1e-12.
+  spatial_linear <- "Easting + Northing + Easting:Northing"
+  spatial_quadratic <- "I(Easting^2) + I(Northing^2)"
+
+  climate_bird_v2 <- c(
+    climate_bird_mammal_v2,
+    paste(climate_bird_mammal_v2[-1], "+", spatial_linear),
+    paste(
+      climate_bird_mammal_v2[-1], "+", spatial_linear, "+",
+      spatial_quadratic
+    )
+  )
+
   # The subset of the above without CMD, five of the nine models.
   # No spec uses it since the camera climate supplied CMD; kept
   # for an experiment on a dataset that lacks CMD.
@@ -295,14 +313,54 @@ model_sets <- function() {
     "Crop", "Crop", "Alien", "Alien", "Alien", "Alien", "Alien", "Alien", "Alien", "Crop", "Alien", "Alien", "Alien", "Alien", "Alien", "Alien", "Alien"
   )
 
+  # The mammal south presence set, spliced from
+  # south-models/00_models.R: 15 soil and footprint models, then
+  # the same 15 with pAspen. Each names the category it leaves
+  # out, which the one-hot rule reports alongside.
+  mammal_south_base <- c(
+    "ClayWet + SandyLoam + RapidDrain + ThinBlow + WetlandMargin + RurUrbInd + Well + RoughP + TameP + Crop + EnSoftLinSeismic + TrSoftLin",
+    "ClayWet + SandyRapid + ThinBlow + WetlandMargin + RurUrbInd + Well + RoughP + TameP + Crop + EnSoftLinSeismic + TrSoftLin",
+    "SandyLoam + Nonproductive + WetlandMargin + RurUrbInd + Well + RoughP + TameP + Crop + EnSoftLinSeismic + TrSoftLin",
+    "WetlandMargin + RurUrbInd + Well + RoughP + TameP + Crop + EnSoftLinSeismic + TrSoftLin",
+    "ClayWet + SandyRapid + ThinBlow + WetlandMargin + RurUrbInd + Well + Cult + EnSoftLinSeismic + TrSoftLin",
+    "SandyLoam + Nonproductive + WetlandMargin + RurUrbInd + Well + Cult + EnSoftLinSeismic + TrSoftLin",
+    "WetlandMargin + RurUrbInd + Well + Cult + EnSoftLinSeismic + TrSoftLin",
+    "ClayWet + SandyRapid + ThinBlow + WetlandMargin + NonAgAlien + Cult + Succ",
+    "SandyLoam + Nonproductive + WetlandMargin + NonAgAlien + Cult + Succ",
+    "WetlandMargin + NonAgAlien + Cult + Succ",
+    "ClayWet + SandyRapid + ThinBlow + WetlandMargin + Alien + Succ",
+    "SandyLoam + Nonproductive + WetlandMargin + Alien + Succ",
+    "WetlandMargin + Alien + Succ",
+    "WetlandMargin + Alien",
+    "WetlandMargin"
+  )
+
+  habitat_mammal_south_pa_v2 <- c(
+    paste0(". ~ . + ", mammal_south_base, " + seas_days + Climate"),
+    paste0(
+      ". ~ . + ", mammal_south_base, " + pAspen + seas_days + Climate"
+    )
+  )
+
+  intercept_mammal_south_pa_v2 <- rep(
+    c("Loamy", "Loamy", "Loamy", "AllNative", "Loamy", "Loamy",
+      "AllNative", "Loamy", "Loamy", "AllNative", "Loamy", "Loamy",
+      "AllNative", "AllNativeSucc", "AllExceptMargin"),
+    2
+  )
+
   list(
     climate_bird_mammal_v2 = climate_bird_mammal_v2,
+    climate_bird_v2 = climate_bird_v2,
     climate_plant_v2_full = climate_plant_v2_full,
     climate_mammal_available = climate_mammal_available,
     climate_plant_v2 = climate_plant_v2,
     habitat_mammal_north_pa_v2 = habitat_mammal_north_pa_v2,
     intercept_mammal_north_pa_v2 =
       intercept_mammal_north_pa_v2,
+    habitat_mammal_south_pa_v2 = habitat_mammal_south_pa_v2,
+    intercept_mammal_south_pa_v2 =
+      intercept_mammal_south_pa_v2,
     landcover_bird_north_v2 = landcover_bird_north_v2,
     landcover_bird_south_v2 = landcover_bird_south_v2,
     habitat_veg_plant_v2 = habitat_veg_plant_v2,

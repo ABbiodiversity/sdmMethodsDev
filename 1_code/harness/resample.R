@@ -203,6 +203,17 @@ spatial_blocks <- function(
 
 #' Read Bootstrap Ids the Source Pipeline Generated
 #'
+#' Two layouts. Birds store one table for the taxon,
+#' `lookup/<taxon>_bootstrap_ids.csv`, one column per draw. The
+#' plant-group taxa store v2's draws per species, because v2
+#' drew them per species:
+#' `lookup/v2_bootstrap_ids/<taxon>/<species>.rds`, written by
+#' 1_code/_setup/07_harmonize_v2_plant_bootstrap_ids.R.
+#'
+#' Replaying v2's own draws is what makes parity numerical rather
+#' than distributional: the harness then fits the same rows v2
+#' fitted, draw by draw.
+#'
 #' @param data_dir Character. Path to 0_data/test_dataset.
 #' @param taxon Character. Taxon slug.
 #' @param iterations Integer vector of bootstrap iterations.
@@ -211,47 +222,88 @@ spatial_blocks <- function(
 #' @param frame A data frame carrying `survey_unit_id` and
 #'   `id_column`, used to translate stored ids into survey unit
 #'   ids. NULL when the stored ids are already unit ids.
+#' @param species Character. The species, for per-species ids.
+#' @param per_species Logical. Read the per-species layout.
+#' @param unique_ids Logical. Keep each unit once per draw. v2's
+#'   bird scripts select a draw with `%in%`, so a unit drawn twice
+#'   is fitted once; the plant scripts index rows, so repeats
+#'   count.
 #' @return A list of character vectors, one per iteration.
 #'
 #' @example # Example usage of the function
 #' # ids <- resample_precomputed(data_dir, "bird", 1:3,
 #' #                             id_column = "surveyid",
-#' #                             frame = md$covariates)
+#' #                             frame = md$covariates,
+#' #                             unique_ids = TRUE)
+#' # ids <- resample_precomputed(data_dir, "lichen", 1:3,
+#' #                             species = "Physcia.adscendens",
+#' #                             per_species = TRUE)
 resample_precomputed <- function(
   data_dir,
   taxon,
   iterations,
   id_column = NULL,
-  frame = NULL
+  frame = NULL,
+  species = NULL,
+  per_species = FALSE,
+  unique_ids = FALSE
 ) {
-  path <- file.path(
-    data_dir, "lookup", paste0(taxon, "_bootstrap_ids.csv")
-  )
-
-  if (!file.exists(path)) {
-    stop(
-      "No precomputed bootstrap ids for ", taxon, ":\n  ", path,
-      "\nUse a different resampling scheme, or generate them.",
-      call. = FALSE
+  # Step 1: Read the stored draws, as a list of id vectors
+  if (per_species) {
+    path <- file.path(
+      data_dir, "lookup", "v2_bootstrap_ids", taxon,
+      paste0(species, ".rds")
     )
+
+    if (is.null(species) || !file.exists(path)) {
+      stop(
+        "No stored v2 bootstrap ids for ", taxon, " ",
+        species, ":\n  ", path,
+        "\nRun 1_code/_setup/07_harmonize_v2_plant_bootstrap_ids.R",
+        " for this species, or use the spatial_block scheme.",
+        call. = FALSE
+      )
+    }
+
+    stored <- readRDS(path)
+
+    # v2 stores a species' draws as a matrix, units by draws
+    if (is.matrix(stored)) {
+      stored <- lapply(seq_len(ncol(stored)), function(j) stored[, j])
+    }
+  } else {
+    path <- file.path(
+      data_dir, "lookup", paste0(taxon, "_bootstrap_ids.csv")
+    )
+
+    if (!file.exists(path)) {
+      stop(
+        "No precomputed bootstrap ids for ", taxon, ":\n  ", path,
+        "\nUse a different resampling scheme, or generate them.",
+        call. = FALSE
+      )
+    }
+
+    stored <- as.list(fread(path))
   }
 
-  stored <- fread(path)
-  columns <- names(stored)
-
-  if (max(iterations) > length(columns)) {
+  if (max(iterations) > length(stored)) {
     stop(
-      taxon, " has ", length(columns), " precomputed bootstrap ",
+      taxon, " has ", length(stored), " precomputed bootstrap ",
       "iterations; ", max(iterations), " were requested.",
       call. = FALSE
     )
   }
 
   lapply(iterations, function(i) {
-    ids <- stored[[columns[i]]]
+    ids <- stored[[i]]
     ids <- ids[!is.na(ids)]
 
-    # Step 1: Translate to survey unit ids when the stored ids
+    if (unique_ids) {
+      ids <- unique(ids)
+    }
+
+    # Step 2: Translate to survey unit ids when the stored ids
     # are a different key, which is how the bird ids are stored
     if (is.null(id_column)) {
       return(as.character(ids))

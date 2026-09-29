@@ -175,7 +175,9 @@ sdmMethodsDev/
 │   │       ├── mammal_climate_predictions.csv
 │   │       ├── bird_modelled_species.csv
 │   │       ├── bird_bootstrap_ids.csv      # the 100 stored v2 draws
-│   │       └── bird_factor_levels.csv
+│   │       ├── bird_factor_levels.csv
+│   │       ├── bird_veg_age_matrix.csv     # v2 bird translation, from _setup/06_
+│   │       └── v2_bootstrap_ids/<taxon>/  # v2's stored plant draws, from _setup/07_
 │   ├── v2_results/                # the v2 outputs, harmonized: built by _setup/05_
 │   │   ├── v2_results.csv
 │   │   └── v2_results_coverage.csv
@@ -192,7 +194,9 @@ sdmMethodsDev/
 │   │   ├── 02_validate_test_dataset.R
 │   │   ├── 03_rerun_bryophyte_v2_reference.R
 │   │   ├── 04_package_bird_coefficients.R
-│   │   └── 05_harmonize_v2_results.R
+│   │   ├── 05_harmonize_v2_results.R
+│   │   ├── 06_harmonize_bird_translation_lookup.R
+│   │   └── 07_harmonize_v2_plant_bootstrap_ids.R
 │   ├── _deprecated/               # superseded code; not sourced
 │   ├── harness/                   # shared, taxon-agnostic
 │   │   ├── harness.R              # load_harness(): sources the rest in order
@@ -217,17 +221,23 @@ sdmMethodsDev/
 │   │   ├── lichens/spec.R
 │   │   ├── soil_mites/spec.R
 │   │   ├── vascular_plants/spec.R
-│   │   ├── mammals/spec.R
-│   │   └── birds/spec.R
+│   │   ├── mammals/
+│   │   │   ├── spec.R
+│   │   │   └── hurdle.R           # v2's hurdle model, both halves together
+│   │   └── birds/
+│   │       ├── spec.R
+│   │       └── standardize.R      # raw coefficients → v2's standardized terms
 │   └── experiments/
 │       └── exp_000_parity_v2/
 │           ├── README.md          # question, design, coverage
 │           ├── run.R              # the only file to edit
 │           ├── utils/
-│           │   └── focal_species.R  # named species sets
+│           │   ├── focal_species.R  # named species sets
+│           │   └── parity_targets.R # what pass means
 │           ├── 01_collect_results.R
 │           ├── 02_compare_to_v2.R
-│           └── 03_build_report.R
+│           ├── 03_build_report.R
+│           └── v2_self_agreement.R  # v2 against itself; run once
 │
 ├── 2_pipeline/                    # intermediates; gitignored
 │   ├── exp_000_parity_v2/
@@ -243,8 +253,9 @@ sdmMethodsDev/
 │       │   ├── parity_summary.csv       # committed
 │       │   ├── coverage.csv             # committed
 │       │   ├── metric_summary.csv       # committed
+│       │   ├── v2_self_agreement_summary.csv  # committed
 │       │   ├── coefficient_summary.csv  # gitignored; rebuilt
-│       │   └── parity_climate.csv       # gitignored; rebuilt
+│       │   └── parity_terms.csv         # gitignored; rebuilt
 │       ├── report.md              # committed
 │       └── run_record.md          # committed
 │
@@ -383,6 +394,7 @@ call the harness and specs; they do not reimplement them.
 | 1.5b | `stage_models`: replacement candidate sets, or `NULL` for v2's |
 | 1.6 | `n_bootstraps` |
 | 1.6b | `boot_seed`; `NULL` leaves the draws unseeded, as v2 did |
+| 1.4 (`plant_bootstrap`) | `"spatial_block"` draws v2's bootstrap afresh; `"v2_ids"` replays v2's stored draws |
 | 1.7 | Which steps run: fit, collect, compare, report, record |
 
 Output locations are the experiment's to choose. `pipeline_dir` takes the
@@ -401,6 +413,8 @@ them sorted clear of the run-time code.
 | `03_rerun_bryophyte_v2_reference.R` | The v2 plant project's bryophyte data, and the frozen v2 functions | `2_pipeline/v2_reference/bryophyte-species-models.Rdata` |
 | `04_package_bird_coefficients.R` | The per-draw v2 bird coefficient CSVs | `2_pipeline/v2_reference/Birds2024.RData` |
 | `05_harmonize_v2_results.R` | v2 plant `COEFS.RData`, the mammal coefficient tables, `Birds2024.RData` | `0_data/v2_results/` |
+| `06_harmonize_bird_translation_lookup.R` | v2's bird `Xn-veg-v2024.Rdata` | `0_data/test_dataset/lookup/bird_veg_age_matrix.csv` |
+| `07_harmonize_v2_plant_bootstrap_ids.R` | v2's stored plant bootstrap draws | `0_data/test_dataset/lookup/v2_bootstrap_ids/` |
 
 - **`01`** writes every response, covariate and lookup table described
   under [`0_data/`](#0_data), so experiments run from
@@ -426,7 +440,19 @@ them sorted clear of the run-time code.
 - **`05`** flattens the three v2 storage formats into
   `0_data/v2_results/v2_results.csv`. Plants come from `COEFS.RData`, v2's
   own standardization output, which holds complete bryophyte arrays. Mammal
-  results average the two seasons, as v2's `.all` tables do.
+  results average the two seasons, as v2's `.all` tables do. Note that
+  `Birds2024.RData` labels draws 2 to 100 in file-listing order (`b2` is draw
+  10, `b3` draw 100), a v2 packaging quirk: medians and bands are unaffected,
+  but a draw-by-draw comparison has to remap them.
+- **`06`** copies the `age` matrix v2 uses to translate bird landcover
+  coefficients onto the standardized habitat types, so
+  `modules/birds/standardize.R` can do the same without the bird drive. Re-run
+  it whenever `01` rebuilds `lookup/`.
+- **`07`** copies v2's stored plant bootstrap draws, one file per species, so a
+  run with `plant_bootstrap = "v2_ids"` fits exactly the rows v2 fitted. The
+  full sets are large (1.3 GB compressed for vascular plants), so
+  `SDM_V2_BOOT_TAXA` and `SDM_V2_BOOT_SPECIES` restrict it to what a run needs.
+  Bryophytes come from `03`'s regenerated draws.
 
 `_deprecated/` holds code superseded by the harness: the earlier
 plant-only modules, placeholder harness files and the first version of
@@ -470,7 +496,7 @@ time from the repository alone without large files changing on every run:
 | --- | --- |
 | `run_record.md`, `report.md` | `figures/` |
 | `tables/parity_summary.csv` | `tables/coefficient_summary.csv` |
-| `tables/coverage.csv` | `tables/parity_climate.csv` |
+| `tables/coverage.csv` | `tables/parity_terms.csv` |
 | `tables/metric_summary.csv` | |
 
 The gitignored tables hold per-species, per-term detail. They grow with the
@@ -494,7 +520,7 @@ A run writes its outputs in this order:
 
 ```
 2_pipeline stores ─► 01_collect  ─► coverage · metric_summary · coefficient_summary
-                    02_compare  ─► parity_climate · parity_summary
+                    02_compare  ─► parity_terms · parity_summary
                     03_report   ─► report.md
                     run.R 3.4   ─► run_record.md
 ```
@@ -514,13 +540,17 @@ to `v2_bootstraps`), the tables describe a trial.
 | Coverage | Rows written per taxon and region |
 | Metrics | A short metric summary |
 
-**`tables/coverage.csv`** — what ran. One row per taxon × region.
+**`tables/coverage.csv`** — what ran. One row per run × region.
 
 | Column | Meaning |
 | --- | --- |
-| `taxon`, `region` | Taxon slug and model region (`north`, `south`) |
+| `taxon` | Data slug, from the store's `meta.json` |
+| `run` | The spec's key in `run.R`, which names the store; the two mammal runs are `mammal_summer` and `mammal_winter` |
+| `region` | Model region (`north`, `south`) |
+| `season`, `part` | Mammals only: season, and hurdle part (`presence`, `abundance`) |
 | `species` | Species that produced output |
 | `draws` | Draws that produced output |
+| `stages` | Stages with stored coefficients |
 | `has_coefficients` | Whether coefficients were stored |
 | `has_grid` | Whether predictions onto the habitat prediction grid were stored |
 
@@ -529,7 +559,14 @@ reason is in `2_pipeline/<exp_id>/run_log.csv`.
 
 **`tables/metric_summary.csv`** — how well the models fit. One row per
 taxon × region × species × metric, with `n`, `median`, `p10` and `p90` over
-draws.
+draws. Each harness metric comes twice, prefixed by where it is scored:
+
+| Prefix | Scored on |
+| --- | --- |
+| `insample_` | The units the draw fitted |
+| `oob_` | The units the draw left out: the held-out read. NA for iteration 1, the full data |
+| `v2val_` | v2's own validation (plants): seven AUCs scored from the coefficients on the draw's units, as v2 does |
+| `oob_v2val_` | The same seven, on the units the draw left out |
 
 | Metric | Meaning |
 | --- | --- |
@@ -540,51 +577,69 @@ draws.
 | `calibration_slope` | 1 is well calibrated; below 1, predictions are over-confident |
 | `prevalence` | Observed detection rate |
 | `n` | Survey units scored |
+| `Climate`, `Climate_Truncated`, `Landcover`, `Full`, `Full_Truncated`, `Full_Joint`, `Full_Joint_Truncated` | v2's validation AUCs: climate alone (and capped at its 99th percentile), landcover alone, the two combined, and combined per habitat type |
 
-These are in-sample and come from the best single candidate model, not the
-averaged one. They show a model ran sensibly; they are not a validation.
+The harness metrics come from the final stage's best single candidate model;
+the v2 validation AUCs from the coefficients, as v2 reports them.
 
 **`tables/coefficient_summary.csv`** (gitignored) — what the models
-estimated. One row per taxon × region × species × term, with `n`, `median`,
-`p10` and `p90` over draws. Only the final stage is stored, and a term means
-something different by taxon:
+estimated. One row per run × region × stage × species × term, with the
+labels from `coverage.csv`, `n`, `median`, `p10` and `p90` over draws, and
+`boot1`, the iteration-1 (full-data) value. Every stage is stored, and a term
+means something different by taxon and stage:
 
-| Taxon | `term` holds |
+| Taxon and stage | `term` holds |
 | --- | --- |
-| Plant group | Effect of each habitat type on the logit scale, plus `Intercept`, `Climate` and, for bryophytes and lichens, `Protocol` |
-| Mammals | Probability of presence per habitat type |
-| Birds | Raw `glm` coefficients (e.g. `vegcCrop`), not the v2 standardized names |
+| Any, `climate` | Model-averaged climate coefficients, on the link scale |
+| Plant group, `habitat` | Effect of each habitat type on the logit scale, plus `Intercept`, `Climate` and, for bryophytes and lichens, `Protocol` |
+| Mammals, `habitat` | Probability of presence per habitat type in the winning model |
+| Birds, `landcover` | Raw `glm` coefficients (e.g. `vegcCrop`) |
+| Birds, `habitat` | The same, translated onto v2's standardized habitat types by `modules/birds/standardize.R`, log scale |
 
-**`tables/parity_climate.csv`** (gitignored) — the term-by-term comparison
-with v2: `coefficient_summary.csv` joined to the v2 reference on species and
-term. Despite the name it holds the final (habitat) stage. Use it to find
-which terms or species disagree.
+**`tables/parity_terms.csv`** (gitignored) — the term-by-term comparison
+with v2: `coefficient_summary.csv` joined to `0_data/v2_results/v2_results.csv`
+on taxon, region, stage, part, species and term. Plant habitat terms are
+relabelled as v2 publishes them; mammal seasons are averaged first. Use it to
+find which terms or species disagree.
 
 | Column | Meaning |
 | --- | --- |
-| `median`, `p10`, `p90`, `n` | This run's summary over draws |
-| `v2_median`, `v2_p10`, `v2_p90` | The v2 summary |
-| `v2_n` | v2 draws; `1` means v2 fitted once and has no band |
-| `reference_object`, `reference_source` | The v2 object and file compared against |
-| `age_spline_term` | `TRUE` where v2 overwrites the term with machinery the harness lacks (age splines, cutblock convergence), so it cannot match yet |
+| `ref_region`, `ref_part` | The reference rows joined to: climate joins region `all`, because v2 fits it province-wide |
+| `seasons` | Mammals: the seasons averaged (`summer+winter`) |
+| `median`, `p10`, `p90`, `boot1`, `n` | This run's summary over draws |
+| `v2_median`, `v2_p10`, `v2_p90`, `v2_n`, `source` | The v2 summary and where it came from; `v2_n = 1` means v2 fitted once |
+| `comparison`, `run_value` | `median`, or `iteration 1` where v2 fitted once, and the run value used |
+| `unreachable_reason`, `reachable` | Why a term cannot match yet (age spline, cutblock convergence, pooled with a spline term, v2 placeholder), from `v2_unreachable_terms()` in `02_compare_to_v2.R` |
 | `in_band` | `TRUE` where the v2 median falls inside this run's `p10`–`p90` band |
-| `standardized_difference` | \|run median − v2 median\| ÷ half this run's band width. Below 1 is close; far above 1 is a systematic difference |
+| `absolute_difference` | \|run value − v2 median\| |
+| `standardized_difference` | The absolute difference ÷ half this run's band width. Below 1 is close; far above 1 is a systematic difference |
 
 **`tables/parity_summary.csv`** — the gate result. One row per
-taxon × region.
+taxon × region × stage.
 
 | Column | Meaning |
 | --- | --- |
-| `terms_compared` | Terms joined to a v2 value |
+| `comparison` | `median` or `iteration 1` |
 | `species` | Species with at least one joined term |
+| `terms_compared` | Terms joined to a v2 value |
 | `in_band_pct` | Percentage of compared terms in band |
-| `reachable_terms` | Compared terms excluding `age_spline_term` |
-| `reachable_in_band_pct` | Percentage of reachable terms in band. **Read the gate on this** |
+| `reachable_terms` | Compared terms v2 does not set by missing machinery or a placeholder |
+| `reachable_in_band_pct` | Percentage of reachable terms in band |
 | `median_standardized_difference` | Typical size of the gap, over reachable terms |
+| `median_absolute_difference` | Typical absolute gap, over reachable terms |
+| `max_absolute_difference` | Largest absolute gap, over reachable terms; the numerical test for `iteration 1` rows |
+| `median_spearman` | Median, over species, of the rank correlation between run and v2 medians |
+| `verdict` | `pass`, `fail`, `no comparison`, or `not gated (trial run)`, against the targets in `utils/parity_targets.R` |
+| `indicative_verdict` | For a 100-draw run on a species subset: the same test, **not** the gate |
 
-No pass mark is set yet; see [Parity gate](#parity-gate). With few draws the
-band is wide and `in_band_pct` is inflated, so a trial run's numbers are not a
-parity read.
+The targets are proposed from `v2_self_agreement.R`, which measures how
+closely two v2 runs agree with each other; see the experiment README. A trial
+run — fewer draws than v2's 100, or a species subset — is not gated: with few
+draws the band is wide and `in_band_pct` is inflated.
+
+**`tables/v2_self_agreement_summary.csv`** — how closely v2 agrees with itself
+on the bryophyte climate stage, the evidence the distributional targets are
+set from. Written once by `v2_self_agreement.R`, not by `run.R`.
 
 **`report.md`** — a readable summary, generated rather than written:
 
@@ -594,7 +649,7 @@ parity read.
 | What each spec reproduces of v2 | Each spec's `v2_coverage` |
 | v2 references | `0_data/v2_results/v2_results_coverage.csv`, and what this run's comparison could not reach |
 | What ran | `tables/coverage.csv` |
-| Parity against v2 (final stage) | `tables/parity_summary.csv` |
+| Parity against v2, by stage | `tables/parity_summary.csv` |
 | Model fit | Median AUC from `tables/metric_summary.csv` |
 
 ### `docs/`
@@ -635,24 +690,19 @@ remediation plan, is in
 [`docs/reviews/2026-09-28_alignment_review.md`](docs/reviews/2026-09-28_alignment_review.md).
 The main ones:
 
-- **The climate stage is fitted per region.** v2 fits climate once across
-  the province and applies the region filter only for the habitat stage;
-  the harness filters first, and draws the bootstrap within each region.
-  This shifts every downstream habitat coefficient.
-- **The gate compares the wrong things.** Only the final stage's
-  coefficients are stored, so climate-stage parity is never measured.
-  `02_compare_to_v2.R` reads v2 from the network drives rather than from
-  `0_data/v2_results/v2_results.csv`, and does not yet find the rebuilt
-  bryophyte and bird references.
-- **Birds depart from v2.** v2 fits 25 climate candidates, where the harness
-  fits 9 — the other 16 need `Easting` and `Northing`, which the bird
-  covariates lack. v2 also weights the landcover models, carries climate on
-  the response scale, and always advances to each group's winner.
-- **Machinery not yet built.** Plant age splines (45 of the 87 vegetation
-  effects) and cutblock convergence; the same for mammals, whose
-  implementation differs; mammal total abundance; the mammal south habitat
-  sets; and v2's validation stage.
+- **Some published v2 results cannot be reproduced exactly.** The harness
+  matches v2's own code to numerical precision (plants and birds, climate
+  and habitat). But the published lichen models were fitted on bootstrap
+  draws v2 did not keep, and the published bird results on a different
+  vintage of `Stratified.Rdata`, so parity against those is approximate.
+  See [`docs/taxon_quirks.md`](docs/taxon_quirks.md).
 - **No parity target has been agreed.**
+
+The v2 machinery is now all in the harness: the plant age splines, cutblock
+convergence and validation (`modules/_shared/plant_group.R`), and the mammal
+hurdle with its splines, calibration and convergence
+(`modules/mammals/hurdle.R`). Each matches v2 numerically where the
+reference was fitted on data the test dataset holds.
 
 ## Naming conventions
 

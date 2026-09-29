@@ -24,55 +24,99 @@ statement. In short:
 
 | Taxon | Climate | Habitat or landcover | Resampling |
 | --- | --- | --- | --- |
-| Plant group (×4) | Partial: v2's 58-model set, fitted per region where v2 fits once province-wide | Partial: IVW on the grid and footprint pooling; no age splines or cutblock convergence | Partial: drawn within region |
-| Mammals | Partial: v2's full 9-model set, fitted as a stage where v2 reads a prediction | Partial: north only, one hurdle half per run; no age splines, convergence, total abundance or south sets | Partial: v2 does not bootstrap this stage |
-| Birds | Partial: 9 of v2's 25 candidates; carried on the link scale | Partial: staged BIC, but unweighted and with a different advance rule | Reproduced: v2's stored draws |
+| Plant group (×4) | Reproduced: v2's 58-model set, fitted once province-wide; exact to v2's code | Reproduced: IVW on the grid, stand-age splines, cutblock convergence, footprint pooling and pAspen; exact to v2 on the full-data draw | Reproduced: once per species over the province, or v2's own stored draws |
+| Mammals | Reproduced: v2's precomputed climate prediction | Reproduced: the hurdle (presence, abundance, total) on the full habitat set, with splines, calibration and convergence; exact to v2's published tables | v2 fits once; iteration 1 is compared |
+| Birds | Reproduced: v2's 25 candidates, province-wide, carried as exp(link + offset); exact to v2's code | Reproduced: weighted staged BIC from `count ~ climate`; exact to v2's code | Reproduced: v2's stored draws |
 
 If this table and the specs disagree, the specs are right; update this
 table.
 
 ## What the gate compares today
 
-`02_compare_to_v2.R` compares each taxon's **final** stage, because only
-the final stage's coefficients are stored. It reads v2 from the network
-drives rather than from `0_data/v2_results/v2_results.csv`. As a result:
+`02_compare_to_v2.R` compares **every stage** against
+`0_data/v2_results/v2_results.csv` alone, so it runs with the network
+drives unmounted. Every taxon, bryophytes included, has a reference there.
 
-- **Plant group:** lichens, mites and vascular plants are compared on
-  their habitat terms. The climate stage is not compared.
-- **Bryophytes:** not compared. The published model file is all error
-  objects, and the gate does not search either usable reference: v2's
-  `COEFS.RData`, which `v2_results.csv` is built from, or the climate
-  reference `_setup/03` rebuilt in `2_pipeline/v2_reference/`.
-- **Birds:** not compared. `_setup/04` packaged `Birds2024.RData`, but
-  the gate sets the bird reference to `NULL`, and the harness stores raw
-  `glm` names where v2's packaged coefficients use the standardized
-  template.
-- **Mammals:** no term joins. The reference read is the climate
-  coefficients; the run's final stage is habitat. v2's references also
-  average the two seasons, where a run fits one.
+- **Climate:** scored against v2's single province-wide fit
+  (`region = "all"`), which the harness now reproduces: one fit per draw,
+  shared by both regions.
+- **Plant habitat:** terms relabelled as v2's `04a` standardization
+  publishes them (`BlackSpruce` as `TreedBog`, `UrbInd` copied to
+  `Urban`, `Industrial` and `Rural`, and so on). The unaged stand types do
+  not join, because v2 publishes only their spline-fitted age classes.
+- **Bird habitat:** the landcover coefficients translated onto v2's
+  standardized template by `modules/birds/standardize.R`, a port of
+  v2's `08.PackageCoefficients.R`. Checked against v2's own packaged
+  output: translating v2's raw per-draw coefficients reproduces
+  `Birds2024.RData` exactly. The raw `landcover` stage is kept in the
+  summary but not scored.
+- **Mammals:** the summer and winter runs are averaged, as v2's `.all`
+  tables are, and compared at iteration 1, because v2 fits once. The
+  hurdle writes presence, abundance and total abundance on v2's full
+  habitat set, each joined to its own v2 table.
 
-The report lists what its comparison could not reach, so this is
-checkable run by run.
+Terms v2 sets with machinery the harness lacks, or fixes at a placeholder,
+are listed from the v2 code in `v2_unreachable_terms()` and left out of
+the reachable scores. The report lists anything its comparison could not
+join, so this is checkable run by run.
 
 Earlier ad hoc checks put mammal presence at r = 0.985 and abundance at
 r = 0.79 against v2 on iteration 1. They were not produced by the
 committed gate and cannot be regenerated from it.
 
+## Parity targets (proposed)
+
+The targets live in `utils/parity_targets.R`, and `02_compare_to_v2.R`
+reads a `verdict` per taxon, region and stage against them. **They are
+proposals until agreed**; the report says so.
+
+**How closely v2 agrees with itself.** `v2_self_agreement.R` compares two
+v2 runs of the same code on the same data: the bryophyte climate stage as
+published in `COEFS.RData`, and the rerun `_setup/03` made, 134 species by
+19 terms by 100 draws each, scored exactly as the gate scores the harness.
+
+| Measure | v2 against itself |
+| --- | --- |
+| Terms with one run's median in the other's 10–90% band | 100% |
+| Median standardized difference | 0.019 |
+| Median per-species Spearman correlation of the medians | 0.998 (10th percentile 0.887) |
+
+At 100 draws a median is stable relative to the 10–90% band, so a correct
+reimplementation should reach close to these. The targets leave a margin
+for one run being compared with one run:
+
+| Comparison | Passes when |
+| --- | --- |
+| Numerical (iteration 1, where v2 fits once: the mammal hurdle) | Every reachable term within 1e-6 |
+| Distributional (v2 bootstraps: plant and bird stages) | At least 90% of reachable terms in band, median standardized difference ≤ 0.25, and median per-species Spearman ≥ 0.95 |
+
+Only a full run is gated: every species, 100 draws. A run with 100 draws
+on a species subset also gets an `indicative_verdict`, never to be read
+as the gate.
+
+Assumptions, stated because they carry the targets:
+
+- The calibration covers the plant climate stage only; the same targets
+  are applied to plant habitat and to birds, on the assumption that v2's
+  self-agreement is similar there. No second v2 run exists to check it.
+- The review's strawman asked for a grid-prediction correlation; v2's
+  reference holds no grid predictions, so the rank correlation of the
+  coefficient medians stands in for it.
+
 ## Before this gate can be closed
 
-1. **Agree a numeric parity target, per taxon and stage.** Without one,
-   "did it pass" has no answer.
-2. **Compare the right things:** store every stage's coefficients, read
-   `0_data/v2_results/v2_results.csv`, average mammal seasons, and
-   translate bird terms to the standardized template.
-3. **Match v2 where the specs depart from it:** fit climate
-   province-wide and draw the bootstrap once per species across the
-   province; give birds v2's 25 climate candidates (which needs
-   `Easting` and `Northing` added to the bird covariates), weights, carry
-   scale and advance rule.
-4. **Build the missing machinery:** plant age splines and cutblock
-   convergence, the separate mammal versions, mammal total abundance and
-   the mammal south sets.
+1. **Agree the parity targets above**, or change them in
+   `utils/parity_targets.R`.
+2. **Run the full species queues at 100 draws** and commit the report
+   and record. That run is days of compute (every species of four plant
+   taxa, mammals and birds); run it on a machine that can be left.
+3. **Get references that can be matched exactly.** The harness now
+   matches v2's own code to numerical precision, but the published lichen,
+   mite and vascular plant models were fitted on bootstrap draws v2 did
+   not keep, and the published bird results on a different vintage of
+   `Stratified.Rdata`. Re-running v2 on the stored draws (as `_setup/03`
+   did for bryophytes), or finding the bird data those results used, would
+   make those gates numerical. Until then they stay distributional.
 
 The review, `docs/reviews/2026-09-28_alignment_review.md`, has the
 evidence for each and an ordered plan.

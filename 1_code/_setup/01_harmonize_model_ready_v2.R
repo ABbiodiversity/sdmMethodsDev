@@ -377,8 +377,14 @@ mammal_camera_climate_file <- Sys.getenv(
 
 # What it supplies. Everything else in the file - coordinates,
 # natural region, elevation - is already in sites.csv.
+#
+# pAspen is deliberately not taken from it. The file carries a
+# pAspen, but v2's south habitat models fit the SpTable's own,
+# a different extraction that differs by up to 0.92 at matched
+# deployments; replacing it made every south candidate with
+# pAspen disagree with v2. The SpTable's column is kept.
 mammal_camera_climate_cols <- c(
-  "pAspen", "MAT", "MWMT", "MCMT", "TD", "MAP", "MSP", "AHM",
+  "MAT", "MWMT", "MCMT", "TD", "MAP", "MSP", "AHM",
   "SHM", "DD_0", "DD5", "DD_18", "DD18", "NFFD", "bFFP", "eFFP",
   "FFP", "PAS", "EMT", "EXT", "Eref", "CMD", "RH", "CMI",
   "DD1040", "bio9", "bio15", "HTV"

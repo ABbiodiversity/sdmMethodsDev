@@ -67,9 +67,7 @@ focal_species_sets <- function() {
     # between north and south so the southern model is genuinely
     # exercised.
     #
-    # Birds are the exception. No v2 reference is reachable, so
-    # AMRO and YEWA prove the run path works but cannot be
-    # gated. Drop "bird" from run_taxa for a parity-only pass.
+    # Birds use v2's stored draws, so their bands are v2's own.
     #
     # Detections north / south, and prevalence north / south:
     #   Ceratodon.purpureus       2140 /  554   44.1 / 24.0
@@ -109,11 +107,16 @@ focal_species_sets <- function() {
       vascular_plant = "Vicia.americana",
 
       # Both have a published climate reference. Coyote carries
-      # the south, where moose is thinner.
+      # the south, where moose is thinner. Both seasons, because
+      # v2's mammal references average summer and winter; each
+      # season's spec takes its own and skips the other.
       mammal         = "Moose_Summer",
+      mammal         = "Moose_Winter",
       mammal         = "Coyote_Summer",
+      mammal         = "Coyote_Winter",
 
-      # Runnable, not gateable.
+      # Gated on climate, and on landcover once translated to
+      # v2's standardized terms.
       bird           = "AMRO",
       bird           = "YEWA"
     ),
@@ -147,6 +150,7 @@ focal_species_sets <- function() {
       mite           = "Ceratozetes.gracilis",
       vascular_plant = "Galium.boreale",
       mammal         = "Moose_Summer",
+      mammal         = "Moose_Winter",
       bird           = "AMRO"
     )
   )

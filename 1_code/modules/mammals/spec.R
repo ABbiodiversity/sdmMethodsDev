@@ -149,53 +149,48 @@ mammal_agp_response <- function(values, frame) {
 
 #' Build the v2 Spec for Mammals
 #'
-#' @param climate_source Character. "fitted" runs the adapted
-#'   climate stage; "precomputed" is the v2 default, which takes
-#'   the offset from the lookup instead of fitting it.
+#' @param climate_source Character. "precomputed", the v2
+#'   default, reads each species' climate prediction from
+#'   mammal_climate_predictions.csv and drops the deployments
+#'   without one, as v2 does; "fitted" fits the adapted climate
+#'   stage instead.
 #' @param season Character. "summer" or "winter"; selects the
 #'   weight column and the species queue.
 #' @param tier Character. "modelled" is the full habitat model,
 #'   fitted for species with at least 20 detections; "ua" is the
 #'   use-availability model, at least 3.
-#' @param part Character. Which half of the hurdle to fit.
-#'   "presence" is the binomial model, compared against
-#'   Coef.pa.all; "abundance" is the Gamma model on the units
-#'   where the species was seen, compared against Coef.agp.all.
-#'   v2 multiplies the two for total abundance; they are run
-#'   separately here because each has its own reference.
+#' @param part Character. "hurdle", v2's model, fits both halves
+#'   together (hurdle.R) and reports presence, abundance and
+#'   total abundance on v2's full habitat set, with the stand-age
+#'   splines and cutblock convergence. "presence" and
+#'   "abundance" fit one half alone with the harness's generic
+#'   rules and report the winning model's own categories.
 #' @return A spec list, as run_spec() consumes.
 #'
 #' @example # Example usage of the function
-#' # spec <- mammal_spec(climate_source = "fitted")
+#' # spec <- mammal_spec()
+#' # spec <- mammal_spec(climate_source = "fitted",
+#' #                     part = "presence")
 mammal_spec <- function(
-  climate_source = c("fitted", "precomputed"),
+  climate_source = c("precomputed", "fitted"),
   season = c("summer", "winter"),
   tier = "modelled",
-  part = c("presence", "abundance")
+  part = c("hurdle", "presence", "abundance")
 ) {
   climate_source <- match.arg(climate_source)
   season <- match.arg(season)
   part <- match.arg(part)
-
-  # Said here rather than discovered as a missing `Climate`
-  # column once the run is loading data.
-  if (climate_source == "precomputed") {
-    stop(
-      "climate_source = \"precomputed\" is not implemented: ",
-      "nothing reads mammal_climate_predictions.csv yet. Use ",
-      "\"fitted\".",
-      call. = FALSE
-    )
-  }
+  hurdle <- part == "hurdle"
 
   # The abundance half fits the same candidates with Climate
   # dropped - v2's note is that climate effects on abundance
   # given presence are minimal - plus a null carrying only
   # sampling effort.
-  habitat_models <- function() {
-    models <- get_model_set("habitat_mammal_north_pa_v2")
+  habitat_models <- function(set) {
+    models <- get_model_set(set)
 
-    if (part == "presence") {
+    # The hurdle rule derives its abundance candidates itself
+    if (part %in% c("presence", "hurdle")) {
       return(models)
     }
 
@@ -231,11 +226,25 @@ mammal_spec <- function(
     taxon = "mammal",
     response_name = "response",
 
-    # v2 models presence rather than the recorded density.
-    response_transform = if (part == "presence") {
-      mammal_pa_response
-    } else {
+    # v2 models presence rather than the recorded density. The
+    # hurdle rule recomputes both halves' responses from the raw
+    # count itself.
+    response_transform = if (part == "abundance") {
       mammal_agp_response
+    } else {
+      mammal_pa_response
+    },
+
+    # v2 reads climate from a separate pipeline's prediction
+    species_frame = if (climate_source == "precomputed") {
+      mammal_precomputed_climate
+    } else {
+      NULL
+    },
+    supplied_columns = if (climate_source == "precomputed") {
+      "Climate"
+    } else {
+      NULL
     },
     family = "binomial",
     weight_column = paste0("wt_", season),
@@ -249,30 +258,66 @@ mammal_spec <- function(
     regions = list(
       north = list(
         # v2 drops deployments with too little sampling effort
-        # to estimate from.
+        # to estimate from, and in the north the wetland-margin
+        # deployments (section 5.1).
         filter = if (season == "summer") {
-          ~ summer_days > 10
+          ~ summer_days > 10 & WetlandMargin != 1
         } else {
-          ~ winter_days > 10
+          ~ winter_days > 10 & WetlandMargin != 1
         },
         grid = "mammal_north",
+        # v2's prediction matrix without WetlandMargin, and
+        # without the Climate row (section 5.2)
+        grid_drop_rows = c("WetlandMargin", "Climate"),
+        grid_drop_cols = "WetlandMargin",
         term_block = "veg",
-        habitat_models = habitat_models()
+        habitat_models = habitat_models("habitat_mammal_north_pa_v2"),
+        intercept_cats = "intercept_mammal_north_pa_v2",
+        # The stand-age splines read the aged cover columns
+        extra_covariates = if (hurdle) {
+          as.vector(t(outer(
+            c("Spruce", "Pine", "Decid", "Mixedwood", "TreedBog"),
+            c("R", 1:8), paste0
+          )))
+        } else {
+          NULL
+        }
       ),
       south = list(
+        # The south drops all-water deployments instead
         filter = if (season == "summer") {
-          ~ summer_days > 10
+          ~ summer_days > 10 & Water == 0
         } else {
-          ~ winter_days > 10
+          ~ winter_days > 10 & Water == 0
         },
         grid = "mammal_south",
+        grid_drop_rows = "Climate",
         term_block = "soil",
-        habitat_models = NULL
+        # v2's 30 south candidates, from south-models/00_models.R
+        habitat_models = habitat_models("habitat_mammal_south_pa_v2"),
+        intercept_cats = "intercept_mammal_south_pa_v2",
+        # Half the south candidates carry pAspen. Like sampling
+        # effort, it is held fixed for the one-hot predictions
+        # rather than read as a habitat type.
+        constants = list(seas_days = 100, Climate = 0, pAspen = 0)
       )
     ),
 
     stages = c(stages, list(
-      if (part == "presence") {
+      if (hurdle) {
+        list(
+          name = "habitat",
+          models = NULL,
+          engine = "glm",
+          # Both halves of v2's hurdle together; see hurdle.R.
+          # Writes stages habitat_presence, habitat_abundance and
+          # habitat_total.
+          selection = select_mammal_v2_hurdle,
+          ic = "AICc",
+          carry_from = "climate",
+          carry_from_as = "Climate"
+        )
+      } else if (part == "presence") {
         list(
           name = "habitat",
           models = NULL,
@@ -283,8 +328,7 @@ mammal_spec <- function(
           carry_from_as = "Climate",
           # Each candidate leaves one land cover out; the rule
           # reports it, because every other effect is relative
-          # to it.
-          intercept_cats = "intercept_mammal_north_pa_v2",
+          # to it. Set per region, with the region's models.
           constants = list(seas_days = 100, Climate = 0),
           slope_terms = "Climate",
           # v2 shifts the whole set on the logit scale so mean
@@ -333,23 +377,43 @@ mammal_spec <- function(
     # What this spec reproduces of v2, per stage. The single
     # source of truth for coverage: the report reads it.
     v2_coverage = list(
-      climate = v2_status(
-        "partial",
-        paste(
-          "The full v2 9-model set, glm, AICc averaged, fitted",
-          "as a stage and bootstrapped. v2 fits it once, in a",
-          "separate pipeline, and reads back a prediction."
+      climate = if (climate_source == "precomputed") {
+        v2_status(
+          "reproduced",
+          paste(
+            "v2's precomputed climate prediction, read per species;",
+            "deployments without one are dropped, as in v2."
+          )
         )
-      ),
-      habitat = v2_status(
-        "partial",
-        paste(
-          "North only, one half of the hurdle per run (presence",
-          "or abundance). Not implemented: age splines, cutblock",
-          "convergence, the assembled total abundance, and the",
-          "south candidate sets."
+      } else {
+        v2_status(
+          "partial",
+          paste(
+            "The full v2 9-model set, fitted as a stage. v2 fits",
+            "it once, in a separate pipeline, and reads back a",
+            "prediction; use climate_source = \"precomputed\"."
+          )
         )
-      ),
+      },
+      habitat = if (hurdle) {
+        v2_status(
+          "reproduced",
+          paste(
+            "v2's hurdle: presence, abundance and total abundance",
+            "on the full habitat set, with the stand-age splines,",
+            "calibration and cutblock convergence. Matches v2's",
+            "published tables to 2e-14, north and south."
+          )
+        )
+      } else {
+        v2_status(
+          "partial",
+          paste(
+            "One half of the hurdle alone, reporting the winning",
+            "model's own categories; use part = \"hurdle\" for v2."
+          )
+        )
+      },
       resampling = v2_status(
         "partial",
         paste(
@@ -359,11 +423,10 @@ mammal_spec <- function(
         )
       ),
       season = v2_status(
-        "partial",
+        "reproduced",
         paste(
-          "One season per run. v2's `.all` references average",
-          "summer and winter, so both must be run and averaged",
-          "before comparing."
+          "One season per spec; run.R runs both, and the gate",
+          "averages them as v2's `.all` references do."
         )
       )
     ),

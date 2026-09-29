@@ -206,29 +206,38 @@ fit_glm_family <- function(
   # A candidate set is expected to hold models that cannot be
   # estimated for a given species and draw. The selection rule
   # needs to see which failed, so failure is returned, not raised.
-  out <- tryCatch(
-    list(
-      fit = do.call(fitter, args),
-      ok = TRUE,
-      message = NA_character_
-    ),
+  #
+  # A convergence warning still leaves a usable fit, so it is
+  # recorded rather than treated as a failure. It is caught with
+  # withCallingHandlers() and muffled, so the model is fitted
+  # once; catching it with tryCatch() would abandon the fit and
+  # force a second one.
+  warnings_seen <- character(0)
+
+  tryCatch(
+    {
+      fit <- withCallingHandlers(
+        do.call(fitter, args),
+        warning = function(w) {
+          warnings_seen <<- c(warnings_seen, conditionMessage(w))
+          invokeRestart("muffleWarning")
+        }
+      )
+
+      list(
+        fit = fit,
+        ok = TRUE,
+        message = if (length(warnings_seen) == 0) {
+          NA_character_
+        } else {
+          paste(unique(warnings_seen), collapse = "; ")
+        }
+      )
+    },
     error = function(e) {
       list(fit = NULL, ok = FALSE, message = conditionMessage(e))
-    },
-    warning = function(w) {
-      # A convergence warning still leaves a usable fit, so it is
-      # recorded rather than treated as a failure
-      suppressWarnings(
-        list(
-          fit = do.call(fitter, args),
-          ok = TRUE,
-          message = conditionMessage(w)
-        )
-      )
     }
   )
-
-  out
 }
 
 ## 5.2 fit_coefficients() ----
@@ -326,7 +335,11 @@ information_criterion <- function(fit, type = "AICc") {
       AIC = stats::AIC(fit$fit),
       BIC = stats::BIC(fit$fit),
       AICc = {
-        k <- length(stats::coef(fit$fit))
+        # The parameter count is the log-likelihood's degrees of
+        # freedom, as MuMIn uses, not the length of the
+        # coefficient vector, which also counts aliased (NA)
+        # terms and so over-penalizes a rank-deficient model.
+        k <- attr(stats::logLik(fit$fit), "df")
         n <- stats::nobs(fit$fit)
         # The correction is undefined once the parameter count
         # reaches the sample size; Inf keeps such a model out of

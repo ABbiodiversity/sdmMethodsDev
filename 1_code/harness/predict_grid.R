@@ -185,7 +185,29 @@ predict_from_coefficients <- function(
 
   data$Intercept <- 1
   terms <- names(estimates)
-  absent <- setdiff(terms, names(data))
+
+  # A term is a column, an interaction of columns (a:b), or an
+  # expression such as I(Easting^2), which v2's bird climate
+  # formulas use. Each is evaluated against the frame.
+  term_value <- function(term) {
+    if (term %in% names(data)) {
+      return(as.numeric(data[[term]]))
+    }
+
+    if (grepl(":", term, fixed = TRUE)) {
+      pieces <- strsplit(term, ":", fixed = TRUE)[[1]]
+      return(Reduce(`*`, lapply(pieces, term_value)))
+    }
+
+    if (startsWith(term, "I(")) {
+      return(as.numeric(eval(parse(text = term)[[1]], data)))
+    }
+
+    NULL
+  }
+
+  columns <- lapply(terms, term_value)
+  absent <- terms[vapply(columns, is.null, logical(1))]
 
   if (length(absent) > 0) {
     stop(
@@ -196,9 +218,7 @@ predict_from_coefficients <- function(
     )
   }
 
-  linear <- drop(
-    as.matrix(data[, terms, drop = FALSE]) %*% estimates
-  )
+  linear <- drop(do.call(cbind, columns) %*% estimates)
 
   if (scale == "response") {
     return(stats::plogis(linear))

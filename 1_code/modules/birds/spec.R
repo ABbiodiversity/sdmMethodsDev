@@ -14,12 +14,13 @@
 #     staged forward selection: groups of formulas, each fitted
 #     as an update to the previous group's winner, keeping the
 #     smallest model within 2 BIC of the best.
-#   - The climate set here is v2's eight climate combinations
-#     plus the null. v2 also fits each with linear and with
-#     quadratic spatial terms, 25 candidates in all
-#     (06.ModelClimate.R). Birds carry no Easting or Northing in
-#     the test dataset, so those cannot be fitted until the
-#     harmonizer adds them.
+#   - The climate set is v2's 25 candidates (06.ModelClimate.R):
+#     the null, eight climate combinations, and each of the eight
+#     with linear and with quadratic spatial terms. The spatial
+#     terms are the UTM easting and northing sites.csv carries
+#     for birds, aliased to v2's names.
+#   - Climate is fitted once per draw on every survey, as v2
+#     does, and shared by both regions (`scope = "province"`).
 #   - Bootstrap ids are precomputed and stored against surveyid
 #     rather than survey_unit_id, so the draw is translated
 #     through the design block.
@@ -52,37 +53,48 @@ bird_spec <- function() {
     weight_column = NULL,
     tier = NULL,
 
+    # v2's spatial terms are the survey's UTM easting and northing
+    # in metres, which sites.csv carries for birds.
+    aliases = list(Easting = "easting", Northing = "northing"),
+
     regions = list(
       north = list(
         filter = ~ useNorth == 1,
         grid = NULL,
         term_block = "veg",
-        habitat_models = "landcover_bird_north_v2"
+        habitat_models = "landcover_bird_north_v2",
+        # v2 weights the landcover models by region
+        weight_column = "vegw"
       ),
       south = list(
         filter = ~ useSouth == 1,
         grid = NULL,
         term_block = "soil",
-        habitat_models = "landcover_bird_south_v2"
+        habitat_models = "landcover_bird_south_v2",
+        weight_column = "soilw"
       )
     ),
 
     stages = list(
       list(
         name = "climate",
-        models = "climate_bird_mammal_v2",
+        # v2's 25 candidates, averaged at once by AICc
+        # (06.ModelClimate.R); only the landcover stage walks
+        # groups.
+        models = "climate_bird_v2",
         engine = "glm",
-        # Averaged by AICc weight, not staged. 06.ModelClimate.R
-        # calls model.avg() over the whole candidate list; only
-        # the landcover stage walks groups.
         selection = "aic_average",
         ic = "AICc",
-        # v2 carries the fitted climate through as a term on the
-        # link scale here, unlike the plant pipeline, because the
-        # landcover model is Poisson with an offset rather than
-        # binomial.
+        # Fitted once on every survey in the draw, as v2 fits it,
+        # and shared by both regions. Unweighted, as in v2.
+        scope = "province",
+        weighted = FALSE,
+        # v2 carries the averaged prediction on the response
+        # scale with the QPAD offset in it: the expected count,
+        # exp(link + offset).
         carry_as = "Climate",
-        carry_scale = "link"
+        carry_scale = "exp",
+        carry_offset = TRUE
       ),
       list(
         name = "landcover",
@@ -92,6 +104,10 @@ bird_spec <- function() {
         engine = "glm",
         selection = "staged_bic",
         ic = "BIC",
+        # v2 always moves on to each group's winner
+        always_advance = TRUE,
+        # Every candidate starts from v2's `count ~ climate`
+        base_terms = "Climate",
         carry_from = "climate",
         carry_from_as = "Climate"
       )
@@ -99,35 +115,41 @@ bird_spec <- function() {
 
     resample = list(
       scheme = "precomputed",
-      id_column = "surveyid"
+      id_column = "surveyid",
+      # v2 selects a draw with %in%, so a survey drawn twice is
+      # fitted once.
+      unique_ids = TRUE,
+      # One draw for the whole province, filtered per region.
+      scope = "province"
     ),
 
     # What this spec reproduces of v2, per stage. The single
     # source of truth for coverage: the report reads it.
     v2_coverage = list(
       climate = v2_status(
-        "partial",
+        "reproduced",
         paste(
-          "AICc averaging as v2, but over 9 candidates where v2",
-          "fits 25; the spatial ones need Easting and Northing,",
-          "which the test dataset lacks for birds. Carried on the",
-          "link scale; v2 carries exp(link). Fitted per region;",
-          "v2 fits it province-wide."
+          "v2's 25 candidates, AICc averaged, fitted once on the",
+          "province-wide draw, unweighted, and carried as",
+          "exp(link + offset)."
         )
       ),
       landcover = v2_status(
-        "partial",
+        "reproduced",
         paste(
-          "Staged BIC over v2's groups. v2 weights the fits by",
-          "vegw or soilw, not applied here, and always advances",
-          "to a group's winner, where this advances only on an",
-          "improvement. Coefficients keep raw glm names; v2's",
-          "packaged ones use the standardized template."
+          "Staged BIC over v2's groups, weighted by vegw or",
+          "soilw, always advancing to each group's winner.",
+          "Raw coefficients are translated onto v2's",
+          "standardized template by standardize.R, a port",
+          "checked exact against v2's packaged output."
         )
       ),
       resampling = v2_status(
         "reproduced",
-        "v2's 100 stored draws, keyed on surveyid."
+        paste(
+          "v2's 100 stored draws, keyed on surveyid, each survey",
+          "once per draw as v2's %in% selects them."
+        )
       )
     ),
 

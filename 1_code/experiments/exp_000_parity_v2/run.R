@@ -68,6 +68,16 @@ for (taxon_dir in c(
   ))
 }
 
+# Translates bird landcover coefficients onto v2's standardized
+# habitat terms, so the comparison can join them.
+source(file.path(
+  project_root, "1_code/modules/birds/standardize.R"
+))
+
+# v2's mammal hurdle model, which the mammal specs select by
+# default.
+source(file.path(project_root, "1_code/modules/mammals/hurdle.R"))
+
 exp_id <- "exp_000_parity_v2"
 
 exp_code_dir <- file.path(
@@ -78,6 +88,9 @@ exp_code_dir <- file.path(
 
 # Named focal-species sets, so run.R chooses rather than lists.
 source(file.path(exp_code_dir, "utils/focal_species.R"))
+
+# The parity targets the comparison reads its verdict against
+source(file.path(exp_code_dir, "utils/parity_targets.R"))
 
 ## 1.3 Choose where the run reads and writes ----
 # data_dir is read only. pipeline_dir takes the result stores,
@@ -91,25 +104,45 @@ out_dir <- file.path(project_root, "3_output", exp_id)
 
 ## 1.4 Set the taxa to run ----
 # Each entry names a spec. Comment one out to skip it.
-# Keys are data slugs, which is what run_taxa and focal_species
-# match on. Soil mites key on "mite".
+# A key names the run and its folder under pipeline_dir; the
+# data slug the spec reads is its own `taxon` field, which is
+# what focal_species matches on. Soil mites use the slug "mite".
+#
+# Mammals run once per season. v2's mammal references average
+# the summer and winter fits, so the comparison needs both.
+#
+# The plant bootstrap. "spatial_block" draws v2's bootstrap
+# afresh, so parity is distributional. "v2_ids" replays the draws
+# v2 stored, which makes it numerical draw by draw - but only
+# against a reference fitted on those draws. The published
+# lichen, mite and vascular plant models were not (checked: no
+# published draw matches beyond the full-data one), so it pays
+# off only for the bryophyte reference _setup/03 regenerated.
+# "v2_ids" needs _setup/07 run for every species in the run.
+plant_bootstrap <- "spatial_block"
+
 specs <- list(
-  bryophyte = bryophyte_spec(),
-  lichen = lichen_spec(),
-  mite = soil_mite_spec(),
-  vascular_plant = vascular_plant_spec(),
-  mammal = mammal_spec(climate_source = "fitted"),
+  bryophyte = bryophyte_spec(bootstrap = plant_bootstrap),
+  lichen = lichen_spec(bootstrap = plant_bootstrap),
+  mite = soil_mite_spec(bootstrap = plant_bootstrap),
+  vascular_plant = vascular_plant_spec(bootstrap = plant_bootstrap),
+  mammal_summer = mammal_spec(
+    season = "summer"
+  ),
+  mammal_winter = mammal_spec(
+    season = "winter"
+  ),
   bird = bird_spec()
 )
 
-# All six. Drop names to run fewer; birds run but cannot be
-# gated, so a parity-only pass can leave "bird" out.
+# Every spec. Drop keys to run fewer.
 run_taxa <- c(
   "bryophyte",
   "lichen",
   "mite",
   "vascular_plant",
-  "mammal",
+  "mammal_summer",
+  "mammal_winter",
   "bird"
 )
 
@@ -143,10 +176,18 @@ focal_species <- get_focal_species("parity_check")
 # rather than "none". That is the convention working as intended,
 # but it turns a set like plants_only into the longest run in the
 # file rather than the shortest, so it is said out loud here.
+# Matched on each spec's data slug, not its key, because the two
+# mammal keys share the slug "mammal".
+run_slugs <- vapply(
+  specs[intersect(run_taxa, names(specs))],
+  function(one) one$taxon,
+  character(1)
+)
+
 unnamed_taxa <- if (is.null(focal_species)) {
   character(0)
 } else {
-  setdiff(run_taxa, unique(names(focal_species)))
+  names(run_slugs)[!run_slugs %in% names(focal_species)]
 }
 
 if (length(unnamed_taxa) > 0) {
@@ -205,9 +246,13 @@ stage_models <- NULL
 #   100  the v2 value, and the only setting that gates
 #    20  a usable band, for a slow-but-real check
 #     5  plumbing only
-v2_bootstraps <- 5L
+#
+# `v2_bootstraps` is v2's draw count, fixed; the run length is
+# `n_bootstraps`. A run shorter than v2's, or on a species
+# subset, is a trial and is not gated.
+v2_bootstraps <- 100L
 
-n_bootstraps <- v2_bootstraps
+n_bootstraps <- 5L
 
 ## 1.6a Validate the run length ----
 # Checked here rather than several hours into a run.
@@ -378,7 +423,10 @@ if (write_record) {
     sort(unique(unlist(lapply(
       specs[run_taxa],
       function(one) {
-        vapply(one$stages, function(st) st[[field]], character(1))
+        vapply(one$stages, function(st) {
+          value <- st[[field]]
+          if (is.function(value)) "custom" else value
+        }, character(1))
       }
     ))))
   }
@@ -398,6 +446,7 @@ if (write_record) {
     n_bootstraps = n_bootstraps,
     v2_bootstraps = v2_bootstraps,
     boot_seed = if (is.null(boot_seed)) "unseeded" else boot_seed,
+    plant_bootstrap = plant_bootstrap,
     stage_models = if (is.null(stage_models)) {
       "spec defaults (v2 candidate sets)"
     } else {

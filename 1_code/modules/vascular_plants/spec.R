@@ -31,16 +31,20 @@
 #'
 #' @param use_protocol Logical, or NULL to take the v2 value,
 #'   which is FALSE for this taxon.
+#' @param bootstrap Character. "spatial_block" or "v2_ids"; see
+#'   plant_group_spec().
 #' @return A spec list, as run_spec() consumes.
 #'
 #' @example # Example usage of the function
 #' # spec <- vascular_plant_spec()
 #' # spec$use_protocol # FALSE
-vascular_plant_spec <- function(use_protocol = NULL) {
+vascular_plant_spec <- function(use_protocol = NULL,
+                                bootstrap = "spatial_block") {
   plant_group_spec(
     taxon = "vascular_plant",
     protocol_in_v2 = FALSE,
-    use_protocol = use_protocol
+    use_protocol = use_protocol,
+    bootstrap = bootstrap
   )
 }
 

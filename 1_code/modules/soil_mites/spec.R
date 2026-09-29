@@ -37,17 +37,21 @@
 #'
 #' @param use_protocol Logical, or NULL to take the v2 value,
 #'   which is FALSE for this taxon.
+#' @param bootstrap Character. "spatial_block" or "v2_ids"; see
+#'   plant_group_spec().
 #' @return A spec list, as run_spec() consumes. Its `taxon` field
 #'   is "mite".
 #'
 #' @example # Example usage of the function
 #' # spec <- soil_mite_spec()
 #' # spec$taxon # "mite"
-soil_mite_spec <- function(use_protocol = NULL) {
+soil_mite_spec <- function(use_protocol = NULL,
+                           bootstrap = "spatial_block") {
   plant_group_spec(
     taxon = "mite",
     protocol_in_v2 = FALSE,
-    use_protocol = use_protocol
+    use_protocol = use_protocol,
+    bootstrap = bootstrap
   )
 }
 

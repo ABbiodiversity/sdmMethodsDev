@@ -79,19 +79,29 @@ prediction for plants, and a calibrated probability for mammals.
 | QPAD offset | A log-offset per survey and species, from `bird_offsets.csv`. It must appear **inside** the formula as `offset(offset)`, not as a `predict()` argument | OK |
 | Poisson counts | Fitted on raw counts, no binarization | OK |
 | Climate selection | `model.avg(climate.list, rank = "AICc")`, full average, null model included in the set | OK |
-| Climate candidate set | 25 models: the null, eight climate combinations, and each of the eight with `Easting + Northing + Easting:Northing` and again with `I(Easting^2) + I(Northing^2)` added (`06.ModelClimate.R`) | PART the harness fits the null and the eight; the spatial 16 need `Easting` and `Northing`, which the bird covariates lack |
-| Climate scope | Fitted on every survey in the draw, province-wide; the region filter applies only to landcover | GAP the harness fits climate per region |
-| Carrying climate forward | The averaged prediction on the response scale, `exp(link)`, joins the landcover model as a covariate | GAP the harness carries it on the link scale |
-| Landcover weights | `weights = vegw` in the north and `soilw` in the south (`07.ModelLandcover.R`) | GAP not applied |
+| Climate candidate set | 25 models: the null, eight climate combinations, and each of the eight with `Easting + Northing + Easting:Northing` and again with `I(Easting^2) + I(Northing^2)` added (`06.ModelClimate.R`) | OK `climate_bird_v2`, with `Easting`/`Northing` aliased from `sites.csv` |
+| Climate scope | Fitted on every survey in the draw, province-wide; the region filter applies only to landcover | OK `scope = "province"` |
+| Carrying climate forward | The averaged prediction on the response scale, `exp(link)`, joins the landcover model as a covariate | OK `carry_scale = "exp"`, `carry_offset = TRUE` |
+| Landcover weights | `weights = vegw` in the north and `soilw` in the south (`07.ModelLandcover.R`) | OK region `weight_column` |
 | Landcover selection | Staged forward BIC over named groups, not a flat candidate set | OK |
-| The BIC rule | Within each stage, keep models with `Delta_BIC <= 2` and `K > 1`, then take the **smallest** of those. Not the lowest BIC. Always advance to that model | PART the harness advances only when it improves on the current model's BIC |
+| The BIC rule | Within each stage, keep models with `Delta_BIC <= 2` and `K > 1`, then take the **smallest** of those. Not the lowest BIC. Always advance to that model | OK `always_advance = TRUE`; every candidate starts from `count ~ climate` (`base_terms`). Matches v2's code to 4e-13 |
 | The groups | North has six: Hab, Age, CC, Contrast, ARU, Water. South has four: Hab, Contrast, ARU, Water | OK |
 | Age terms | 13 candidates in the Age group alone, built from `wtAge`, `wtAge2` and `wtAge05` crossed with `isCon`, `isUpCon`, `isBogFen`, `isMix`, `isPine` and `isWSpruce` | OK |
-| Bootstrap ids | Precomputed and keyed on `surveyid`, not on row index | OK |
-| Factor levels | `vegc` 22, `soilc` 17, `method` 4, `block` 60. Stored order matters, since a level absent from one bootstrap sample must not renumber the rest | OK |
+| Bootstrap ids | Precomputed and keyed on `surveyid`, not on row index | OK, each survey once per draw (`unique_ids`), as v2's `%in%` selects |
+| Factor levels | `vegc` 22, `soilc` 17, `method` 4, `block` 60. Stored order matters, since a level absent from one bootstrap sample must not renumber the rest | OK. Until 2026-09-29 `method` was loaded as `method_veg` and `method_soil` and missed the lookup, so it fell back to alphabetical order with `1SPM` as reference instead of `PC`; `apply_factor_levels()` now follows the suffixes |
 | Column suffixes | Six columns arrive suffixed `_veg` or `_soil` and are rewritten by `term_map()` | OK |
 | No coordinates | 0 of 215,758 rows in `sites.csv` carry latitude or longitude | GAP blocks spatial resampling and every spatial term |
-| Reference output | The packaged `Birds2024.RData` is absent from the drive. `_setup/04` rebuilds it from the per-draw CSVs, on the standardized term template, and `_setup/05` carries it into `v2_results.csv` | PART rebuilt, but the gate does not read it and the harness stores raw `glm` term names |
+| Reference output | The packaged `Birds2024.RData` is absent from the drive. `_setup/04` rebuilds it from the per-draw CSVs, on the standardized term template, and `_setup/05` carries it into `v2_results.csv` | OK rebuilt and compared. `modules/birds/standardize.R` ports the translation onto the standardized template and reproduces the packaged values exactly. Note the package labels draws 2 to 100 in file-listing order (`b2` is draw 10) |
+
+**The published bird results come from a different data vintage.**
+Run on the current `Stratified.Rdata`, v2's own climate code gives
+coefficients up to 28% away from the published per-draw files (AMRO,
+draw 1), while the harness matches that same v2 code to 2.5e-15, and
+its landcover stage matches v2's to 4e-13. The published
+`Birds2024.RData` was therefore fitted on data that differs from the
+archived `Stratified.Rdata` the test dataset is built from, so bird
+parity against it can only be approximate. Locating the data those
+results were fitted on would make it exact.
 
 **The offset trap.** Passing the offset as an argument rather than
 in the formula does not error. `predict()` recycles it, silently. It
@@ -107,7 +117,7 @@ AUC would have been silently invalid. Fixed with `as.numeric()`.
 
 | Quirk | What v2 does | Status |
 | --- | --- | --- |
-| Hurdle structure | Binomial presence times Gamma abundance given presence, on a log link. Their product is total abundance | PART halves fit, product not assembled |
+| Hurdle structure | Binomial presence times Gamma abundance given presence, on a log link. Their product is total abundance | OK `mammal_spec(part = "hurdle")`, both halves together (hurdle.R) |
 | Lure correction | Estimated **only** from numbered ABMI grid sites, which are the ones with matched lured and unlured deployments. Applied as `sign(Count) / lure_ratio`, then rescaled to a maximum of 1 | OK |
 | Abundance winsorizing | Capped at the 99th percentile of abundance given presence, before fitting | OK |
 | Season | Separate summer and winter models, with `wt_summer` and `wt_winter` passed as `glm` weights | OK |
@@ -117,17 +127,25 @@ AUC would have been silently invalid. Fixed with `as.numeric()`.
 | Coefficient extraction | One-hot prediction onto the prediction matrix at `seas_days = 100` and `Climate = 0`, on the probability scale | OK |
 | `Climate` is special | Taken from its own slope coefficient, never from a one-hot prediction, because it is a slope and not a habitat-type logit | OK |
 | Presence calibration | Additive logit shift, observed mean minus fitted mean on the logit scale, applied to habitat coefficients and explicitly **not** to `Climate` | OK |
-| Abundance calibration | Multiplicative, observed mean over predicted mean, applied to the **product** and to neither half. Deliberate: an additive shift on the log scale can give the log of a negative number for sparse habitat types | PART |
+| Abundance calibration | Multiplicative, observed mean over predicted mean, applied to the **product** and to neither half. Deliberate: an additive shift on the log scale can give the log of a negative number for sparse habitat types | OK |
 | Abundance scale | The stored abundance coefficients are exponentiated before saving, so they are on the **response** scale despite the source comment calling them log-scale | OK |
-| GAM age splines | A binomial spline in the square root of stand age, basis dimension 4, with the site-level prediction as an offset and cover times season weight as the weight. Five stand types plus three pooled frames, so eight fits | GAP |
-| Age groupings | Three strategies compared by summed AIC, corrected by -8, -4 and 0 for the extra variance parameters | GAP |
-| Cutblock convergence | Fixed recovery weights, not fitted. Conifer 0.500, 0.849, 0.960 and deciduous or mixedwood 0.705, 0.912, 0.970 at age classes 2, 3 and 4. Applied to total abundance only, never to presence | GAP |
-| No bootstrapping | The habitat stage fits once, so like-for-like comparison is iteration 1 rather than a distribution | GAP the harness bootstraps it, and the gate does not yet restrict mammals to iteration 1 |
-| Climate is external | Fitted by a separate pipeline and read back as a single covariate, not fitted alongside habitat | PART the harness fits v2's 9-model set as a stage; reading the stored prediction (`climate_source = "precomputed"`) is not implemented |
-| Seasons in the reference | The published `.all` tables average the summer and winter fits | GAP a run fits one season; both must be run and averaged before comparing |
-| South habitat | A separate south candidate set on soil types | GAP not specified; every south draw fails |
+| GAM age splines | A binomial spline in the square root of stand age, basis dimension 4, with the site-level prediction as an offset and cover times season weight as the weight. Five stand types plus three pooled frames, so eight fits | OK |
+| Age groupings | Three strategies compared by summed AIC, corrected by -8, -4 and 0 for the extra variance parameters | OK the mammal version weighs each spline against its null by AICc weight; ported as written |
+| Cutblock convergence | Fixed recovery weights, not fitted. Conifer 0.500, 0.849, 0.960 and deciduous or mixedwood 0.705, 0.912, 0.970 at age classes 2, 3 and 4. Applied to total abundance only, never to presence | OK |
+| No bootstrapping | The habitat stage fits once, so like-for-like comparison is iteration 1 rather than a distribution | OK handled in the gate: the harness bootstraps, and mammals are compared at iteration 1 |
+| Climate is external | Fitted by a separate pipeline and read back as a single covariate, not fitted alongside habitat | OK `climate_source = "precomputed"` reads the prediction and drops deployments without one |
+| Seasons in the reference | The published `.all` tables average the summer and winter fits | OK `run.R` runs both seasons and the gate averages them |
+| South habitat | A separate south candidate set on soil types | OK v2's 30 candidates, spread over the full soil set; needs the SpTable pAspen (see below) |
 | Regions overlap | North and south are separate models sharing 512 deployments | OK |
 | Climate extraction | From `abmi-camera-climate_2023.Rdata`, a different extraction from the one in the species table. At matched deployments the two disagree by up to 531 mm of `MAP` | OK |
+
+**The mammal south needs the SpTable's own pAspen.** The
+harmonizer used to replace it with the camera climate file's
+pAspen, a different extraction that differs by up to 0.92 at
+matched deployments, so every south candidate with pAspen
+disagreed with v2. `_setup/01` now keeps the SpTable column; the
+existing dataset was patched to match. With it, the south hurdle
+matches v2 to 1e-15.
 
 **Mammals have age splines too.** Earlier notes recorded splines as
 a plant-only quirk. Section 6.5 of the north basic-models script
@@ -149,11 +167,11 @@ other.
 | Habitat selection | Inverse-variance weighting **on the prediction grid**. What v2 calls the habitat coefficients are grid predictions weighted by their own precision, not regression coefficients | OK |
 | Carrying climate forward | The averaged coefficient vector applied to the data and passed through the logistic, so the habitat stage sees a probability. Not the best model's link prediction | OK |
 | Footprint pooling | `HardLin` borrows from `UrbInd` by inverse-variance weighting on the logit scale. `EnSoftLin`, `EnSeismic` and `TrSoftLin` borrow from a young-regeneration composite with **fixed** weights 0.049, 0.0893, 0.434 and 0.396 over three cutblock regeneration classes and young black spruce | OK |
-| GAM age splines | A binomial spline in the square root of stand age, basis dimension 3, nine fits, intercept-only where detections are too few. Overwrites **45 of the 87** vegetation effects | GAP largest single parity gap |
-| Cutblock convergence | Moves cutblock age classes 2, 3 and 4 part of the way to the natural stand of the same age, with fixed weights, before the footprint pooling | GAP |
+| GAM age splines | A binomial spline in the square root of stand age, basis dimension 3, nine fits, intercept-only where detections are too few. Overwrites **45 of the 87** vegetation effects | OK `plant_age_splines()`; matches v2 to 2e-12 |
+| Cutblock convergence | Moves cutblock age classes 2, 3 and 4 part of the way to the natural stand of the same age, with fixed weights, before the footprint pooling | OK `plant_cutblock_convergence()` |
 | `Protocol` | Fitted for **bryophytes and lichens only**. Mites and vascular plants pass the protocol flag as false | OK |
-| Climate scope | Fitted on every site in the draw, province-wide; the region filter applies only to the habitat stage | GAP the harness fits climate per region |
-| Bootstrap | Spatial-block over the whole province, once per species, redrawing until 20 detections are reached | PART the harness draws within each region |
+| Climate scope | Fitted on every site in the draw, province-wide; the region filter applies only to the habitat stage | OK `scope = "province"`; north and south share one fit per draw |
+| Bootstrap | Spatial-block over the whole province, once per species, redrawing until 20 detections are reached | OK drawn once per species over the province; `bootstrap = "v2_ids"` replays v2's stored draws |
 | Derived climate | Products of stored columns are computed on load and never stored | OK by design |
 
 **Why the derived products are not stored.** `fwrite` writes 15
@@ -161,6 +179,17 @@ significant digits. Round-tripping a covariate and its square
 separately leaves the stored square inconsistent with the square of
 the stored input, by enough to move a coefficient. They are
 recomputed on load instead.
+
+**The published plant models were not fitted on the stored draws.**
+Replaying v2's stored bootstrap ids (`bootstrap = "v2_ids"`, from
+`_setup/07`) reproduces v2 exactly when the reference was fitted on
+them: the regenerated bryophyte reference matches to 4e-11 on every
+draw tested. Against the published lichen models only draw 1, the
+full data, matches (5e-12); for draws 2 to 6 no row among the 100
+published ones matches, so those models were fitted on draws that
+were not kept. Plant parity against `v2_results.csv` stays
+distributional until v2 is re-run on the stored draws, as `_setup/03`
+did for bryophytes.
 
 **The bryophyte reference has two independent defects.** Every
 species and draw in the published bryophyte model file is an error

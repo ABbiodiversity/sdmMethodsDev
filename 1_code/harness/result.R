@@ -173,12 +173,16 @@ write_unit_predictions <- function(
 #' @param boot Integer.
 #' @param coefficients A data frame of term, estimate and se, or
 #'   NULL for an engine that has none.
+#' @param stage Character. The stage the coefficients came from.
+#'   Every stage is recorded, not only the last, so a staged
+#'   model can be compared stage by stage.
 #' @return NULL, invisibly.
 #'
 #' @example # Example usage of the function
-#' # write_coefficients(store, "ALFL", "north", 1, coefs)
+#' # write_coefficients(store, "ALFL", "north", 1, coefs,
+#' #                    stage = "climate")
 write_coefficients <- function(
-  store, species, region, boot, coefficients
+  store, species, region, boot, coefficients, stage = NA_character_
 ) {
   if (is.null(coefficients) || nrow(coefficients) == 0) {
     return(invisible(NULL))
@@ -187,6 +191,7 @@ write_coefficients <- function(
   result_append(store, "coefficients", data.frame(
     species = species,
     region = region,
+    stage = as.character(stage),
     boot = as.integer(boot),
     term = as.character(coefficients$term),
     estimate = as.numeric(coefficients$estimate),

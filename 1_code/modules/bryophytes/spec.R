@@ -37,16 +37,20 @@
 #'
 #' @param use_protocol Logical, or NULL to take the v2 value,
 #'   which is TRUE for this taxon.
+#' @param bootstrap Character. "spatial_block" or "v2_ids"; see
+#'   plant_group_spec().
 #' @return A spec list, as run_spec() consumes.
 #'
 #' @example # Example usage of the function
 #' # spec <- bryophyte_spec()
 #' # spec$use_protocol # TRUE
-bryophyte_spec <- function(use_protocol = NULL) {
+bryophyte_spec <- function(use_protocol = NULL,
+                           bootstrap = "spatial_block") {
   plant_group_spec(
     taxon = "bryophyte",
     protocol_in_v2 = TRUE,
     use_protocol = use_protocol,
+    bootstrap = bootstrap,
     reference_note = paste0(
       "The published v2 model file is unusable; the v2 ",
       "reference is COEFS.RData, via v2_results.csv."

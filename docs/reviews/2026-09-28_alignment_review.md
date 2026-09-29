@@ -275,43 +275,43 @@ step has an acceptance check.
 
 ### Phase 1: Make the gate measure the right thing
 
-| # | Action | Done when |
-| --- | --- | --- |
-| 1.1 | Write coefficients **per stage**, with a `stage` column (C3). | `coefficient_summary.csv` has climate and habitat rows. |
-| 1.2 | Point `02_compare_to_v2.R` at `0_data/v2_results/v2_results.csv` only; drop the network paths (C5). | The gate runs with the network drives unmounted. |
-| 1.3 | Join on `taxon × region × stage × species × term`. Score plant **climate** against the `region = "all"` rows. | The climate-stage parity table exists for all four plant taxa. |
-| 1.4 | Mammals: run both seasons, average them, and compare against `.all`. Gate on `boot == 1` (M4). | Mammal rows are like-for-like. |
-| 1.5 | Birds: port the `08.PackageCoefficients.R` term translation (C4). | Bird habitat terms join on the standardized template. |
-| 1.6 | Build the non-reachable-term list from v2's code, including `CC*2` (M5). | `reachable_terms` excludes every spline- or convergence-overwritten term. |
+| # | Action | Done when | Status (2026-09-29) |
+| --- | --- | --- | --- |
+| 1.1 | Write coefficients **per stage**, with a `stage` column (C3). | `coefficient_summary.csv` has climate and habitat rows. | Done |
+| 1.2 | Point `02_compare_to_v2.R` at `0_data/v2_results/v2_results.csv` only; drop the network paths (C5). | The gate runs with the network drives unmounted. | Done |
+| 1.3 | Join on `taxon × region × stage × species × term`. Score plant **climate** against the `region = "all"` rows. | The climate-stage parity table exists for all four plant taxa. | Done; plant habitat terms also relabelled as v2's `04a` does |
+| 1.4 | Mammals: run both seasons, average them, and compare against `.all`. Gate on `boot == 1` (M4). | Mammal rows are like-for-like. | Done, with season filtering fixed in `list_species()`; mammal habitat joins only terms named alike (new item) |
+| 1.5 | Birds: port the `08.PackageCoefficients.R` term translation (C4). | Bird habitat terms join on the standardized template. | Done; exact against `Birds2024.RData`. Needs `_setup/06`. Found and fixed a `method` reference-level bug |
+| 1.6 | Build the non-reachable-term list from v2's code, including `CC*2` (M5). | `reachable_terms` excludes every spline- or convergence-overwritten term. | Done, for plants, mammals and bird placeholders |
 
 ### Phase 2: Match v2 behaviour where the harness departs from it
 
-| # | Action | Done when |
-| --- | --- | --- |
-| 2.1 | Fit the climate stage on the full province draw; apply the region filter only for habitat (C1). | The plant climate coefficients for north and south runs are identical per draw. |
-| 2.2 | Draw the bootstrap once per species over the province, with v2's redraw rule (C2, M6). | Draw sizes match `bootstrap_data()`; a rare species logs and skips instead of aborting. |
-| 2.3 | **Strongly recommended:** harmonize v2's own stored plant bootstrap ids (`<taxon>-bootstrap-ids.Rdata`: 100 draws for lichen, mite and vascular plant, regenerated for bryophyte) into `lookup/`, and extend `resample_precomputed()` to per-species ids. This turns parity from **distributional** into **numerical, draw by draw**, as birds already allow. | Per-draw climate coefficients match v2 to numerical tolerance (e.g. relative difference < 1e-6), or each deviation is explained. |
-| 2.4 | Birds: use the 25-model climate set, `vegw`/`soilw` weights, climate carried on the response scale, and v2's advance rule (C4). | The bird climate stage matches `Birds2024.RData` per draw with precomputed ids. |
-| 2.5 | Take the AICc degrees of freedom from `logLik` (M7). Fit once per candidate (M8). | Akaike weights match `MuMIn::model.avg` on a test case. |
-| 2.6 | Seed per species, with RNG state restored (M1, M2). | Two runs of the same configuration give identical stores. |
-| 2.7 | Mammal south: implement the sets or skip the region explicitly. Implement or remove `climate_source = "precomputed"` (M4). | `run_log.csv` has no structural `error` rows. |
+| # | Action | Done when | Status (2026-09-29) |
+| --- | --- | --- | --- |
+| 2.1 | Fit the climate stage on the full province draw; apply the region filter only for habitat (C1). | The plant climate coefficients for north and south runs are identical per draw. | Done; north and south climate identical per draw (difference 0) |
+| 2.2 | Draw the bootstrap once per species over the province, with v2's redraw rule (C2, M6). | Draw sizes match `bootstrap_data()`; a rare species logs and skips instead of aborting. | Done; draws are the full province size, and a species whose draws cannot be made is logged `resample_failed` |
+| 2.3 | **Strongly recommended:** harmonize v2's own stored plant bootstrap ids (`<taxon>-bootstrap-ids.Rdata`: 100 draws for lichen, mite and vascular plant, regenerated for bryophyte) into `lookup/`, and extend `resample_precomputed()` to per-species ids. This turns parity from **distributional** into **numerical, draw by draw**, as birds already allow. | Per-draw climate coefficients match v2 to numerical tolerance (e.g. relative difference < 1e-6), or each deviation is explained. | Done (`_setup/07`, `bootstrap = "v2_ids"`). Exact to 4e-11 per draw against the regenerated bryophyte reference; the published lichen models were not fitted on the stored draws, so only draw 1 matches there |
+| 2.4 | Birds: use the 25-model climate set, `vegw`/`soilw` weights, climate carried on the response scale, and v2's advance rule (C4). | The bird climate stage matches `Birds2024.RData` per draw with precomputed ids. | Done; matches v2's own code to 4e-13 (climate and landcover). Also fixed: landcover lacked `Climate`. The published `Birds2024` differs because it came from a different data vintage |
+| 2.5 | Take the AICc degrees of freedom from `logLik` (M7). Fit once per candidate (M8). | Akaike weights match `MuMIn::model.avg` on a test case. | Done; matches `MuMIn::model.avg` (≤ 6e-17), including aliased terms |
+| 2.6 | Seed per species, with RNG state restored (M1, M2). | Two runs of the same configuration give identical stores. | Done (earlier); two runs give identical stores |
+| 2.7 | Mammal south: implement the sets or skip the region explicitly. Implement or remove `climate_source = "precomputed"` (M4). | `run_log.csv` has no structural `error` rows. | Done: south sets implemented; `precomputed` stops with a clear message. No `error` rows |
 
 ### Phase 3: Add the missing v2 machinery
 
-| # | Action | Done when |
-| --- | --- | --- |
-| 3.1 | Plant age splines: 9 GAM fits, AIC selection across the 4 groupings, prediction at ages 0.5 and 1–8. `select_ivw_grid()` must also return the site-level IVW prediction (`data$prediction` in v2). | The 45 aged-stand terms enter the reachable set. |
-| 3.2 | Plant cutblock convergence for classes 2, 3 and 4, then `coef.adjust`. **Order matters:** v2 applies convergence *before* the adjustment. | The `CC*` terms are reachable. |
-| 3.3 | Mammal age splines, cutblock convergence and total abundance, as a separate implementation (per `taxon_quirks.md`). | The mammal habitat terms are reachable. |
-| 3.4 | Port v2's validation stage (`03x_model-validation`) and compute held-out metrics. | `metric_summary.csv` holds out-of-bag or validation metrics, not in-sample ones. |
+| # | Action | Done when | Status (2026-09-29) |
+| --- | --- | --- | --- |
+| 3.1 | Plant age splines: 9 GAM fits, AIC selection across the 4 groupings, prediction at ages 0.5 and 1–8. `select_ivw_grid()` must also return the site-level IVW prediction (`data$prediction` in v2). | The 45 aged-stand terms enter the reachable set. | Done; north habitat matches v2 to 2e-12 on the full-data draw (lichen, mite). Also fixed: the south dropped its pAspen candidates |
+| 3.2 | Plant cutblock convergence for classes 2, 3 and 4, then `coef.adjust`. **Order matters:** v2 applies convergence *before* the adjustment. | The `CC*` terms are reachable. | Done; converged before the pooling, as v2 |
+| 3.3 | Mammal age splines, cutblock convergence and total abundance, as a separate implementation (per `taxon_quirks.md`). | The mammal habitat terms are reachable. | Done: `modules/mammals/hurdle.R`, both halves together on v2's full habitat set; presence, abundance and total match to 2e-14 (moose, coyote; north and south). Also fixed: the dataset carried the wrong south pAspen |
+| 3.4 | Port v2's validation stage (`03x_model-validation`) and compute held-out metrics. | `metric_summary.csv` holds out-of-bag or validation metrics, not in-sample ones. | Done: v2's 7 AUCs in-bag and out-of-bag, plus out-of-bag harness metrics. South exact; north within 2e-4 of v2's published values |
 
 ### Phase 4: Close the gate
 
-| # | Action | Done when |
-| --- | --- | --- |
-| 4.1 | **Calibrate before you set a target.** Compare the regenerated bryophyte reference against `COEFS.RData` (two v2 runs of the same code) to measure v2's own run-to-run agreement. That sets the ceiling for any distributional target. | A documented v2-vs-v2 in-band rate exists. |
-| 4.2 | Agree a numeric target per taxon and per stage. A strawman: with precomputed ids, **numerical** agreement on climate; for stages that stay stochastic, an in-band rate ≥ the v2-vs-v2 rate minus a stated tolerance, **and** grid-prediction correlation ≥ 0.95. | The targets are recorded in the experiment README. |
-| 4.3 | Run 100 draws for the full species queues and commit the report and record. | The gate reads pass or fail per taxon. |
+| # | Action | Done when | Status (2026-09-29) |
+| --- | --- | --- | --- |
+| 4.1 | **Calibrate before you set a target.** Compare the regenerated bryophyte reference against `COEFS.RData` (two v2 runs of the same code) to measure v2's own run-to-run agreement. That sets the ceiling for any distributional target. | A documented v2-vs-v2 in-band rate exists. | Done: `v2_self_agreement.R`. v2 against itself: 100% in band, median standardized difference 0.019, median Spearman 0.998 |
+| 4.2 | Agree a numeric target per taxon and per stage. A strawman: with precomputed ids, **numerical** agreement on climate; for stages that stay stochastic, an in-band rate ≥ the v2-vs-v2 rate minus a stated tolerance, **and** grid-prediction correlation ≥ 0.95. | The targets are recorded in the experiment README. | Proposed, awaiting agreement: `utils/parity_targets.R`, recorded in the experiment README; verdicts computed per row. Spearman of medians replaces the grid correlation, which v2's reference cannot support |
+| 4.3 | Run 100 draws for the full species queues and commit the report and record. | The gate reads pass or fail per taxon. | Partly: the full queues are days of compute; the parity_check set was run at 100 draws for an indicative verdict. Not committed |
 
 ---
 

@@ -182,15 +182,21 @@ species_catalogue <- function(data_dir, taxon = NULL) {
 #' @param taxon Character. Taxon slug.
 #' @param region Character. Restrict to one region, or NULL.
 #' @param tier Character. Restrict to one model tier, or NULL.
+#' @param season Character. Restrict to one season, or NULL.
+#'   Only mammals have seasons, and a mammal spec is fitted for
+#'   one; without this, a summer spec would also queue the
+#'   `_Winter` species and fit them with summer weights.
 #' @return A character vector of species names, in source order.
 #'
 #' @example # Example usage of the function
 #' # head(list_species(data_dir, "bryophyte", "north"), 3)
+#' # list_species(data_dir, "mammal", "north", season = "winter")
 list_species <- function(
   data_dir,
   taxon,
   region = NULL,
-  tier = NULL
+  tier = NULL,
+  season = NULL
 ) {
   catalogue <- species_catalogue(data_dir, taxon)
 
@@ -200,6 +206,12 @@ list_species <- function(
 
   if (!is.null(tier)) {
     catalogue <- catalogue[catalogue$tier == tier, ]
+  }
+
+  if (!is.null(season)) {
+    catalogue <- catalogue[
+      !is.na(catalogue$season) & catalogue$season == season,
+    ]
   }
 
   catalogue <- catalogue[order(catalogue$order), ]

@@ -61,7 +61,8 @@ selection_registry <- function() {
 #'
 #' The single entry point the fitting loop calls.
 #'
-#' @param rule Character. A name in selection_registry().
+#' @param rule Character, a name in selection_registry(), or a
+#'   function a spec supplies with the same arguments.
 #' @param models A list of formulas, or for staged rules a list
 #'   of named groups of formulas.
 #' @param base A formula the candidates update, e.g.
@@ -94,24 +95,35 @@ selection_run <- function(
   control = list(),
   ...
 ) {
+  # A rule is a registered name, or a function a spec supplies
+  # for a model the registry has no shape for: the v2 mammal
+  # hurdle is one.
   registry <- selection_registry()
 
-  if (!rule %in% names(registry)) {
-    stop(
-      "Unknown selection rule `", rule, "`. Registered: ",
-      paste(names(registry), collapse = ", "),
-      call. = FALSE
-    )
+  if (is.function(rule)) {
+    rule_fn <- rule
+    rule_name <- "custom"
+  } else {
+    if (!rule %in% names(registry)) {
+      stop(
+        "Unknown selection rule `", rule, "`. Registered: ",
+        paste(names(registry), collapse = ", "),
+        call. = FALSE
+      )
+    }
+
+    rule_fn <- registry[[rule]]
+    rule_name <- rule
   }
 
   # Only pass the extra arguments a rule actually declares, so a
   # spec can set a grid for every stage without the rules that
   # do not use one failing on it.
   extra <- list(...)
-  accepted <- names(formals(registry[[rule]]))
+  accepted <- names(formals(rule_fn))
   extra <- extra[names(extra) %in% accepted]
 
-  out <- do.call(registry[[rule]], c(
+  out <- do.call(rule_fn, c(
     list(
       models = models, base = base, data = data, engine = engine,
       family = family, weights = weights, offset = offset,
@@ -120,7 +132,7 @@ selection_run <- function(
     extra
   ))
 
-  out$rule <- rule
+  out$rule <- rule_name
 
   out
 }
@@ -367,9 +379,12 @@ select_aic_average <- function(
         next
       }
 
+      # A term the candidate lacks, or estimated as NA because it
+      # is aliased, counts as zero, as in MuMIn's full average.
       row <- match(term, cf$term)
-      value <- if (is.na(row)) 0 else cf$estimate[row]
-      se <- if (is.na(row)) 0 else cf$se[row]
+      absent <- is.na(row) || is.na(cf$estimate[row])
+      value <- if (absent) 0 else cf$estimate[row]
+      se <- if (absent) 0 else cf$se[row]
 
       estimate <- estimate + w * value
       variance <- variance + w * ifelse(is.na(se), 0, se^2)
@@ -403,6 +418,9 @@ select_aic_average <- function(
 #' @inheritParams select_single
 #' @param threshold Numeric. How far above the best score a
 #'   candidate may sit and still be eligible.
+#' @param always_advance Logical. TRUE, v2's rule, takes each
+#'   group's winner as the next base whatever its score; FALSE
+#'   takes it only when it improves on the running model.
 #' @return A selection result, with `ic_table` carrying a `stage`
 #'   column.
 #'
@@ -412,7 +430,7 @@ select_aic_average <- function(
 select_staged_bic <- function(
   models, base, data, engine, family,
   weights = NULL, offset = NULL, ic = "BIC", control = list(),
-  threshold = 2
+  threshold = 2, always_advance = TRUE
 ) {
   # Step 1: Fit the base model. It is the starting point every
   # group updates, and the fallback if no group improves on it.
@@ -465,10 +483,13 @@ select_staged_bic <- function(
     close <- eligible[fitted$scores[eligible] <= best + threshold]
     winner <- close[which.min(table$k[close])]
 
-    # Step 4: Only carry forward a group that improved on the
-    # model it was updating, so a group with nothing to add
-    # leaves the running model untouched
-    if (fitted$scores[winner] < engine$ic(current, ic)) {
+    # Step 4: Carry the group's winner forward. v2 always does,
+    # even when it scores worse than the model it updated
+    # (07.ModelLandcover.R, section 14); `always_advance = FALSE`
+    # keeps the running model instead unless the group improves
+    # on it.
+    if (always_advance ||
+          fitted$scores[winner] < engine$ic(current, ic)) {
       current <- fitted$fits[[winner]]
       current_formula <- fitted$formulas[[winner]]
     }
@@ -607,12 +628,39 @@ select_ivw_grid <- function(
     stringsAsFactors = FALSE
   )
 
-  selection_result(
+  # Step 3: The site-level prediction, averaged the same way. v2
+  # keeps it as `data$prediction` and uses it as the offset of
+  # its stand-age splines. It averages every fitted candidate,
+  # converged or not; one that failed outright is left out here,
+  # where v2's would turn the whole average into NaN.
+  site <- lapply(which(table$ok), function(i) {
+    engine$predict(fitted$fits[[i]], data, "link", se = TRUE)
+  })
+  site <- site[!vapply(site, is.null, logical(1))]
+
+  site_prediction <- if (length(site) == 0) {
+    NULL
+  } else {
+    site_fit <- do.call(rbind, lapply(site, `[[`, "fit"))
+    site_se <- do.call(rbind, lapply(site, `[[`, "se.fit"))
+    colSums(site_fit / site_se^2) / colSums(1 / site_se^2)
+  }
+
+  result <- selection_result(
     fit = fitted$fits[[which.min(fitted$scores)]],
     coefficients = coefficients,
     ic_table = table,
     fitted = fitted
   )
+  result$site_prediction <- site_prediction
+
+  # Each fitted candidate's own coefficients, for steps that
+  # average a term the grid does not carry: v2's pAspen.
+  result$candidate_coefficients <- lapply(
+    which(table$ok), function(i) fit_coefficients(fitted$fits[[i]])
+  )
+
+  result
 }
 
 ## 4.6 ivw_combine() ----

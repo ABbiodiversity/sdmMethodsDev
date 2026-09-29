@@ -160,7 +160,16 @@ gate_lines <- if (length(gate_notes) == 0) {
 fit_lines <- if (is.null(metric_summary)) {
   "_No metrics recorded._"
 } else {
-  auc <- metric_summary[metric_summary$metric == "auc", ]
+  # In-sample against held-out, and v2's own validation where
+  # the spec supplies it. Out-of-bag is the honest read;
+  # in-sample is what v2 reports.
+  shown <- c(
+    insample_auc = "insample_auc",
+    oob_auc = "oob_auc",
+    v2val_full = "v2val_Full",
+    oob_v2val_full = "oob_v2val_Full"
+  )
+  auc <- metric_summary[metric_summary$metric %in% shown, ]
 
   if (nrow(auc) == 0) {
     "_No AUC recorded._"
@@ -168,15 +177,23 @@ fit_lines <- if (is.null(metric_summary)) {
     markdown_table(do.call(rbind, lapply(
       split(auc, list(auc$taxon, auc$region), drop = TRUE),
       function(block) {
-        data.frame(
+        row <- data.frame(
           taxon = block$taxon[1],
           region = block$region[1],
-          species = nrow(block),
-          median_auc = round(
-            stats::median(block$median, na.rm = TRUE), 3
-          ),
+          species = length(unique(block$species)),
           stringsAsFactors = FALSE
         )
+
+        for (label in names(shown)) {
+          values <- block$median[block$metric == shown[[label]]]
+          row[[paste0("median_", label)]] <- if (length(values) == 0) {
+            NA_real_
+          } else {
+            round(stats::median(values, na.rm = TRUE), 3)
+          }
+        }
+
+        row
       }
     )))
   }
@@ -216,25 +233,46 @@ lines <- c(
   "",
   markdown_table(coverage),
   "",
-  "## Parity against v2 (final stage)",
+  "## Parity against v2, by stage",
   "",
-  "Only each spec's final stage is stored, so this compares the",
-  "habitat or landcover stage. Read the gate on",
-  "`reachable_in_band_pct`, which leaves out the terms v2",
-  "overwrites with machinery the harness does not have yet.",
+  "Every stage is compared against `v2_results.csv`. Climate is",
+  "scored against v2's province-wide fit in both regions. Terms v2",
+  "fixes at a placeholder are left out of the reachable scores.",
+  "",
+  paste0(
+    "`verdict` reads each row against the parity targets in ",
+    "`utils/parity_targets.R` (", parity_targets()$status, "): ",
+    "numerical rows (iteration 1) pass when every reachable term is ",
+    "within ", parity_targets()$numerical_tolerance, "; ",
+    "distributional rows when at least ",
+    parity_targets()$min_in_band_pct, "% of reachable terms are in ",
+    "band, the median standardized difference is at most ",
+    parity_targets()$max_standardized_difference, ", and the median ",
+    "per-species Spearman correlation is at least ",
+    parity_targets()$min_spearman, ". A trial run is not gated."
+  ),
   "",
   markdown_table(
     parity_summary,
     "_No comparison produced. See the references above._"
   ),
   "",
-  "Parity is **distributional**: v2 seeds no random draw, so two",
-  "v2 runs differ, and each term is scored on whether the v2",
-  "value falls inside this run's 10th-to-90th percentile band.",
+  "Where v2 bootstraps, parity is **distributional**: v2 seeds no",
+  "random draw, so two v2 runs differ, and each term is scored on",
+  "whether the v2 median falls inside this run's",
+  "10th-to-90th percentile band. Where v2 fits once",
+  "(`comparison` = iteration 1: mammals), the run's full-data fit",
+  "is compared directly; read `median_absolute_difference`.",
   "",
   "## Model fit",
   "",
-  "In-sample, from the best single candidate model.",
+  paste(
+    "Median AUC over species. `insample` scores the units each",
+    "draw fitted; `oob` the units it left out, the held-out read.",
+    "`v2val` is v2's validation, scored from the coefficients as v2",
+    "does (plants only). Iteration 1 is the full data and has no",
+    "out-of-bag units."
+  ),
   "",
   fit_lines,
   "",
