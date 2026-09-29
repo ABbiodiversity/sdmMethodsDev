@@ -240,6 +240,9 @@ read_mammal_reference <- function(dir_path) {
       " Climate Coefficients[.]RData$", "", basename(path)
     )
 
+    # The same provenance columns the plant reader adds, so the
+    # two can be stacked and every row says what it was measured
+    # against.
     data.frame(
       species = species,
       term = as.character(env$avg_coef$term),
@@ -247,6 +250,8 @@ read_mammal_reference <- function(dir_path) {
       v2_p10 = NA_real_,
       v2_p90 = NA_real_,
       v2_n = 1L,
+      reference_object = "avg_coef",
+      reference_source = path,
       stringsAsFactors = FALSE
     )
   })
