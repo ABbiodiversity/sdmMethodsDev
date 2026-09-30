@@ -320,13 +320,21 @@ if (!is.null(run_rows) && !is.null(reference) &&
   ## 4.3 Score ----
   matched <- is.finite(parity$v2_median)
 
-  parity$in_band <- matched &
-    is.finite(parity$p10) & is.finite(parity$p90) &
-    parity$v2_median >= parity$p10 & parity$v2_median <= parity$p90
-
   spread <- (parity$p90 - parity$p10) / 2
   parity$absolute_difference <- ifelse(
     matched, abs(parity$run_value - parity$v2_median), NA_real_
+  )
+
+  # A term agrees when the v2 median is inside this run's band,
+  # or when the two are within numerical tolerance. The second
+  # matters for averaged terms carrying almost no model weight:
+  # their values run to 1e-20 or 1e-137, and banding numerical
+  # noise is meaningless.
+  parity$in_band <- matched & (
+    (is.finite(parity$p10) & is.finite(parity$p90) &
+       parity$v2_median >= parity$p10 &
+       parity$v2_median <= parity$p90) |
+      parity$absolute_difference <= parity_targets()$numerical_tolerance
   )
   parity$standardized_difference <- ifelse(
     matched & is.finite(spread) & spread > 0,
@@ -394,6 +402,14 @@ if (!is.null(parity) && nrow(parity) > 0) {
                            collapse = "+"),
         species = length(unique(compared$species)),
         terms_compared = nrow(compared),
+        # The draws the store actually holds, which the verdict
+        # checks: a store overwritten by a shorter run still reads
+        # the configured draw count.
+        min_draws = if (nrow(compared) == 0) {
+          NA_integer_
+        } else {
+          as.integer(min(compared$n))
+        },
         in_band_pct = pct(compared$in_band),
         reachable_terms = nrow(reachable),
         reachable_in_band_pct = pct(reachable$in_band),
@@ -459,6 +475,20 @@ if (!is.null(parity) && nrow(parity) > 0) {
     verdict_of(TRUE)
   } else {
     NA_character_
+  }
+
+  # A distributional row read from fewer stored draws than v2 has
+  # no verdict, whatever the run was configured for: a band from
+  # five draws is narrower than one from a hundred.
+  short <- grepl("median", parity_summary$comparison) &
+    !is.na(parity_summary$min_draws) &
+    parity_summary$min_draws < get0("v2_bootstraps", ifnotfound = 0L)
+  short_note <- paste0(
+    "not gated (store holds ", parity_summary$min_draws, " draws)"
+  )
+  parity_summary$verdict[short] <- short_note[short]
+  if (!all(is.na(parity_summary$indicative_verdict))) {
+    parity_summary$indicative_verdict[short] <- short_note[short]
   }
 
   rownames(parity_summary) <- NULL

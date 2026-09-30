@@ -92,7 +92,29 @@ for one run being compared with one run:
 
 Only a full run is gated: every species, 100 draws. A run with 100 draws
 on a species subset also gets an `indicative_verdict`, never to be read
-as the gate.
+as the gate. Either verdict is withheld from a distributional row whose
+store holds fewer draws than v2 (`min_draws` in `parity_summary.csv`),
+whatever the run was configured for; a store overwritten by a shorter run
+would otherwise be scored on five-draw bands.
+
+**Indicative result (2026-09-29, `parity_check` set, 100 draws).** 17 of
+22 rows pass. Mammal habitat matches v2 to ≤1e-14; bryophyte, lichen and
+vascular plant climate and habitat, and mite habitat, pass every target.
+Two things fail:
+
+- **Birds, all four rows.** The published bird results (December 2025)
+  were fitted on a `Stratified.Rdata` that was rebuilt in place on
+  2026-08-19; the test dataset is built from the rebuilt one. v2's own
+  code on the test data matches a 2026-08 v2 re-run to 1.5e-12 and the
+  published files only to 40%, and the harness matches v2's code to
+  2.5e-15. Not a harness fault; see `docs/taxon_quirks.md`.
+- **Mite climate** (the stage is province-wide, so north and south are
+  one result). Every term is in band, but the median Spearman is 0.834.
+  Most of the terms are averaged to effectively zero in both runs
+  (1e-10 down to 1e-144), and ranking them ranks noise. Leaving out
+  terms below 1e-20 in both runs lifts *Ceratozetes gracilis* to 1.000;
+  *Trhypochthonius tectorum* stays at 0.81. Whether the Spearman target
+  should leave such terms out is part of agreeing the targets.
 
 Assumptions, stated because they carry the targets:
 

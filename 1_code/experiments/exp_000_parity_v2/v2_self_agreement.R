@@ -102,11 +102,17 @@ joined <- merge(
   by = c("species", "term")
 )
 
+# Scored as the gate scores: in band, or within the numerical
+# tolerance for terms whose values are effectively zero.
+tolerance <- 1e-6
+
 joined[, `:=`(
   published_in_rerun_band =
-    pub_median >= rerun_p10 & pub_median <= rerun_p90,
+    (pub_median >= rerun_p10 & pub_median <= rerun_p90) |
+    abs(pub_median - rerun_median) <= tolerance,
   rerun_in_published_band =
-    rerun_median >= pub_p10 & rerun_median <= pub_p90,
+    (rerun_median >= pub_p10 & rerun_median <= pub_p90) |
+    abs(pub_median - rerun_median) <= tolerance,
   standardized_difference_rerun =
     abs(pub_median - rerun_median) / ((rerun_p90 - rerun_p10) / 2),
   standardized_difference_published =

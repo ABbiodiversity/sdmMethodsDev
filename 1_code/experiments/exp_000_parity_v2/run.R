@@ -71,7 +71,8 @@ for (taxon_dir in c(
 # Translates bird landcover coefficients onto v2's standardized
 # habitat terms, so the comparison can join them.
 source(file.path(
-  project_root, "1_code/modules/birds/standardize.R"
+  project_root,
+  "1_code/modules/birds/standardize.R"
 ))
 
 # v2's mammal hurdle model, which the mammal specs select by
@@ -252,7 +253,7 @@ stage_models <- NULL
 # subset, is a trial and is not gated.
 v2_bootstraps <- 100L
 
-n_bootstraps <- 5L
+n_bootstraps <- 100L
 
 ## 1.6a Validate the run length ----
 # Checked here rather than several hours into a run.
@@ -332,9 +333,10 @@ iterations <- seq_len(n_bootstraps)
 boot_seed <- 20260909L
 
 ## 1.7 Set the stages to run ----
-run_models <- FALSE
+run_models <- TRUE
 run_collect <- TRUE
 run_compare <- TRUE
+run_plots <- TRUE
 run_report <- TRUE
 
 # Named write_record rather than run_record, which would shadow
@@ -402,12 +404,19 @@ if (run_compare) {
   source(file.path(exp_code_dir, "02_compare_to_v2.R"))
 }
 
-## 3.3 Build the report ----
+## 3.3 Plot parity against v2 ----
+# One figure per taxon in figures/, gitignored like the
+# per-species tables it is drawn from.
+if (run_plots) {
+  source(file.path(exp_code_dir, "04_plot_parity.R"))
+}
+
+## 3.4 Build the report ----
 if (run_report) {
   source(file.path(exp_code_dir, "03_build_report.R"))
 }
 
-## 3.4 Write the run record ----
+## 3.5 Write the run record ----
 # Committed with the report and summary tables. The stores in
 # 2_pipeline/ and the per-species tables are gitignored, so when
 # the stores are cleared this is what is left to say what
@@ -423,10 +432,14 @@ if (write_record) {
     sort(unique(unlist(lapply(
       specs[run_taxa],
       function(one) {
-        vapply(one$stages, function(st) {
-          value <- st[[field]]
-          if (is.function(value)) "custom" else value
-        }, character(1))
+        vapply(
+          one$stages,
+          function(st) {
+            value <- st[[field]]
+            if (is.function(value)) "custom" else value
+          },
+          character(1)
+        )
       }
     ))))
   }

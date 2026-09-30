@@ -237,6 +237,7 @@ sdmMethodsDev/
 │           ├── 01_collect_results.R
 │           ├── 02_compare_to_v2.R
 │           ├── 03_build_report.R
+│           ├── 04_plot_parity.R     # one parity figure per taxon
 │           └── v2_self_agreement.R  # v2 against itself; run once
 │
 ├── 2_pipeline/                    # intermediates; gitignored
@@ -248,7 +249,7 @@ sdmMethodsDev/
 │
 ├── 3_output/                      # deliverables; summaries committed
 │   └── exp_000_parity_v2/
-│       ├── figures/               # gitignored
+│       ├── figures/               # parity_<taxon>.png, parity_mean.png; gitignored
 │       ├── tables/
 │       │   ├── parity_summary.csv       # committed
 │       │   ├── coverage.csv             # committed
@@ -521,8 +522,9 @@ A run writes its outputs in this order:
 ```
 2_pipeline stores ─► 01_collect  ─► coverage · metric_summary · coefficient_summary
                     02_compare  ─► parity_terms · parity_summary
+                    04_plot     ─► figures/parity_<taxon>.png · parity_mean.png
                     03_report   ─► report.md
-                    run.R 3.4   ─► run_record.md
+                    run.R 3.5   ─► run_record.md
 ```
 
 A *draw* is one bootstrap iteration. Every summary reduces the draws to a
@@ -622,6 +624,7 @@ taxon × region × stage.
 | `comparison` | `median` or `iteration 1` |
 | `species` | Species with at least one joined term |
 | `terms_compared` | Terms joined to a v2 value |
+| `min_draws` | Fewest draws the store holds for any compared term; a `median` row below v2's 100 gets no verdict |
 | `in_band_pct` | Percentage of compared terms in band |
 | `reachable_terms` | Compared terms v2 does not set by missing machinery or a placeholder |
 | `reachable_in_band_pct` | Percentage of reachable terms in band |
@@ -629,17 +632,38 @@ taxon × region × stage.
 | `median_absolute_difference` | Typical absolute gap, over reachable terms |
 | `max_absolute_difference` | Largest absolute gap, over reachable terms; the numerical test for `iteration 1` rows |
 | `median_spearman` | Median, over species, of the rank correlation between run and v2 medians |
-| `verdict` | `pass`, `fail`, `no comparison`, or `not gated (trial run)`, against the targets in `utils/parity_targets.R` |
+| `verdict` | `pass`, `fail`, `no comparison`, `not gated (trial run)`, or `not gated (store holds N draws)`, against the targets in `utils/parity_targets.R` |
 | `indicative_verdict` | For a 100-draw run on a species subset: the same test, **not** the gate |
 
 The targets are proposed from `v2_self_agreement.R`, which measures how
 closely two v2 runs agree with each other; see the experiment README. A trial
 run — fewer draws than v2's 100, or a species subset — is not gated: with few
-draws the band is wide and `in_band_pct` is inflated.
+draws the run's 10–90% band is estimated from a handful of values, and is
+typically narrower than v2's 100-draw band, so `standardized_difference` is
+inflated and the in-band tests are unreliable in both directions.
 
 **`tables/v2_self_agreement_summary.csv`** — how closely v2 agrees with itself
 on the bryophyte climate stage, the evidence the distributional targets are
 set from. Written once by `v2_self_agreement.R`, not by `run.R`.
+
+**`figures/parity_<taxon>.png`** — one figure per taxon, drawn from
+`parity_terms.csv` by `04_plot_parity.R`. Panels are stage × region (and
+hurdle part, for mammals) by species; each row is a term. v2 and exp_000 are
+drawn in different colours as a median and a 10th–90th percentile bar, which
+is all v2's reference keeps of its draws. Terms span 1e-144 to 1e2, so each
+is drawn relative to v2: 0 is v2's median and one unit is half v2's band,
+the scale of `standardized_difference`. Where v2 fitted once (mammals), the
+unit is half the run's band, v2 is a point, and the run's iteration 1 — what
+the gate compares — is drawn in a third colour. Unreachable terms are left
+out and counted in the caption.
+
+**`figures/parity_mean.png`** — the same scaled values averaged over every
+species and term: one facet per taxon, one row per stage and region (and
+hurdle part). Each row is labelled with `|d|`, the mean absolute difference of
+the run's median from v2's, and the share of terms in band. Setting
+`mean_facet <- "group"` in `04_plot_parity.R` pools the four plant taxa into
+one facet beside mammals and birds. Averages use values clamped at ±4, so one
+far-off term cannot dominate a row.
 
 **`report.md`** — a readable summary, generated rather than written:
 

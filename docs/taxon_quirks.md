@@ -103,6 +103,23 @@ archived `Stratified.Rdata` the test dataset is built from, so bird
 parity against it can only be approximate. Locating the data those
 results were fitted on would make it exact.
 
+Confirmed 2026-09-30 from the bird drive's file dates and a direct
+check:
+
+| Date | On the bird drive |
+| --- | --- |
+| 2025-12-12 / 15 | Per-draw climate and landcover csvs in `Results/Archive/`, the reference `_setup/04` packages |
+| 2026-01-16 | `Results/Archive/Birds2024.RData`, packaged from them |
+| 2026-02 to 03 | New WildTrax pulls; `Data/Archive/2025/Wrangled.Rdata` rebuilt |
+| 2026-08-19 | `Data/Archive/2025/Stratified.Rdata` rebuilt, in place |
+| 2026-08-25 | A v2 re-run begins in `Results/ClimateModels/` (ALFL only so far) |
+
+v2's own climate code, run on the test dataset's draw 1 for ALFL,
+matches the 2026-08-25 re-run to 1.5e-12 and the 2025-12-12 archive
+only to 40%. The published results were fitted on a
+`Stratified.Rdata` that was overwritten, and no copy of it is on the
+drive.
+
 **The offset trap.** Passing the offset as an argument rather than
 in the formula does not error. `predict()` recycles it, silently. It
 moved bird AUC from 0.736 to 0.746, small enough to look like noise
