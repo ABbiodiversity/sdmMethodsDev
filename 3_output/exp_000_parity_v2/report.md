@@ -1,6 +1,6 @@
 # exp_000_parity_v2
 
-Generated 2026-09-29 19:33:04
+Generated 2026-09-30 12:15:44
 
 **Trial run.** 14 focal species, 100 of 100 draws. Its parity numbers show the pipeline ran; they are not a parity read.
 
@@ -82,32 +82,32 @@ Every stage is compared against `v2_results.csv`. Climate is
 scored against v2's province-wide fit in both regions. Terms v2
 fixes at a placeholder are left out of the reachable scores.
 
-`verdict` reads each row against the parity targets in `utils/parity_targets.R` (proposed, not yet agreed): numerical rows (iteration 1) pass when every reachable term is within 1e-06; distributional rows when at least 90% of reachable terms are in band, the median standardized difference is at most 0.25, and the median per-species Spearman correlation is at least 0.95. A trial run is not gated.
+`verdict` reads each row against the parity targets in `utils/parity_targets.R` (proposed, not yet agreed): numerical rows (iteration 1) pass when every reachable term is within 1e-06; distributional rows when at least 90% of reachable terms are in band, the median standardized difference is at most 0.25, and the median band-width ratio (this run's band over v2's) is between 0.75 and 1.33. `median_spearman` is reported, not gated. A trial run is not gated.
 
-| taxon | region | stage | comparison | species | terms_compared | min_draws | in_band_pct | reachable_terms | reachable_in_band_pct | median_standardized_difference | median_absolute_difference | max_absolute_difference | median_spearman | verdict | indicative_verdict |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| bird | north | climate | median | 2 | 20 | 100 | 90 | 20 | 90 | 0.649 | 0 | 7.35 | 1 | not gated (trial run) | fail |
-| bryophyte | north | climate | median | 2 | 38 | 100 | 100 | 38 | 100 | 0.003 | 0 | 1.4 | 0.996 | not gated (trial run) | pass |
-| lichen | north | climate | median | 2 | 38 | 100 | 100 | 38 | 100 | 0 | 0 | 0.644 | 0.996 | not gated (trial run) | pass |
-| mite | north | climate | median | 2 | 38 | 100 | 100 | 38 | 100 | 0 | 0 | 1.95 | 0.834 | not gated (trial run) | fail |
-| vascular_plant | north | climate | median | 2 | 38 | 100 | 100 | 38 | 100 | 0 | 0 | 0.266 | 0.999 | not gated (trial run) | pass |
-| bird | south | climate | median | 2 | 20 | 100 | 90 | 20 | 90 | 0.649 | 0 | 7.35 | 1 | not gated (trial run) | fail |
-| bryophyte | south | climate | median | 2 | 38 | 100 | 100 | 38 | 100 | 0.003 | 0 | 1.4 | 0.996 | not gated (trial run) | pass |
-| lichen | south | climate | median | 2 | 38 | 100 | 100 | 38 | 100 | 0 | 0 | 0.644 | 0.996 | not gated (trial run) | pass |
-| mite | south | climate | median | 2 | 38 | 100 | 100 | 38 | 100 | 0 | 0 | 1.95 | 0.834 | not gated (trial run) | fail |
-| vascular_plant | south | climate | median | 2 | 38 | 100 | 100 | 38 | 100 | 0 | 0 | 0.266 | 0.999 | not gated (trial run) | pass |
-| bird | north | habitat | median | 2 | 198 | 100 | 20.2 | 188 | 16 | 1.904 | 0.125 | 3.93 | 0.966 | not gated (trial run) | fail |
-| bryophyte | north | habitat | median | 2 | 188 | 100 | 100 | 188 | 100 | 0.084 | 0.026 | 0.133 | 0.995 | not gated (trial run) | pass |
-| lichen | north | habitat | median | 2 | 188 | 100 | 100 | 188 | 100 | 0.091 | 0.024 | 0.118 | 0.999 | not gated (trial run) | pass |
-| mammal | north | habitat | iteration 1 | 2 | 448 | 65 | 100 | 436 | 100 | 0 | 0 | 9.77e-15 | 1 | not gated (trial run) | pass |
-| mite | north | habitat | median | 2 | 188 | 100 | 100 | 188 | 100 | 0.088 | 0.023 | 0.148 | 0.995 | not gated (trial run) | pass |
-| vascular_plant | north | habitat | median | 2 | 188 | 100 | 100 | 188 | 100 | 0.108 | 0.022 | 0.125 | 0.999 | not gated (trial run) | pass |
-| bird | south | habitat | median | 2 | 48 | 100 | 50 | 42 | 42.9 | 1.137 | 0.151 | 3.1 | 0.955 | not gated (trial run) | fail |
-| bryophyte | south | habitat | median | 2 | 40 | 100 | 100 | 40 | 100 | 0.043 | 0.023 | 0.0704 | 0.987 | not gated (trial run) | pass |
-| lichen | south | habitat | median | 2 | 40 | 100 | 100 | 40 | 100 | 0.088 | 0.029 | 0.278 | 0.995 | not gated (trial run) | pass |
-| mammal | south | habitat | iteration 1 | 2 | 138 | 99 | 100 | 126 | 100 | 0 | 0 | 5.33e-15 | 1 | not gated (trial run) | pass |
-| mite | south | habitat | median | 2 | 40 | 100 | 100 | 40 | 100 | 0.068 | 0.024 | 0.464 | 0.991 | not gated (trial run) | pass |
-| vascular_plant | south | habitat | median | 2 | 40 | 100 | 100 | 40 | 100 | 0.074 | 0.027 | 0.184 | 0.997 | not gated (trial run) | pass |
+| taxon | region | stage | comparison | species | terms_compared | min_draws | in_band_pct | reachable_terms | reachable_in_band_pct | median_standardized_difference | median_absolute_difference | max_absolute_difference | negligible_terms | median_spearman | median_band_ratio | verdict | indicative_verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| bird | north | climate | median | 2 | 20 | 100 | 90 | 20 | 90 | 0.649 | 0 | 7.35 | 0 | 1 | 0.961 | not gated (trial run) | fail |
+| bryophyte | north | climate | median | 2 | 38 | 100 | 100 | 38 | 100 | 0.003 | 0 | 1.4 | 13 | 0.99 | 1.032 | not gated (trial run) | pass |
+| lichen | north | climate | median | 2 | 38 | 100 | 100 | 38 | 100 | 0 | 0 | 0.644 | 17 | 0.993 | 0.879 | not gated (trial run) | pass |
+| mite | north | climate | median | 2 | 38 | 100 | 100 | 38 | 100 | 0 | 0 | 1.95 | 20 | 0.905 | 0.953 | not gated (trial run) | pass |
+| vascular_plant | north | climate | median | 2 | 38 | 100 | 100 | 38 | 100 | 0 | 0 | 0.266 | 24 | 1 | 0.97 | not gated (trial run) | pass |
+| bird | south | climate | median | 2 | 20 | 100 | 90 | 20 | 90 | 0.649 | 0 | 7.35 | 0 | 1 | 0.961 | not gated (trial run) | fail |
+| bryophyte | south | climate | median | 2 | 38 | 100 | 100 | 38 | 100 | 0.003 | 0 | 1.4 | 13 | 0.99 | 1.032 | not gated (trial run) | pass |
+| lichen | south | climate | median | 2 | 38 | 100 | 100 | 38 | 100 | 0 | 0 | 0.644 | 17 | 0.993 | 0.879 | not gated (trial run) | pass |
+| mite | south | climate | median | 2 | 38 | 100 | 100 | 38 | 100 | 0 | 0 | 1.95 | 20 | 0.905 | 0.953 | not gated (trial run) | pass |
+| vascular_plant | south | climate | median | 2 | 38 | 100 | 100 | 38 | 100 | 0 | 0 | 0.266 | 24 | 1 | 0.97 | not gated (trial run) | pass |
+| bird | north | habitat | median | 2 | 198 | 100 | 20.2 | 188 | 16 | 1.904 | 0.125 | 3.93 | 0 | 0.966 | 0.99 | not gated (trial run) | fail |
+| bryophyte | north | habitat | median | 2 | 188 | 100 | 100 | 188 | 100 | 0.084 | 0.026 | 0.133 | 0 | 0.995 | 0.911 | not gated (trial run) | pass |
+| lichen | north | habitat | median | 2 | 188 | 100 | 100 | 188 | 100 | 0.091 | 0.024 | 0.118 | 0 | 0.999 | 0.988 | not gated (trial run) | pass |
+| mammal | north | habitat | iteration 1 | 2 | 448 | 65 | 100 | 436 | 100 | 0 | 0 | 9.77e-15 | 0 | 1 | NA | not gated (trial run) | pass |
+| mite | north | habitat | median | 2 | 188 | 100 | 100 | 188 | 100 | 0.088 | 0.023 | 0.148 | 0 | 0.995 | 1.024 | not gated (trial run) | pass |
+| vascular_plant | north | habitat | median | 2 | 188 | 100 | 100 | 188 | 100 | 0.108 | 0.022 | 0.125 | 0 | 0.999 | 0.95 | not gated (trial run) | pass |
+| bird | south | habitat | median | 2 | 48 | 100 | 50 | 42 | 42.9 | 1.137 | 0.151 | 3.1 | 0 | 0.955 | 0.983 | not gated (trial run) | fail |
+| bryophyte | south | habitat | median | 2 | 40 | 100 | 100 | 40 | 100 | 0.043 | 0.023 | 0.0704 | 2 | 0.985 | 1.046 | not gated (trial run) | pass |
+| lichen | south | habitat | median | 2 | 40 | 100 | 100 | 40 | 100 | 0.088 | 0.029 | 0.278 | 1 | 0.994 | 0.961 | not gated (trial run) | pass |
+| mammal | south | habitat | iteration 1 | 2 | 138 | 99 | 100 | 126 | 100 | 0 | 0 | 5.33e-15 | 2 | 1 | NA | not gated (trial run) | pass |
+| mite | south | habitat | median | 2 | 40 | 100 | 100 | 40 | 100 | 0.068 | 0.024 | 0.464 | 1 | 0.991 | 0.975 | not gated (trial run) | pass |
+| vascular_plant | south | habitat | median | 2 | 40 | 100 | 100 | 40 | 100 | 0.074 | 0.027 | 0.184 | 0 | 0.997 | 1.021 | not gated (trial run) | pass |
 
 Where v2 bootstraps, parity is **distributional**: v2 seeds no
 random draw, so two v2 runs differ, and each term is scored on

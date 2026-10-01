@@ -317,6 +317,20 @@ if (!is.null(run_rows) && !is.null(reference) &&
   )
   parity$reachable <- is.na(parity$unreachable_reason)
 
+  ## 4.2a Flag negligible terms ----
+  # Terms model averaging has shrunk to nothing in both runs. They
+  # stay in the in-band scores, which the numerical tolerance
+  # already handles, but not in the band ratio or the Spearman,
+  # where their noise would decide the row.
+  term_scales <- term_scale(reference, c("taxon", "stage"))
+  parity <- merge(
+    parity, term_scales,
+    by = c("taxon", "stage", "term"), all.x = TRUE
+  )
+  parity$negligible <- is_negligible(
+    parity$run_value, parity$v2_median, parity$typical
+  )
+
   ## 4.3 Score ----
   matched <- is.finite(parity$v2_median)
 
@@ -384,6 +398,7 @@ if (!is.null(parity) && nrow(parity) > 0) {
     function(block) {
       compared <- block[is.finite(block$v2_median), ]
       reachable <- compared[compared$reachable, ]
+      substantive <- reachable[!reachable$negligible, ]
 
       pct <- function(x) {
         if (length(x) == 0) NA_real_ else round(100 * mean(x), 1)
@@ -424,11 +439,12 @@ if (!is.null(parity) && nrow(parity) > 0) {
         } else {
           signif(max(reachable$absolute_difference, na.rm = TRUE), 3)
         },
+        negligible_terms = sum(reachable$negligible),
         # Per species, then the median: the terms span twenty
         # orders of magnitude, so a rank correlation, as the v2
-        # self-agreement calibration uses
+        # self-agreement calibration uses. Reported, not gated.
         median_spearman = med(vapply(
-          split(reachable, reachable$species),
+          split(substantive, substantive$species),
           function(one) {
             if (nrow(one) < 3) {
               return(NA_real_)
@@ -436,6 +452,20 @@ if (!is.null(parity) && nrow(parity) > 0) {
             suppressWarnings(stats::cor(
               one$run_value, one$v2_median, method = "spearman"
             ))
+          },
+          numeric(1)
+        )),
+        # This run's 10-90% band over v2's, per term; the median
+        # per species, then over species, as the v2 calibration
+        # takes it. Single terms vary threefold between two v2
+        # runs, a species' median does not. NA where v2 has no
+        # band: the iteration-1 rows.
+        median_band_ratio = med(vapply(
+          split(substantive, substantive$species),
+          function(one) {
+            ratio <- (one$p90 - one$p10) / (one$v2_p90 - one$v2_p10)
+            ratio <- ratio[is.finite(ratio) & ratio > 0]
+            if (length(ratio) == 0) NA_real_ else stats::median(ratio)
           },
           numeric(1)
         )),
@@ -456,7 +486,7 @@ if (!is.null(parity) && nrow(parity) > 0) {
       function(i) {
         with(parity_summary[i, ], parity_verdict(
           comparison, reachable_in_band_pct,
-          median_standardized_difference, median_spearman,
+          median_standardized_difference, median_band_ratio,
           max_absolute_difference, gate
         ))
       },

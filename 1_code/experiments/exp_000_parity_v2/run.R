@@ -333,9 +333,9 @@ iterations <- seq_len(n_bootstraps)
 boot_seed <- 20260909L
 
 ## 1.7 Set the stages to run ----
-run_models <- TRUE
-run_collect <- TRUE
-run_compare <- TRUE
+run_models <- FALSE
+run_collect <- FALSE
+run_compare <- FALSE
 run_plots <- TRUE
 run_report <- TRUE
 

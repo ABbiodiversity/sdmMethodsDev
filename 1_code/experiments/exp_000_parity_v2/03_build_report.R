@@ -248,8 +248,11 @@ lines <- c(
     parity_targets()$min_in_band_pct, "% of reachable terms are in ",
     "band, the median standardized difference is at most ",
     parity_targets()$max_standardized_difference, ", and the median ",
-    "per-species Spearman correlation is at least ",
-    parity_targets()$min_spearman, ". A trial run is not gated."
+    "band-width ratio (this run's band over v2's) is between ",
+    paste(round(parity_targets()$band_ratio_range, 2),
+          collapse = " and "),
+    ". `median_spearman` is reported, not gated. ",
+    "A trial run is not gated."
   ),
   "",
   markdown_table(

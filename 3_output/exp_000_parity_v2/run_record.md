@@ -6,10 +6,10 @@ Written by `run_record()`. The result stores this describes are gitignored; this
 
 _Volatile. Excluded from cross-run comparison._
 
-- **git_commit**: 2f885a3
+- **git_commit**: 5b61d5c
 - **pipeline_dir**: D:/local_projects/active/sdmMethodsDev/2_pipeline/exp_000_parity_v2
 - **r_version**: 4.5.0
-- **written_at**: 2026-09-30 01:33:05
+- **written_at**: 2026-09-30 18:15:45
 
 ## Configuration
 
@@ -17,9 +17,6 @@ _Volatile. Excluded from cross-run comparison._
 - **data_dir**: test_dataset
 - **engines**: bayesglm, glm
 - **focal_species**: bird=AMRO, bird=YEWA, bryophyte=Bryum.All, bryophyte=Ceratodon.purpureus, lichen=Cladonia.chlorophaea, lichen=Physcia.adscendens, mammal=Coyote_Summer, mammal=Coyote_Winter, mammal=Moose_Summer, mammal=Moose_Winter, mite=Ceratozetes.gracilis, mite=Trhypochthonius.tectorum, vascular_plant=Galium.boreale, vascular_plant=Vicia.americana
-- **jobs_not_ok**: 1
-- **jobs_ok**: 2799
-- **jobs_total**: 2800
 - **n_bootstraps**: 100
 - **plant_bootstrap**: spatial_block
 - **selection**: aic_average, custom, ivw_grid, staged_bic

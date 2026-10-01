@@ -9,6 +9,8 @@
 #   in out_dir/figures/:
 #     - parity_<taxon>.png, one per taxon
 #     - parity_mean.png, every taxon averaged, one facet each
+#     - parity_bell.png, v2 and the run as bell curves, one facet
+#       each
 # notes:
 #   - One figure per taxon. Each panel is a stage and region (and,
 #     for mammals, a hurdle part) for one species; each row a term.
@@ -34,6 +36,12 @@
 #   - parity_mean.png averages the same scaled values over every
 #     species and term, one facet per taxon (or per group; section
 #     1.4), one row per stage and region.
+#   - parity_bell.png draws each row as two curves, v2 and the run,
+#     each the average of its terms read as normal curves from
+#     their median and band. A shifted curve is a location
+#     difference, a wider or narrower one a spread difference. The
+#     normal shape is a drawing convenience; v2 keeps only three
+#     summaries of its draws.
 #   - Expects out_dir from run.R. Can also be run on its own from
 #     the repository root after 02_compare_to_v2.R.
 # ---
@@ -353,5 +361,190 @@ ggsave(
 )
 
 cat("Parity figure: ", mean_file, "\n", sep = "")
+
+# 5. Plot v2 and the run as bell curves ----
+# One figure, one facet per taxon (or group), one curve pair per
+# stage and region, stacked. Input: plottable. Output:
+# parity_bell.png.
+#
+# Each term's 100 draws are summarized, in both runs, by a median
+# and a 10-90% band. Read as a normal curve, the median is its
+# centre and the band spans 2 x 1.2816 standard deviations. Each
+# row's curve is the average of its terms' curves, in v2 units,
+# so v2's sits at 0 and the run's shows where, and how widely, the
+# run lands against it: shifted if the medians differ, wider or
+# narrower if the bands do.
+#
+# The normal shape is a drawing convenience, not a claim: v2 keeps
+# only the three summaries, so the true shape of its draws is not
+# known. Negligible terms are left out, as the gate leaves them
+# out. Where v2 fitted once (the mammal hurdle) it has no band and
+# is drawn as a line at 0.
+
+## 5.1 One normal curve per term ----
+# qnorm(0.9): the 90th percentile is this many standard deviations
+# above the centre.
+z90 <- stats::qnorm(0.9)
+
+bell_terms <- copy(plottable)
+if (!"negligible" %in% names(bell_terms)) {
+  message(
+    "parity_terms.csv has no `negligible` column; rerun ",
+    "02_compare_to_v2.R. Every term is drawn."
+  )
+  bell_terms[, negligible := FALSE]
+}
+bell_terms <- bell_terms[!(negligible)]
+
+bell_terms[, `:=`(
+  facet = get(mean_facet),
+  run_centre = (median - v2_median) / unit,
+  run_sd = (p90 - p10) / (2 * z90) / unit,
+  v2_sd = (v2_p90 - v2_p10) / (2 * z90) / unit
+)]
+
+## 5.2 Average the curves per row ----
+x_grid <- seq(-axis_limit, axis_limit, length.out = 401)
+
+#' Average of Normal Curves on a Grid
+#'
+#' @param centre,sd Numeric vectors, one entry per term.
+#' @return Numeric, the mean density at each point of x_grid; NA
+#'   when no term has a usable spread.
+mixture_density <- function(centre, sd) {
+  keep <- is.finite(centre) & is.finite(sd) & sd > 0
+  if (!any(keep)) {
+    return(rep(NA_real_, length(x_grid)))
+  }
+  rowMeans(vapply(
+    which(keep),
+    function(i) stats::dnorm(x_grid, centre[i], sd[i]),
+    numeric(length(x_grid))
+  ))
+}
+
+bell_curves <- bell_terms[, {
+  run <- mixture_density(run_centre, run_sd)
+  v2 <- mixture_density(rep(0, .N), v2_sd)
+  data.table(
+    x = rep(x_grid, 2),
+    density = c(v2, run),
+    source = rep(c("v2", "exp_000"), each = length(x_grid))
+  )
+}, by = .(facet, panel)]
+
+# v2 with no band: a line at 0 instead of a curve
+v2_lines <- bell_curves[
+  source == "v2",
+  .(single = all(is.na(density))),
+  by = .(facet, panel)
+][(single)]
+bell_curves <- bell_curves[is.finite(density)]
+
+## 5.3 Stack the rows ----
+# Climate above habitat, north above south. Each facet's curves
+# are scaled so its tallest reaches 0.75 of a row, leaving room
+# for the row's label above it.
+bell_rows <- unique(bell_terms[, .(facet, panel)])
+setorder(bell_rows, facet, panel)
+bell_rows[, offset := rev(seq_len(.N)) - 1, by = facet]
+
+bell_rows <- merge(
+  bell_rows, mean_labels, by = c("facet", "panel"), all.x = TRUE
+)
+bell_rows[, text := fifelse(
+  is.na(label), panel, paste0(panel, "   ", label)
+)]
+
+bell_curves <- merge(bell_curves, bell_rows, by = c("facet", "panel"))
+bell_curves[, height := 0.75 * density / max(density), by = facet]
+bell_curves[, `:=`(bottom = offset, top = offset + height)]
+
+v2_lines <- merge(v2_lines, bell_rows, by = c("facet", "panel"))
+
+bell_curves[, source := factor(source, levels = c("v2", "exp_000"))]
+
+## 5.4 Draw ----
+
+#' Plot v2 and the Run as Bell Curves
+#'
+#' Draws, per facet, one stacked pair of curves per stage and
+#' region: v2 and the run, in v2 units.
+#'
+#' @param curves data.table. bell_curves: facet, x, bottom, top,
+#'   source, panel.
+#' @param rows data.table. bell_rows: facet, offset, text.
+#' @param lines data.table. v2_lines: facet, offset.
+#' @return A ggplot object.
+#'
+#' @example # Example usage of the function
+#' # plot_bell(bell_curves, bell_rows, v2_lines)
+plot_bell <- function(curves, rows, lines) {
+  colours <- c(v2 = "#0072B2", exp_000 = "#D55E00")
+
+  ggplot(curves) +
+    geom_vline(xintercept = 0, colour = "grey75") +
+    geom_vline(
+      xintercept = c(-1, 1),
+      colour = "grey85", linetype = "dashed"
+    ) +
+    geom_ribbon(
+      aes(
+        x = x, ymin = bottom, ymax = top,
+        fill = source, colour = source,
+        group = interaction(panel, source)
+      ),
+      alpha = 0.3, linewidth = 0.4
+    ) +
+    geom_segment(
+      data = lines,
+      aes(x = 0, xend = 0, y = offset, yend = offset + 0.75),
+      colour = colours[["v2"]], linewidth = 0.8
+    ) +
+    geom_text(
+      data = rows,
+      aes(x = -axis_limit, y = offset + 0.8, label = text),
+      hjust = 0, vjust = 0, size = 2.4, colour = "grey25"
+    ) +
+    scale_fill_manual(values = colours, name = NULL) +
+    scale_colour_manual(values = colours, name = NULL) +
+    scale_x_continuous(limits = c(-axis_limit, axis_limit)) +
+    scale_y_continuous(expand = expansion(add = c(0.05, 0.25))) +
+    facet_wrap(~facet, scales = "free_y", ncol = 2) +
+    labs(
+      title = "v2 and exp_000 as distributions",
+      subtitle = paste(
+        "Each curve averages its row's terms, each drawn as a",
+        "normal curve from its median and 10th-90th percentile",
+        "band,\nin v2 units: 0 is v2's median; +/- 1 is half v2's",
+        "band. Negligible terms left out. A blue line: v2 fitted",
+        "once (no band).\n|d|: mean absolute difference of the",
+        "medians. In band: v2's median inside the run's band."
+      ),
+      x = "Difference from v2's median, in half-band units",
+      y = NULL
+    ) +
+    theme_bw(base_size = 9) +
+    theme(
+      legend.position = "top",
+      axis.text.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      panel.grid.major.y = element_blank(),
+      panel.grid.minor.y = element_blank()
+    )
+}
+
+bell_file <- file.path(figures_dir, "parity_bell.png")
+bell_depth <- max(bell_rows[, .N, by = facet]$N)
+bell_facets <- uniqueN(bell_rows$facet)
+
+ggsave(
+  bell_file, plot_bell(bell_curves, bell_rows, v2_lines),
+  width = 10,
+  height = 2 + ceiling(bell_facets / 2) * (0.6 + 0.8 * bell_depth),
+  dpi = 150
+)
+
+cat("Parity figure: ", bell_file, "\n", sep = "")
 
 # End of script ----

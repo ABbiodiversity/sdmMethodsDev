@@ -31,7 +31,10 @@
 #   - Also the Spearman correlation of the medians across terms,
 #     per species, because the terms span twenty orders of
 #     magnitude and a Pearson correlation would read only the
-#     intercept.
+#     intercept. Reported, no longer gated.
+#   - And the band-width ratio, the rerun's 10-90% band over the
+#     published run's, as a median per species. Its 5th to 95th
+#     percentile over species sets the gate's band_ratio_range.
 #   - Climate only: the regenerated reference has no habitat
 #     stage. The rate is assumed to carry to the plant habitat
 #     stage; that is an assumption, stated in the README.
@@ -46,6 +49,12 @@ library(data.table) # reading and writing tables (version: 1.16.4)
 
 ## 1.2 Resolve paths ----
 project_root <- normalizePath(getwd(), winslash = "/")
+
+# The gate's negligible-term rule, so both are scored alike
+source(file.path(
+  project_root,
+  "1_code/experiments/exp_000_parity_v2/utils/parity_targets.R"
+))
 rerun_path <- file.path(
   project_root, "2_pipeline", "v2_reference",
   "bryophyte-species-models.Rdata"
@@ -119,19 +128,38 @@ joined[, `:=`(
     abs(pub_median - rerun_median) / ((pub_p90 - pub_p10) / 2)
 )]
 
-by_species <- joined[, .(
+finite_median <- function(x) stats::median(x[is.finite(x)])
+
+# The rerun's band width over the published run's. Summarized per
+# species as the median over its terms, as the gate takes it, and
+# without the terms both runs shrink to nothing, by the gate's
+# is_negligible() rule.
+joined[, band_ratio := (rerun_p90 - rerun_p10) / (pub_p90 - pub_p10)]
+
+term_scales <- as.data.table(term_scale(
+  as.data.frame(published), c("taxon", "stage")
+))
+joined <- merge(
+  joined, term_scales[, .(term, typical)],
+  by = "term", all.x = TRUE
+)
+joined[, negligible := is_negligible(
+  rerun_median, pub_median, typical
+)]
+
+by_species <- joined[!(negligible), .(
   spearman = suppressWarnings(stats::cor(
     rerun_median, pub_median, method = "spearman"
-  ))
+  )),
+  band_ratio = finite_median(band_ratio[band_ratio > 0])
 ), by = species]
-
-finite_median <- function(x) stats::median(x[is.finite(x)])
 
 summary_table <- data.table(
   stage = "climate",
   taxon = "bryophyte",
   species = uniqueN(joined$species),
   terms = nrow(joined),
+  negligible_terms = sum(joined$negligible),
   in_band_pct_published_in_rerun = round(
     100 * mean(joined$published_in_rerun_band), 1
   ),
@@ -148,6 +176,13 @@ summary_table <- data.table(
   median_spearman = round(finite_median(by_species$spearman), 3),
   p10_spearman = round(stats::quantile(
     by_species$spearman, 0.1, na.rm = TRUE, names = FALSE
+  ), 3),
+  median_band_ratio = round(finite_median(by_species$band_ratio), 3),
+  p05_band_ratio = round(stats::quantile(
+    by_species$band_ratio, 0.05, na.rm = TRUE, names = FALSE
+  ), 3),
+  p95_band_ratio = round(stats::quantile(
+    by_species$band_ratio, 0.95, na.rm = TRUE, names = FALSE
   ), 3)
 )
 

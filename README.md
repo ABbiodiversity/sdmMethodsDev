@@ -249,7 +249,7 @@ sdmMethodsDev/
 │
 ├── 3_output/                      # deliverables; summaries committed
 │   └── exp_000_parity_v2/
-│       ├── figures/               # parity_<taxon>.png, parity_mean.png; gitignored
+│       ├── figures/               # parity_<taxon>, _mean, _bell .png; gitignored
 │       ├── tables/
 │       │   ├── parity_summary.csv       # committed
 │       │   ├── coverage.csv             # committed
@@ -522,7 +522,7 @@ A run writes its outputs in this order:
 ```
 2_pipeline stores ─► 01_collect  ─► coverage · metric_summary · coefficient_summary
                     02_compare  ─► parity_terms · parity_summary
-                    04_plot     ─► figures/parity_<taxon>.png · parity_mean.png
+                    04_plot     ─► figures/parity_<taxon>.png · parity_mean.png · parity_bell.png
                     03_report   ─► report.md
                     run.R 3.5   ─► run_record.md
 ```
@@ -631,7 +631,9 @@ taxon × region × stage.
 | `median_standardized_difference` | Typical size of the gap, over reachable terms |
 | `median_absolute_difference` | Typical absolute gap, over reachable terms |
 | `max_absolute_difference` | Largest absolute gap, over reachable terms; the numerical test for `iteration 1` rows |
-| `median_spearman` | Median, over species, of the rank correlation between run and v2 medians |
+| `negligible_terms` | Reachable terms both runs shrink to nothing (below a millionth of the term's typical size); left out of the two columns below |
+| `median_spearman` | Median, over species, of the rank correlation between run and v2 medians. Reported, not gated |
+| `median_band_ratio` | Median, over species, of the median of this run's 10–90% band width ÷ v2's. Near 1 when the run is as variable as v2; gated between 0.75 and 1.33 |
 | `verdict` | `pass`, `fail`, `no comparison`, `not gated (trial run)`, or `not gated (store holds N draws)`, against the targets in `utils/parity_targets.R` |
 | `indicative_verdict` | For a 100-draw run on a species subset: the same test, **not** the gate |
 
@@ -664,6 +666,16 @@ the run's median from v2's, and the share of terms in band. Setting
 `mean_facet <- "group"` in `04_plot_parity.R` pools the four plant taxa into
 one facet beside mammals and birds. Averages use values clamped at ±4, so one
 far-off term cannot dominate a row.
+
+**`figures/parity_bell.png`** — v2 and exp_000 as distributions. One
+facet per taxon (or group, as above) and one pair of curves per stage and
+region, v2 in blue and exp_000 in orange. Each term's median and 10–90%
+band is read as a normal curve, in v2 units, and a row's curve is the
+average over its terms, negligible ones left out. A shifted orange curve is
+a difference in location; a wider or narrower one, a difference in spread
+(what `median_band_ratio` measures). The normal shape is a drawing
+convenience: v2 keeps only three summaries of its draws. Where v2 fitted
+once (mammals) it is a blue line at 0.
 
 **`report.md`** — a readable summary, generated rather than written:
 
