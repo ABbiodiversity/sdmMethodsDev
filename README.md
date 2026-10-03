@@ -10,470 +10,474 @@
 > [!IMPORTANT]
 > This repository is developed by and for the Science Centre at the Alberta Biodiversity Monitoring
 Institute (ABMI). It is intended for internal use.
-> 
+>
 
-Shared pipeline and static cross-taxa test dataset for methods R&D on ABMI
-species models.
+A shared, static cross-taxa test dataset and one modelling pipeline, so that
+methods questions for Species Models 3.0 can be asked once and answered for
+every taxon, against the same v2.0 baseline.
 
 ## Contents
 
-- [Overview](#overview)
+- [Why this repository exists](#why-this-repository-exists)
 - [Quick start](#quick-start)
 - [Status](#status)
-- [Pipeline flow](#pipeline-flow)
+- [How it works](#how-it-works)
+  - [One pipeline, taxon as configuration](#one-pipeline-taxon-as-configuration)
+  - [Everything is compared with one v2 baseline](#everything-is-compared-with-one-v2-baseline)
+  - [What a taxon spec holds](#what-a-taxon-spec-holds)
+  - [Methods are plug-ins](#methods-are-plug-ins)
+- [The experiment pipeline](#the-experiment-pipeline)
+  - [From run.R to results](#from-runr-to-results)
+  - [Inside one species job](#inside-one-species-job)
+  - [Configuring a run](#configuring-a-run)
+- [Building the dataset](#building-the-dataset)
 - [Directory structure](#directory-structure)
-  - [`0_data/`](#0_data)
-  - [`1_code/`](#1_code)
-  - [`2_pipeline/`](#2_pipeline)
-  - [`3_output/`](#3_output)
-  - [`docs/`](#docs)
+- [Data: `0_data/`](#data-0_data)
+- [Outputs: `2_pipeline/` and `3_output/`](#outputs-2_pipeline-and-3_output)
 - [Parity gate](#parity-gate)
 - [Known gaps](#known-gaps)
-- [Naming conventions](#naming-conventions)
 - [Adding an experiment](#adding-an-experiment)
 - [Contributing a taxon module](#contributing-a-taxon-module)
+- [Naming conventions](#naming-conventions)
 - [Setup](#setup)
 - [Related resources](#related-resources)
 - [Contact](#contact)
 
-## Overview
+## Why this repository exists
 
-A shared environment for testing methods across taxa. It holds a static
-cross-taxa test dataset and a companion R&D pipeline: a taxon-agnostic
-harness, and one taxon spec per taxon that states that taxon's v2
-configuration as data.
+Species Models are produced one taxon at a time, each by its taxon lead. That
+works for production, but it confines R&D to one taxon: a method that improves
+plant models may or may not improve bird models, and testing it three times in
+three codebases duplicates effort.
 
-Because the dataset and pipeline are fixed, R&D questions can be run once
-across all taxa rather than reimplemented per taxon, and results stay
-comparable over time.
+This repository holds:
 
-This repository is for methods research and development. It is not for the
-final species models and does not generate reporting products.
+- a **frozen test dataset** of 10–20 focal species per taxon, harmonized to
+  one format (`0_data/test_dataset/`);
+- **one pipeline** that runs every taxon's v2.0 model as configuration rather
+  than as separate code (`1_code/`);
+- **exp_000**, which checks that the pipeline reproduces v2.0, and is the
+  baseline every later experiment is compared against.
+
+It is for methods research and development. It does not produce the final
+species models or reporting products.
 
 ## Quick start
 
-New here? Read [`docs/getting_started.md`](docs/getting_started.md): the
-vocabulary, how to run the baseline, how to read what it writes, and how to
-test a change against it.
+New to the repository? Read [`docs/getting_started.md`](docs/getting_started.md)
+first: the vocabulary, how to run the baseline, how to read what it writes,
+and how to test a change.
 
 ```r
 source("1_code/harness/harness.R")
-load_framework()     # the harness, every method, every taxon module
-list_methods()       # the engines, selection rules, resampling, metrics
-names(standard_specs())  # the runs an experiment can choose
+load_framework()          # the harness, every method, every taxon module
+list_methods()            # engines, selection rules, resampling, metrics
+names(standard_specs())   # the runs an experiment can choose
 
-# The v2 baseline: configure at the top of run.R, then run it
+# The v2 baseline: check the settings at the top of run.R, then
 source("1_code/experiments/exp_000_parity_v2/run.R")
 ```
 
-A new experiment starts from `1_code/experiments/_template/`; a new method is
-one file in `1_code/methods/` (see its [README](1_code/methods/README.md)).
+| To | Start from |
+| --- | --- |
+| Run the v2 baseline | `1_code/experiments/exp_000_parity_v2/run.R` |
+| Test a methods question | A copy of `1_code/experiments/_template/` |
+| Add an engine, selection rule, resampling scheme or metric | [`1_code/methods/README.md`](1_code/methods/README.md) |
+| Check a code change broke nothing | `Rscript 1_code/tests/run_tests.R`, then [this check](docs/getting_started.md#check-that-nothing-broke) |
 
 ## Status
 
 | Component | State |
 | --- | --- |
-| Test dataset | Built from the `model_ready_v2` snapshot and the bird `Stratified.Rdata`. Responses, covariates and lookups for the four plant-group taxa, mammals and birds. Validated by `_setup/02` |
-| v2 reference | Harmonized into `0_data/v2_results/v2_results.csv` by `_setup/05`. Bryophyte model reference regenerated by `_setup/03`; bird coefficients re-packaged by `_setup/04` |
-| Harness | Built: loading, resampling, fitting engines, selection rules, metrics, result stores, run records |
-| Taxon specs | Every stage of every taxon runs, and every one is partial against v2. The detail is each spec's `v2_coverage`, printed in `report.md` |
-| v2.0 parity check (`exp_000`) | Runs end to end. Not yet able to gate; see [Known gaps](#known-gaps) |
+| Test dataset | Built for the four plant-group taxa (bryophytes, lichens, soil mites, vascular plants), mammals and birds. Validated by `_setup/02` |
+| v2 reference | Published v2 results harmonized into one table, `0_data/v2_results/` |
+| Pipeline | Built: plug-in methods, parallel species, final-model metrics and habitat grids for every taxon, experiment runner, contract tests |
+| Taxon specs | Every stage of every taxon runs. What each reproduces of v2 is stated in its spec's `v2_coverage`, printed in `report.md` |
+| exp_000 (v2 parity) | At 100 draws on the 14-species `parity_check` set, all 22 taxon × region × stage rows pass the proposed targets. Not yet a gate: see [Parity gate](#parity-gate) |
 
-## Pipeline flow
+## How it works
 
-Five parts, each with one job.
+### One pipeline, taxon as configuration
 
+The three v2.0 pipelines differ in nearly every detail but share one sequence:
+pick survey units, fit candidate models, choose among or average them,
+predict and score. What differs is the contents of each step. Here those
+contents are data, in a **spec** per taxon, and one **harness** runs any spec.
+How a model is fitted, selected, resampled or scored is a **method**, looked
+up by the name the spec gives.
+
+```mermaid
+%% ----------------------------
+%% Taxon as configuration, not codebase
+%% ----------------------------
+%%{init: {"themeVariables": {"edgeLabelBackground": "#ffffff"}}}%%
+flowchart TD
+
+    subgraph fw["framework: one pipeline, taxon as configuration"]
+        direction TB
+        PARAM["response · family · offset · regions · stages · resampling"]
+        PARAM --> SP["plant-group specs<br/>bryophytes · lichens · mites · vascular plants"]
+        PARAM --> SM["mammal specs<br/>summer · winter"]
+        PARAM --> SB["bird spec"]
+        SP --> H["1_code/harness/"]
+        SM --> H
+        SB --> H
+        MT["1_code/methods/<br/>engines · selection rules · resampling · metrics"]
+        MT -.->|"looked up by name"| H
+        H -->|"the same result files<br/>for every taxon and method"| R["result stores"]
+    end
+
+    %% ----------------------------
+    %% Styles
+    %% ----------------------------
+
+    %% Containers
+    style fw fill:none,stroke:#2D415B,stroke-width:1px
+
+    %% Configuration
+    style PARAM fill:#ffffff,stroke:#2D415B,stroke-width:1px,stroke-dasharray: 5 5
+    style SP fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
+    style SM fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
+    style SB fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
+    style MT fill:#A3B4C7,stroke:#2D415B,stroke-width:1px,stroke-dasharray: 5 5
+
+    %% Shared pipeline
+    style H fill:#A4A88780,stroke:#C8A02C,stroke-width:4px
+    style R fill:#E8A396,stroke:#2D415B,stroke-width:4px
 ```
-0_data/test_dataset/                  (a) the frozen dataset
-        │                                 responses, covariates, lookups; read only;
-        │  read by                        lookup/dataset_manifest.csv says whose is what
-        ▼
-1_code/harness/                       (b) the harness
-        ▲   ▲                             load, resample, fit, select, score, store,
-        │   │  methods looked up by name  summarize, compare; names no taxon
-        │   └── 1_code/methods/       (c) methods: engines, selection rules,
-        │                                 resampling schemes, metrics; one file each
-        │  configured by
-1_code/modules/<taxon>/spec.R         (d) taxon specs
-                                          each taxon's v2 configuration, as data
 
-1_code/experiments/exp_NNN_*/run.R    (e) experiments
-                                          choose runs, species, draws, seed and what
-                                          changes; call run_experiment()
+The harness names no taxon and no method. A taxon module contributes only a
+spec; an experiment changes parts of a spec or names different methods in it.
+
+### Everything is compared with one v2 baseline
+
+```mermaid
+%% ----------------------------
+%% Everything comparable to one v2 baseline
+%% ----------------------------
+%%{init: {"themeVariables": {"edgeLabelBackground": "#ffffff"}}}%%
+flowchart TD
+
+    subgraph fw["framework: everything comparable to one v2 baseline"]
+        direction TB
+        D["0_data/test_dataset/"] --> M["1_code/modules/[taxon]/<br/>v2 specs"]
+        V2["0_data/v2_results/<br/>published v2.0"]
+        M --> E0["exp_000_parity_v2"]
+        M --> E1["exp_001"]
+        M --> E2["exp_002"]
+        V2 -->|"parity check"| E0
+        E0 --> O0["3_output/exp_000_parity_v2/"]
+        E1 --> O1["3_output/exp_001/"]
+        E2 --> O2["3_output/exp_002/"]
+        O0 --> C["compare_experiments()"]
+        O1 --> C
+        O2 --> C
+    end
+
+    %% ----------------------------
+    %% Styles
+    %% ----------------------------
+
+    %% Container
+    style fw fill:none,stroke:#2D415B,stroke-width:1px
+
+    %% Highlighted borders
+    style D fill:#A4A88780,stroke:#B8860B,stroke-width:4px
+    style M fill:#A4A88780,stroke:#B8860B,stroke-width:4px
+    style V2 fill:#ffffff,stroke:#2D415B,stroke-width:1px,stroke-dasharray: 5 5
+    style E0 fill:#A3B4C7,stroke:#B8860B,stroke-width:4px
+    style E1 fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
+    style E2 fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
+    style O0 fill:#ffffff,stroke:#B8860B,stroke-width:4px,stroke-dasharray: 5 5
+    style O1 fill:#ffffff,stroke:#2D415B,stroke-width:1px,stroke-dasharray: 5 5
+    style O2 fill:#ffffff,stroke:#2D415B,stroke-width:1px,stroke-dasharray: 5 5
+    style C fill:#E8A396,stroke:#2D415B,stroke-width:4px
 ```
 
-An experiment run does four things:
-
-1. **Configures.** `run.R` calls `experiment_config()`, the only place a run's
-   decisions are made: the runs (taxa), the focal species, the draws, the
-   seed, any replacement candidate models or specs, and the workers. It is
-   checked before anything is fitted.
-2. **Fits.** `run_experiment()` prepares each spec once - validating it and
-   loading each region's data and grid - then fits every species of every
-   spec as one job, in parallel when `workers` is above 1. Each job loops
-   region, draw and stage, doing what the spec says. A failed species or draw
-   is logged and the run continues. Results are written to
-   `2_pipeline/<id>/<run>/<region>/`.
-3. **Summarizes.** `collect_results()` reduces the stores to per-species
-   summary tables in `3_output/<id>/tables/`.
-4. **Runs the experiment's own steps**, such as exp_000's comparison with v2,
-   and writes `run_record.md`.
-
-Nothing outside `2_pipeline/<id>/` and `3_output/<id>/` is written during a
-run, and `0_data/` is never written to outside `1_code/_setup/`.
+exp_000 runs every taxon's v2 spec and checks the result against the published
+v2.0 output. Every later experiment changes one thing and is compared with
+exp_000, so a difference is a difference in method rather than in plumbing.
+Because the dataset is frozen, results stay comparable over time.
 
 ### What a taxon spec holds
 
-A spec is a list returned by a function such as `lichen_spec()`. It holds no
-modelling code; everything it names is looked up in a harness registry.
+A spec is a list returned by a function such as `lichen_spec()`, in
+`1_code/modules/<taxon>/spec.R`. It holds no modelling code.
 
 | Field | What it sets |
 | --- | --- |
 | `taxon` | The data slug that keys the response file, covariates and lookups |
 | `response_transform`, `family`, `weight_column` | How the recorded value becomes a response, and the error family and weights |
-| `regions` | Per region: the row filter, the prediction grid (by default the manifest's), and the habitat candidate models |
+| `regions` | Per region: the row filter, the prediction grid, and the habitat candidate models |
 | `stages` | In order: candidate models, engine, selection rule, information criterion, any rule settings, and which stage's prediction is carried into the next as `Climate` |
 | `resample` | The resampling scheme and its settings |
-| `final_prediction` | Optional. The model the harness scores and projects; the plant specs name v2's own prediction from its coefficient tables |
-| `v2_coverage` | Per stage, whether the spec reproduces v2 (`reproduced`, `partial`, `not reproduced`) and what differs. **The one place coverage is stated**; the report prints it |
+| `final_prediction` | Optional. The model scored and projected; the plant specs name v2's own prediction from its coefficient tables |
+| `v2_coverage` | Per stage, whether the spec reproduces v2 and what differs. **The one place coverage is stated**; the report prints it |
 | `notes` | Configuration facts, such as whether `Protocol` is fitted |
 
 `validate_spec()` checks every field before a run reads any data. A misspelt
-field, an unregistered method, or a rule paired with an engine that lacks what
-it needs stops the run with a sentence saying which.
-
-| Registry | Where | Entries |
-| --- | --- | --- |
-| Engines | `methods/engines/` | `glm`, `bayesglm` |
-| Selection rules | `methods/selection/` | `single`, `aic_best`, `aic_average`, `staged_bic`, `ivw_grid`, `aic_best_grid`, `aic_best_onehot` |
-| Resampling schemes | `methods/resampling/` | `precomputed`, `spatial_block`, `spatial_cv` |
-| Metrics | `methods/metrics/` | `auc`, `deviance_explained`, `rmse`, `spearman`, `calibration_slope`, `prevalence`, `n` |
-| Candidate model sets | `harness/model_sets.R` | The v2 formulas, spliced verbatim from `0_data/v2_scripts/` |
-
-Each method is one file that registers itself; `list_methods()` prints them
-with what each needs. The contracts are in
-[`1_code/methods/README.md`](1_code/methods/README.md).
+field, an unregistered method, or a selection rule paired with an engine that
+cannot serve it stops the run with a sentence saying which.
 
 The covariates a run loads are read off the formulas it fits, so a term can
-never be fitted without its column being loaded.
+never be fitted without its column being loaded. The v2 candidate formulas
+are in `1_code/harness/model_sets.R`, spliced verbatim from the v2 scripts.
 
-### Where the modelling code came from
+### Methods are plug-ins
 
-`0_data/v2_scripts/<source>/` holds the v2 scripts as received from the taxon
-leads. They are kept unmodified as the reference the harness is checked
-against, and are **not run** by any experiment. The v2 method is restated in
-this repository rather than copied:
+Each method is one file in `1_code/methods/` that registers itself under a
+name. Adding a method is adding a file; no harness code changes.
 
-- **The configuration moved into specs.** What differed between v2 scripts —
-  response, family, candidate models, selection rule, region filters — is a
-  field in a spec. What they shared is harness code, written once.
-- **Formulas are spliced, not retyped.** The candidate sets in
-  `model_sets.R` are copied from the v2 source. The 58-model plant climate
-  set is rebuilt the way v2 builds it: 14 base models, a bioclim variant of
-  each, and three spatial variants of ten of them.
-- **Paths are arguments.** v2 hard-coded paths relative to each v2 project
-  root. Every path is now set by the calling experiment.
-- **Inputs come from the test dataset.** v2 loaded per-taxon `.Rdata` files;
-  the harness reads the harmonized CSVs.
-- **Run length and seed are configurable.** v2 hard-coded 100 bootstrap
-  draws and set no seed. Both are settings in `run.R`.
-- **Species are fitted in parallel.** Each species draws under its own seed,
-  so a run gives the same results on one worker or twelve.
+| Kind | Folder | Registered |
+| --- | --- | --- |
+| Engines: how a model is fitted | `methods/engines/` | `glm`, `bayesglm` |
+| Selection rules: how candidates become one result | `methods/selection/` | `single`, `aic_best`, `aic_average`, `staged_bic`, `ivw_grid`, `aic_best_grid`, `aic_best_onehot` |
+| Resampling: which units each draw fits | `methods/resampling/` | `precomputed`, `spatial_block`, `spatial_cv` |
+| Metrics: how a prediction is scored | `methods/metrics/` | `auc`, `deviance_explained`, `rmse`, `spearman`, `calibration_slope`, `prevalence`, `n` |
 
-Every taxon-specific behaviour in the v2 pipelines, and whether the harness
-reproduces it, is listed in [`docs/taxon_quirks.md`](docs/taxon_quirks.md).
+A selection rule states the engine capabilities it needs (coefficients, an
+information criterion, standard errors), and `validate_spec()` checks them.
+`check_engine()` tests a new engine against the contract on synthetic data.
+The contracts are in [`1_code/methods/README.md`](1_code/methods/README.md).
 
-## Directory structure
+## The experiment pipeline
 
-```
-sdmMethodsDev/
-├── README.md
-│
-├── 0_data/                        # read-only inputs; written only by 1_code/_setup/
-│   ├── covariates/                # reserved for the covariate catalogue; empty
-│   ├── test_dataset/              # frozen: built by 1_code/_setup/01_
-│   │   ├── sites.csv              # one row per survey unit, all sources
-│   │   ├── vascular_plant.csv     # survey_unit_id + species columns
-│   │   ├── bryophyte.csv
-│   │   ├── lichen.csv
-│   │   ├── mite.csv
-│   │   ├── mammal.csv
-│   │   ├── bird.csv               # counts
-│   │   ├── bird_offsets.csv       # QPAD log offsets
-│   │   ├── covariates.csv         # every covariate, keyed on survey_unit_id + taxon
-│   │   └── lookup/
-│   │       ├── covariate_columns.csv       # block and v2 name of each covariate
-│   │       ├── veg_prediction_matrix.csv   # plant north habitat grid
-│   │       ├── soil_prediction_matrix.csv  # plant south habitat grid
-│   │       ├── modelled_species.csv        # plant-group work queue
-│   │       ├── mammal_north_prediction_matrix.csv
-│   │       ├── mammal_south_prediction_matrix.csv
-│   │       ├── mammal_modelled_species.csv
-│   │       ├── mammal_climate_predictions.csv
-│   │       ├── bird_modelled_species.csv
-│   │       ├── bird_bootstrap_ids.csv      # the 100 stored v2 draws
-│   │       ├── bird_factor_levels.csv
-│   │       ├── bird_veg_age_matrix.csv     # v2 bird translation, from _setup/06_
-│   │       ├── v2_bootstrap_ids/<taxon>/  # v2's stored plant draws, from _setup/07_
-│   │       ├── dataset_manifest.csv        # whose files are whose, from _setup/09_
-│   │       ├── species_queue.csv           # every taxon's work queue, one schema
-│   │       ├── factor_levels.csv           # categorical level order, every taxon
-│   │       └── bird_{north,south}_prediction_matrix.csv  # bird habitat grids
-│   ├── v2_results/                # the v2 outputs, harmonized: built by _setup/05_
-│   │   ├── v2_results.csv
-│   │   └── v2_results_coverage.csv
-│   └── v2_scripts/                # as-received snapshots; reference only
-│       ├── README.md              # sources, commits, snapshot date
-│       ├── birds/
-│       ├── mammals/
-│       └── plants/                # all four plant-group taxa
-│
-├── 1_code/
-│   ├── _scratch.R                 # temporary workspace
-│   ├── _setup/                    # one-off; run by hand, not per experiment
-│   │   ├── 01_harmonize_model_ready_v2.R … 08_harmonize_abmiexplorer_results.R
-│   │   └── 09_harmonize_lookups.R # the uniform lookups and the manifest
-│   ├── harness/                   # shared, taxon-agnostic
-│   │   ├── harness.R              # load_framework(): loads everything below
-│   │   ├── registry.R             # register_*(), get_method(), list_methods()
-│   │   ├── cache.R                # reads each lookup once per session
-│   │   ├── spec.R                 # validate_spec(), spec helpers
-│   │   ├── data_load.R            # dataset manifest, loaders, model frames
-│   │   ├── covariate_sets.R
-│   │   ├── species.R
-│   │   ├── model_sets.R           # the v2 candidate formulas
-│   │   ├── resample.R             # seeds, spatial blocks, scheme dispatch
-│   │   ├── engines.R              # engine interface, check_engine()
-│   │   ├── selection.R            # candidate fitting, combined predictors
-│   │   ├── eval_metrics.R
-│   │   ├── predict_grid.R
-│   │   ├── result.R               # stores, shards
-│   │   ├── run_model.R            # run_specs(): the fitting loop
-│   │   ├── summarise.R            # collect_results()
-│   │   ├── compare.R              # compare_experiments()
-│   │   ├── experiment.R           # experiment_config(), run_experiment()
-│   │   └── run_record.R
-│   ├── methods/                   # one file per method; see its README
-│   │   ├── engines/               # glm.R, bayesglm.R, _glm_family.R
-│   │   ├── selection/             # single.R, aic_average.R, ivw_grid.R, …
-│   │   ├── resampling/            # precomputed.R, spatial_block.R, spatial_cv.R
-│   │   ├── metrics/               # auc.R, rmse.R, …
-│   │   └── _templates/            # copy-and-fill skeletons; not loaded
-│   ├── modules/                   # one spec per taxon
-│   │   ├── _shared/
-│   │   │   ├── plant_group.R      # the v2 shape the four plant-group taxa share
-│   │   │   └── standard_specs.R   # every run's v2 spec, by name
-│   │   ├── bryophytes/spec.R
-│   │   ├── lichens/spec.R
-│   │   ├── soil_mites/spec.R
-│   │   ├── vascular_plants/spec.R
-│   │   ├── mammals/
-│   │   │   ├── spec.R
-│   │   │   └── hurdle.R           # v2's hurdle model, both halves together
-│   │   └── birds/
-│   │       ├── spec.R
-│   │       └── standardize.R      # raw coefficients → v2's standardized terms
-│   ├── experiments/
-│   │   ├── _shared/
-│   │   │   └── focal_species.R    # named species sets, for every experiment
-│   │   ├── _template/             # copy to start an experiment
-│   │   └── exp_000_parity_v2/
-│   │       ├── README.md          # question, design, coverage
-│   │       ├── run.R              # the only file to edit
-│   │       ├── utils/parity_targets.R  # what pass means
-│   │       ├── 01_compare_to_v2.R
-│   │       ├── 02_plot_parity.R
-│   │       ├── 03_build_report.R
-│   │       └── v2_self_agreement.R     # v2 against itself; run once
-│   └── tests/
-│       ├── run_tests.R            # the contract tests; seconds
-│       ├── compare_stores.R       # are two runs' results the same?
-│       └── testthat/
-│
-├── 2_pipeline/                    # intermediates; gitignored
-│   ├── exp_000_parity_v2/
-│   │   ├── run_log.csv            # one row per species, region and draw
-│   │   └── <taxon>/<region>/      # result stores
-│   ├── v2_reference/              # rebuilt v2 references, from _setup/03_ and 04_
-│   └── logs/                      # _setup logs
-│
-├── 3_output/                      # deliverables; summaries committed
-│   └── exp_000_parity_v2/
-│       ├── figures/               # parity_<taxon>, _mean, _bell .png; gitignored
-│       ├── tables/
-│       │   ├── parity_summary.csv       # committed
-│       │   ├── coverage.csv             # committed
-│       │   ├── metric_summary.csv       # committed
-│       │   ├── grid_summary.csv         # committed
-│       │   ├── v2_self_agreement_summary.csv  # committed
-│       │   ├── coefficient_summary.csv  # gitignored; rebuilt
-│       │   └── parity_terms.csv         # gitignored; rebuilt
-│       ├── report.md              # committed
-│       └── run_record.md          # committed
-│
-└── docs/
-    ├── framework_design.md        # the harness design and parity ledger
-    ├── taxon_quirks.md            # every taxon-specific v2 behaviour
-    ├── reviews/                   # code reviews
-    └── images/
+### From run.R to results
+
+An experiment is a `run.R` that states its decisions in `experiment_config()`
+and calls `run_experiment()`. Everything after that is the same for every
+experiment.
+
+```mermaid
+%% ----------------------------
+%% The experiment pipeline
+%% ----------------------------
+%%{init: {"themeVariables": {"edgeLabelBackground": "#ffffff"}}}%%
+flowchart TD
+
+    subgraph cfg["run.R"]
+        direction TB
+        C["experiment_config()<br/>runs · species · draws · seed · changes · workers"]
+    end
+
+    subgraph run["run_experiment()"]
+        direction TB
+        V["validate every spec<br/>before any data is read"]
+        P["prepare each spec once<br/>region data · prediction grids"]
+        J["one job per species"]
+        W1["worker 1"]
+        W2["worker 2"]
+        WN["worker n"]
+        S["merge shards<br/>in queue order"]
+        ST["result stores<br/>2_pipeline/id/run/region/"]
+        CR["collect_results()<br/>per-species summaries"]
+        T["3_output/id/tables/"]
+        X["the experiment's own steps<br/>exp_000: compare to v2 · plot · report<br/>later: compare_to_baseline"]
+        RR["run_record.md"]
+
+        V --> P --> J
+        J --> W1 & W2 & WN
+        W1 & W2 & WN --> S --> ST
+        ST --> CR --> T --> X --> RR
+    end
+
+    C --> V
+
+    %% ----------------------------
+    %% Styles
+    %% ----------------------------
+
+    %% Containers
+    style cfg fill:none,stroke:#2D415B,stroke-width:1px
+    style run fill:none,stroke:#2D415B,stroke-width:1px
+
+    %% Configuration
+    style C fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
+
+    %% Shared pipeline
+    style V fill:#A4A88780,stroke:#C8A02C,stroke-width:2px
+    style P fill:#A4A88780,stroke:#C8A02C,stroke-width:2px
+    style J fill:#A4A88780,stroke:#C8A02C,stroke-width:2px
+    style W1 fill:#ffffff,stroke:#C8A02C,stroke-width:1px
+    style W2 fill:#ffffff,stroke:#C8A02C,stroke-width:1px
+    style WN fill:#ffffff,stroke:#C8A02C,stroke-width:1px,stroke-dasharray: 5 5
+    style S fill:#A4A88780,stroke:#C8A02C,stroke-width:2px
+    style CR fill:#A4A88780,stroke:#C8A02C,stroke-width:2px
+
+    %% Outputs
+    style ST fill:#ffffff,stroke:#2D415B,stroke-width:1px,stroke-dasharray: 5 5
+    style T fill:#E8A396,stroke:#2D415B,stroke-width:4px
+    style X fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
+    style RR fill:#E8A396,stroke:#2D415B,stroke-width:2px
 ```
 
-### `0_data/`
+1. **Configure.** `experiment_config()` holds every decision and checks it
+   before anything is fitted.
+2. **Prepare.** Each spec is validated, and each region's data and grid are
+   loaded once.
+3. **Fit.** Every species of every spec is one job; with `workers` above 1
+   the jobs run in parallel R sessions. Each species draws under its own
+   seed, so results are the same on one worker or twelve. A failed species
+   or draw is logged and the run continues.
+4. **Store.** Each job writes a shard; the shards are merged into one result
+   store per run and region in `2_pipeline/<id>/`.
+5. **Summarize.** `collect_results()` reduces the stores to per-species
+   tables in `3_output/<id>/tables/`.
+6. **The experiment's own steps**, in order. For exp_000: compare with v2,
+   plot, write the report. For later experiments: compare with exp_000.
+7. **Record.** `run_record.md` says what ran, for the commit.
 
-Read-only during experiments. The one exception is `1_code/_setup/`, which
-builds `test_dataset/` and `v2_results/` by hand, once per source snapshot;
-nothing in the harness, modules or experiments writes here. The data is
-gitignored; `v2_scripts/` is the tracked part of this folder.
+Nothing outside `2_pipeline/<id>/` and `3_output/<id>/` is written during a
+run, and `0_data/` is never written outside `1_code/_setup/`.
 
-`test_dataset/` holds the frozen cross-taxa dataset. Its contents do not
-change between experiments; an amendment is a rebuild by `_setup/01`,
-checked by `_setup/02`.
+### Inside one species job
 
-Every response table is `survey_unit_id` followed by one column per species,
-and every identity, design and location field is factored out into
-`sites.csv`. Join any response table to `sites.csv` on `survey_unit_id`.
-`sites.csv` carries an `in_<taxon>` flag per taxon.
+```mermaid
+%% ----------------------------
+%% One species, one draw
+%% ----------------------------
+%%{init: {"themeVariables": {"edgeLabelBackground": "#ffffff"}}}%%
+flowchart LR
 
-`covariates.csv` holds everything the models regress against, for every
-taxon, in one wide table keyed on `survey_unit_id` and `taxon`. The key
-includes the taxon because the sources disagree: bryophyte, lichen and
-vascular plant share identical values on shared survey units, but mite does
-not, which points at a different spatial support or HF vintage in the mite
-source. Mammals are keyed per region (`mammal_north`, `mammal_south`),
-because north and south are separate models on overlapping deployments —
-512 `location_project` values appear in both — and their covariates differ.
-The harness reads only the columns a run needs.
+    subgraph job["one species job: every region, every draw"]
+        direction LR
+        F["species frame<br/>response · offset · weights · covariates"]
+        DR["draw<br/>resampling scheme"]
+        S1["stage 1: climate<br/>candidates → selection rule"]
+        S2["stage 2: habitat<br/>candidates → selection rule<br/>→ v2 post-processing"]
+        FM["final model"]
+        F --> DR --> S1
+        S1 -->|"carried as Climate"| S2 --> FM
+    end
 
-`lookup/covariate_columns.csv` records, per taxon, which block each column
-came from (climate, veg, soil, design) and its v2 spelling. A column present
-in more than one block was suffixed by the harmonizer; the harness renames
-model terms to match, so v2 formulas run unchanged.
+    FM --> CO["coefficients.csv<br/>every stage"]
+    FM --> ME["metrics.csv<br/>in-sample and out-of-bag"]
+    FM --> GR["grid_predictions.csv<br/>one row per habitat type"]
 
-Ten columns are deliberately **not** stored, because they are products of
-stored columns: `TD`, `MAPPET`, `MAT2`, `CMDMAT`, `MWMT2`, `Easting`,
-`Northing`, `Easting2`, `Northing2` and `EastingNorthing`. The harness
-computes them on load (`harness/covariate_sets.R`). A CSV carries about 15
-significant digits, so a separately stored `Northing2` would not equal
-`Northing` squared, and a model fitting both would see an inconsistent pair.
+    %% ----------------------------
+    %% Styles
+    %% ----------------------------
 
-Mammal climate comes from `abmi-camera-climate_2023.Rdata`, the file the v2
-mammal climate pipeline fitted against. It replaces the `SpTable` climate
-block rather than filling gaps in it, because the two are different
-extractions. It matched 4,243 of 4,654 north deployments and all 1,168
-south; unmatched deployments carry `NA`, as v2 excludes them.
+    %% Container
+    style job fill:none,stroke:#2D415B,stroke-width:1px
 
-`lookup/` holds the habitat prediction matrices, the work queues — which
-species each model set is fitted for — and the stored bird draws.
+    %% Steps
+    style F fill:#ffffff,stroke:#2D415B,stroke-width:1px,stroke-dasharray: 5 5
+    style DR fill:#A4A88780,stroke:#C8A02C,stroke-width:2px
+    style S1 fill:#A4A88780,stroke:#C8A02C,stroke-width:2px
+    style S2 fill:#A4A88780,stroke:#C8A02C,stroke-width:2px
+    style FM fill:#A3B4C7,stroke:#2D415B,stroke-width:2px
 
-- Mammals have their own `mammal_modelled_species.csv`, because their queue
-  is season by occurrence threshold: `sp_table_*` are the species with at
-  least 20 detections, which get the full habitat model, and
-  `sp_table_*_ua` those with at least 3, which get the use-availability
-  model.
-- `mammal_climate_predictions.csv` is the climate offset the v2 mammal
-  habitat models read from a separate climate pipeline. 509 of 5,822
-  deployments carry `NA`, as the v2 join produced. The harness does not
-  read it yet: the mammal spec fits climate itself.
-- The mammal prediction matrices were checked against the ABMI Mammals
-  drive copies and are identical.
-- `bird_bootstrap_ids.csv` holds v2's 100 stored draws, keyed on
-  `surveyid`, so bird runs resample exactly as v2 did.
-- `bird_factor_levels.csv` restores the source order of categorical levels,
-  so reference levels, and every contrast, match v2.
+    %% Outputs
+    style CO fill:#E8A396,stroke:#2D415B,stroke-width:1px
+    style ME fill:#E8A396,stroke:#2D415B,stroke-width:1px
+    style GR fill:#E8A396,stroke:#2D415B,stroke-width:1px
+```
 
-`v2_results/` holds the published v2 results as one long table, so a run can
-be scored against a single file rather than three storage formats on two
-drives. Columns are `taxon`, `region`, `stage`, `part`, `season`, `species`,
-`species_v2`, `term`, `v2_median`, `v2_p10`, `v2_p90`, `v2_se`, `v2_n` and
-`source`. Plant climate is fitted once province-wide in v2, so those rows
-carry `region = "all"`. `v2_results_coverage.csv` records which source was
-reached for each part. `exp_000` does not read this table yet (see
-[Known gaps](#known-gaps)).
+Plants and birds fit climate, then habitat (birds: landcover), carrying the
+climate prediction into the habitat stage as a term called `Climate`, as v2
+does. The **final model** is the averaged or combined one where a rule
+combines candidates, and for plants v2's own prediction from its coefficient
+tables. Metrics score it in-sample and on the units the draw left out
+(out-of-bag). The **grid** holds its prediction for a pure stand of each
+habitat type, the one quantity every engine can produce, so it is what a
+method without coefficients is compared on.
 
-`v2_scripts/` holds the modelling scripts as received from the taxon leads,
-unmodified, in one subfolder per source repository. The four plant-group
-taxa share `plants/` because v2 fits them with one set of scripts. All three
-are cloned snapshots taken on 2026-09-08; their sources and commits are
-recorded in [`0_data/v2_scripts/README.md`](0_data/v2_scripts/README.md),
-which is also where a refreshed snapshot gets logged.
+### Configuring a run
 
-`covariates/` is reserved for a versioned catalogue of covariate layers —
-metadata and server paths only, with rasters on the ABMI server. It is not
-built yet.
-
-### `1_code/`
-
-`harness/` holds the shared, taxon-agnostic pipeline. `harness.R` defines
-`load_framework()`, which loads the harness, then every method, then every
-taxon module, then the shared experiment settings. Changes here affect every
-experiment, past and future, and should be reviewed accordingly.
-
-| File | Does |
-| --- | --- |
-| `registry.R` | The method registry: `register_engine()` and the rest, `get_method()`, `list_methods()` |
-| `cache.R` | Keeps each lookup file, and each covariate column read, for the session |
-| `spec.R` | `validate_spec()`, `apply_stage_models()`, `spec_covariates()`, `v2_status()` |
-| `data_load.R` | The dataset manifest; column-selective loaders; one frame per taxon and region |
-| `covariate_sets.R` | Named covariate bundles, derived covariates, and term renaming |
-| `species.R` | The species queue and focal-species resolution |
-| `model_sets.R` | The v2 candidate formulas, and `extend_models()`, `models_from_covariates()` |
-| `resample.R` | Seeds (`species_seed()`, `with_seed()`), spatial blocks, scheme dispatch |
-| `engines.R` | How the harness talks to an engine, and `check_engine()` |
-| `selection.R` | Candidate fitting and the result every rule returns |
-| `eval_metrics.R` | `compute_metrics()` |
-| `predict_grid.R` | Projecting a final model onto a habitat prediction grid |
-| `result.R` | Writing, sharding and reading result stores |
-| `run_model.R` | `run_specs()`: prepare, fit each species (in parallel), merge |
-| `summarise.R` | `collect_results()`: stores to summary tables |
-| `compare.R` | `compare_experiments()`: one experiment against a baseline |
-| `experiment.R` | `experiment_config()`, `run_experiment()`, `script_step()` |
-| `run_record.R` | The committed run record |
-
-`methods/` holds every engine, selection rule, resampling scheme and metric,
-one file each, each registering itself. Its
-[`README.md`](1_code/methods/README.md) states each contract and how to add
-and test a method.
-
-`modules/` holds one spec per taxon, in a folder named for the taxon. A spec
-is configuration only; experiment-specific logic belongs in the experiment.
-The four plant-group taxa share their v2 shape through
-`_shared/plant_group.R`, and each taxon's folder states only what is its
-own, such as whether v2 fits `Protocol`. `_shared/standard_specs.R` lists
-every run an experiment can choose, by name. Soil mites use the data slug
-`mite`, not `soil_mite`.
-
-`experiments/` holds one folder per R&D question. Each contains a
-`README.md` stating the question and design, and a `run.R` that configures
-the run and calls `run_experiment()`. An experiment's own scripts are steps
-it passes to `run_experiment()`; each runs in an environment of its own,
-reading only `config` and `results`. `_template/` is the starting point for a
-new experiment; `_shared/` holds settings every experiment can use, such as
-the named focal-species sets.
-
-`run.R` is the only file that has to be edited to change a run. Its
-`experiment_config()` call holds every decision:
+`run.R` is the only file to edit. Its `experiment_config()` call holds every
+decision:
 
 | Argument | Sets |
 | --- | --- |
 | `id` | The experiment's folders under `2_pipeline/` and `3_output/` |
 | `taxa` | The runs, from `names(standard_specs())` |
 | `species` | A named set from `focal_species_sets()`, a vector named by taxon, or `NULL` for every species |
-| `n_bootstraps` | Draws per species; 100 is v2's |
+| `n_bootstraps` | Draws per species; 100 is v2's. Use 5 to check that a run works |
 | `seed` | The base seed; `NULL` leaves draws unseeded, as v2 did |
-| `stage_models` | Replacement candidate sets, or `NULL` for v2's |
-| `specs` | Changed specs, or `NULL` for `standard_specs()` |
+| `stage_models` | Replacement candidate formulas, or `NULL` for v2's |
+| `specs` | Changed specs (a different engine or selection rule), or `NULL` for `standard_specs()` |
 | `plant_bootstrap` | `"spatial_block"` draws v2's bootstrap afresh; `"v2_ids"` replays v2's stored draws |
 | `workers` | Species fitted at once |
 | `unit_predictions` | `"none"` (default), `"oob"` or `"all"` per-unit predictions written |
 
-`tests/` holds the contract tests (`run_tests.R`, seconds) and
-`compare_stores.R`, which says whether two runs' results are the same; see
-[Checking a change](docs/getting_started.md#check-that-nothing-broke).
+Shorten a trial by cutting species, not draws: a 10–90% band read from a
+handful of draws does not mean much. On a 24-core machine, the 14
+`parity_check` species take about 1.6 minutes at 5 draws on 12 workers.
 
-`_setup/` holds one-off scripts that prepare the repository itself. None
-runs as part of an experiment: they are run by hand, in order, when the
-dataset is first built or a source is replaced. The leading underscore keeps
-them sorted clear of the run-time code.
+## Building the dataset
+
+The dataset is built once per source snapshot by the scripts in
+`1_code/_setup/`, run by hand and in order. No experiment runs them.
+
+```mermaid
+%% ----------------------------
+%% Building the frozen dataset and the v2 reference
+%% ----------------------------
+%%{init: {"themeVariables": {"edgeLabelBackground": "#ffffff"}}}%%
+flowchart TD
+
+    subgraph src["network sources"]
+        direction LR
+        SN["model_ready_v2 snapshot<br/>bird Stratified.Rdata<br/>mammal camera climate"]
+        VP["v2 project outputs<br/>plants · mammals · birds"]
+        AX["ABMIexploreR package"]
+    end
+
+    subgraph setup["1_code/_setup/"]
+        direction TB
+        S01["01 harmonize"]
+        S02["02 validate"]
+        S06["06 bird translation matrix"]
+        S07["07 v2 plant draws"]
+        S09["09 harmonize lookups<br/>manifest · species queue · bird grids"]
+        S03["03 rerun bryophyte reference"]
+        S04["04 package bird coefficients"]
+        S05["05 harmonize v2 results"]
+        S08["08 harmonize ABMIexploreR"]
+    end
+
+    DS["0_data/test_dataset/<br/>frozen"]
+    VR["0_data/v2_results/<br/>the v2 reference"]
+
+    SN --> S01 --> DS
+    DS --> S02
+    VP --> S06 --> DS
+    VP --> S07 --> DS
+    DS --> S09 --> DS
+    VP --> S03 --> S05
+    VP --> S04 --> S05
+    S05 --> VR
+    AX --> S08 --> VR
+
+    %% ----------------------------
+    %% Styles
+    %% ----------------------------
+
+    %% Containers
+    style src fill:none,stroke:#2D415B,stroke-width:1px,stroke-dasharray: 5 5
+    style setup fill:none,stroke:#2D415B,stroke-width:1px
+
+    %% Sources
+    style SN fill:#ffffff,stroke:#2D415B,stroke-width:1px
+    style VP fill:#ffffff,stroke:#2D415B,stroke-width:1px
+    style AX fill:#ffffff,stroke:#2D415B,stroke-width:1px
+
+    %% Scripts
+    style S01 fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
+    style S02 fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
+    style S06 fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
+    style S07 fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
+    style S09 fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
+    style S03 fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
+    style S04 fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
+    style S05 fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
+    style S08 fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
+
+    %% Products
+    style DS fill:#A4A88780,stroke:#B8860B,stroke-width:4px
+    style VR fill:#A4A88780,stroke:#B8860B,stroke-width:4px
+```
 
 | Script | Reads | Writes |
 | --- | --- | --- |
@@ -482,174 +486,286 @@ them sorted clear of the run-time code.
 | `03_rerun_bryophyte_v2_reference.R` | The v2 plant project's bryophyte data, and the frozen v2 functions | `2_pipeline/v2_reference/bryophyte-species-models.Rdata` |
 | `04_package_bird_coefficients.R` | The per-draw v2 bird coefficient CSVs | `2_pipeline/v2_reference/Birds2024.RData` |
 | `05_harmonize_v2_results.R` | v2 plant `COEFS.RData`, the mammal coefficient tables, `Birds2024.RData` | `0_data/v2_results/` |
-| `06_harmonize_bird_translation_lookup.R` | v2's bird `Xn-veg-v2024.Rdata` | `0_data/test_dataset/lookup/bird_veg_age_matrix.csv` |
-| `07_harmonize_v2_plant_bootstrap_ids.R` | v2's stored plant bootstrap draws | `0_data/test_dataset/lookup/v2_bootstrap_ids/` |
+| `06_harmonize_bird_translation_lookup.R` | v2's bird `Xn-veg-v2024.Rdata` | `lookup/bird_veg_age_matrix.csv` |
+| `07_harmonize_v2_plant_bootstrap_ids.R` | v2's stored plant bootstrap draws | `lookup/v2_bootstrap_ids/` |
 | `08_harmonize_abmiexplorer_results.R` | ABMIexploreR's packaged coefficients | `0_data/v2_results/abmiexplorer/` |
 | `09_harmonize_lookups.R` | `0_data/test_dataset/lookup/` only (offline) | `species_queue.csv`, `factor_levels.csv`, `dataset_manifest.csv`, the bird prediction grids |
 
-- **`01`** writes every response, covariate and lookup table described
-  under [`0_data/`](#0_data), so experiments run from
-  `0_data/test_dataset/` alone. Mammal species names are resolved against
-  `WildTrax Species Strings.RData`, so the north and south files reach the
-  same column name; a species the lookup lacks keeps its source spelling
-  and is reported (as of the 2024 snapshot, `Raccoon` alone).
-- **`02`** is run after `01`, and again whenever the snapshot or the
-  harmonizer changes. Its first pass describes the tables (sizes, coverage,
-  value ranges, joins). Its second traces every written value back to its
-  source, restating the rules rather than calling the harmonizer's
-  functions, so a bug there shows up rather than cancelling itself out. It
-  writes nothing, so it is safe to re-run.
+- **`01`** writes every response, covariate and lookup table, so experiments
+  run from `0_data/test_dataset/` alone. Mammal species names are resolved
+  against `WildTrax Species Strings.RData`, so the north and south files
+  reach the same column name.
+- **`02`** is run after `01`, `06` and `09`, and whenever the snapshot or a
+  harmonizer changes. It traces every written value back to its source,
+  restating the rules rather than calling the harmonizer, so a bug there
+  shows up rather than cancelling out. It writes nothing.
 - **`03`** exists because the published bryophyte reference is unusable:
-  every draw is an error object, and its bootstrap-id file holds 3 draws
-  instead of 100. It re-runs the frozen v2 functions unmodified and writes to
-  `2_pipeline/`, never to the v2 project. It covers the climate stage only.
-- **`04`** rebuilds the packaged bird output, which is absent from the bird
-  drive. It is a clone of v2's `08.PackageCoefficients.R` with only the paths
-  changed, and puts bird coefficients on the same standardized term names
-  as the plant tables. Reads are serial, because parallel reads trip Google
-  Drive's rate limiting.
-- **`05`** flattens the three v2 storage formats into
-  `0_data/v2_results/v2_results.csv`. Plants come from `COEFS.RData`, v2's
-  own standardization output, which holds complete bryophyte arrays. Mammal
-  results average the two seasons, as v2's `.all` tables do. Note that
+  every draw is an error object. It re-runs the frozen v2 functions
+  unmodified, climate stage only.
+- **`04`** rebuilds the packaged bird output, absent from the bird drive. It
+  is v2's `08.PackageCoefficients.R` with only the paths changed.
+- **`05`** flattens the three v2 storage formats into one table. Mammal
+  results average the two seasons, as v2's `.all` tables do.
   `Birds2024.RData` labels draws 2 to 100 in file-listing order (`b2` is draw
-  10, `b3` draw 100), a v2 packaging quirk: medians and bands are unaffected,
-  but a draw-by-draw comparison has to remap them.
-- **`06`** copies the `age` matrix v2 uses to translate bird landcover
-  coefficients onto the standardized habitat types, so
-  `modules/birds/standardize.R` can do the same without the bird drive. Re-run
-  it whenever `01` rebuilds `lookup/`.
-- **`07`** copies v2's stored plant bootstrap draws, one file per species, so a
-  run with `plant_bootstrap = "v2_ids"` fits exactly the rows v2 fitted. The
-  full sets are large (1.3 GB compressed for vascular plants), so
-  `SDM_V2_BOOT_TAXA` and `SDM_V2_BOOT_SPECIES` restrict it to what a run needs.
-  Bryophytes come from `03`'s regenerated draws.
-- **`09`** writes the lookups every taxon shares one form of: one species
-  queue in one schema (the three taxon leads' lookups had three), one
-  factor-level table, the bird habitat prediction grids, and
-  `dataset_manifest.csv`, which names each taxon's response, offset and grid
-  files, its covariate key and its stored draws. The harness reads file
-  locations from the manifest and nowhere else, so a new taxon is rows there
-  plus its files. It reads only `test_dataset/`, so it runs offline; re-run it
-  after `01` or `06`. The bird north grid is v2's coefficient translation
-  matrix rebuilt in covariate space, and is checked to reproduce it exactly
-  before it is written.
+  10), a v2 packaging quirk: medians and bands are unaffected.
+- **`06`** copies the matrix v2 uses to translate bird landcover coefficients
+  onto the standardized habitat types. Re-run it whenever `01` rebuilds
+  `lookup/`.
+- **`07`** copies v2's stored plant draws, so `plant_bootstrap = "v2_ids"`
+  fits exactly the rows v2 fitted. The sets are large (1.3 GB for vascular
+  plants); `SDM_V2_BOOT_TAXA` and `SDM_V2_BOOT_SPECIES` restrict it.
+- **`08`** harmonizes ABMIexploreR's published coefficients, pinned to a
+  commit; exp_000 scores against this build by default.
+- **`09`** writes one form of the lookups for every taxon: one species queue
+  (the three taxon leads' lookups had three schemas), one factor-level table,
+  the bird habitat grids, and `dataset_manifest.csv`, which names each
+  taxon's files. The harness reads file locations from the manifest and
+  nowhere else. It runs offline in seconds; re-run it after `01` or `06`.
 
-`_scratch.R` is a dated workspace for exploration. Work that proves durable
-is promoted into a proper script and removed from it.
+## Directory structure
 
-### `2_pipeline/`
+```
+sdmMethodsDev/
+├── README.md
+├── 0_data/                        # read-only inputs; written only by 1_code/_setup/
+│   ├── test_dataset/              # the frozen dataset; see "Data" below
+│   ├── v2_results/                # the published v2 results, one table
+│   ├── v2_scripts/                # the v2 scripts as received; reference only
+│   └── covariates/                # reserved for a covariate catalogue; empty
+│
+├── 1_code/
+│   ├── harness/                   # the shared pipeline; names no taxon or method
+│   │   ├── harness.R              # load_framework(): loads everything
+│   │   ├── experiment.R           # experiment_config(), run_experiment()
+│   │   ├── run_model.R            # run_specs(): prepare, fit (parallel), merge
+│   │   ├── spec.R                 # validate_spec() and spec helpers
+│   │   ├── registry.R             # register_*(), list_methods()
+│   │   ├── data_load.R            # the dataset manifest, loaders, model frames
+│   │   ├── summarise.R            # collect_results()
+│   │   ├── compare.R              # compare_experiments()
+│   │   └── …                      # model sets, selection, engines, metrics, grids, stores
+│   ├── methods/                   # one file per method; see its README
+│   │   ├── engines/  selection/  resampling/  metrics/
+│   │   └── _templates/            # copy-and-fill skeletons; not loaded
+│   ├── modules/                   # one v2 spec per taxon
+│   │   ├── _shared/               # plant_group.R (four plant taxa); standard_specs.R
+│   │   ├── bryophytes/  lichens/  soil_mites/  vascular_plants/
+│   │   ├── mammals/               # spec.R, hurdle.R (v2's hurdle model)
+│   │   └── birds/                 # spec.R, standardize.R (v2's term translation)
+│   ├── experiments/
+│   │   ├── _shared/               # named focal-species sets
+│   │   ├── _template/             # copy to start an experiment
+│   │   └── exp_000_parity_v2/     # run.R, 01_compare_to_v2.R, 02_plot_parity.R,
+│   │                              # 03_build_report.R, utils/parity_targets.R
+│   ├── _setup/                    # 01–09: build 0_data/; run by hand
+│   ├── tests/                     # run_tests.R; compare_stores.R
+│   └── _scratch.R                 # dated workspace for exploration
+│
+├── 2_pipeline/                    # result stores and intermediates; gitignored
+│   ├── <exp_id>/<run>/<region>/   # one result store per run and region
+│   └── v2_reference/              # rebuilt v2 references, from _setup/03 and 04
+│
+├── 3_output/                      # deliverables, per experiment; summaries committed
+│   └── <exp_id>/                  # tables/, figures/, report.md, run_record.md
+│
+└── docs/
+    ├── getting_started.md         # start here
+    ├── framework_design.md        # the design, contracts and parity ledger
+    ├── taxon_quirks.md            # every taxon-specific v2 behaviour
+    └── reviews/                   # dated code reviews
+```
 
-Intermediate and cached files. Gitignored.
+| Folder | Edit it to | Affects |
+| --- | --- | --- |
+| `1_code/experiments/exp_NNN_*/` | Ask a question | That experiment only |
+| `1_code/experiments/_shared/` | Add a reusable species set | Experiments that use it |
+| `1_code/methods/` | Add or change a method | Every experiment that names it |
+| `1_code/modules/<taxon>/` | Record what v2 does for a taxon | Every experiment; review as such |
+| `1_code/harness/` | Change how every run works | Every experiment, past and future; review as such |
+| `1_code/_setup/` | Rebuild or extend the dataset | The dataset, and so every experiment |
 
-Each experiment writes one result store per taxon and region to
-`<exp_id>/<taxon>/<region>/`:
+## Data: `0_data/`
+
+Read-only during experiments, and gitignored except `v2_scripts/`.
+
+### `test_dataset/`
+
+The frozen cross-taxa dataset. It does not change between experiments; an
+amendment is a rebuild by `_setup/`, checked by `_setup/02`.
+
+| File | Holds |
+| --- | --- |
+| `sites.csv` | One row per survey unit across every design: identity, design and location fields, and an `in_<taxon>` flag per taxon |
+| `<taxon>.csv` | `survey_unit_id` plus one column per species: detections for plants, densities for mammals, counts for birds. Join to `sites.csv` on `survey_unit_id` |
+| `bird_offsets.csv` | QPAD log offsets per survey unit and bird species |
+| `covariates.csv` | Everything the models regress against, every taxon, in one wide table keyed on `survey_unit_id` and a covariate key |
+| `lookup/dataset_manifest.csv` | Per taxon and region: the response and offset files, the covariate key, the prediction grid, and any stored draws. **The harness reads file locations from here** |
+| `lookup/species_queue.csv` | Every taxon's work queue in one schema: taxon, region, season, tier, species, order, and the name v2 used |
+| `lookup/covariate_columns.csv` | Per taxon, the block each covariate came from (climate, veg, soil, design) and its v2 spelling |
+| `lookup/factor_levels.csv` | The source order of categorical levels, so reference levels and every contrast match v2 |
+| `lookup/*_prediction_matrix.csv` | Habitat prediction grids: one row per habitat type, the cover of a pure stand. Plants (`veg`, `soil`), mammals and birds |
+| `lookup/bird_bootstrap_ids.csv`, `lookup/v2_bootstrap_ids/` | v2's stored draws: birds, keyed on `surveyid`; plants per species |
+| `lookup/mammal_climate_predictions.csv` | The climate offset v2's mammal habitat models read from a separate climate pipeline; the mammal specs read it by default |
+| `lookup/bird_veg_age_matrix.csv` | v2's bird landcover translation matrix |
+
+Things to know about the data:
+
+- **Covariate keys include the taxon,** because the sources disagree: mites
+  differ from the other plant-group taxa on shared survey units, and mammals
+  are keyed per region (`mammal_north`, `mammal_south`) because north and
+  south are separate models on overlapping deployments.
+- **A column in more than one block was suffixed** (`HardLin_veg`,
+  `HardLin_soil`); the harness renames model terms to match, so v2 formulas
+  run unchanged.
+- **Ten derived columns are not stored** (`TD`, `MAPPET`, `MAT2`, `CMDMAT`,
+  `MWMT2`, `Easting`, `Northing`, `Easting2`, `Northing2`,
+  `EastingNorthing`). The harness computes them on load, so a squared term
+  always equals its square.
+- **Mammal climate** comes from `abmi-camera-climate_2023.Rdata`, the file
+  v2's mammal climate pipeline fitted against. It matched 4,243 of 4,654
+  north deployments and all 1,168 south; unmatched deployments carry `NA`, as
+  v2 excludes them.
+- **The bird grids** are v2's translation matrix rebuilt in covariate space
+  by `_setup/09`, checked to reproduce it exactly.
+
+### `v2_results/`
+
+The published v2 results as one long table, so a run is scored against one
+file rather than three storage formats on two drives: `taxon`, `region`,
+`stage`, `part`, `season`, `species`, `species_v2`, `term`, `v2_median`,
+`v2_p10`, `v2_p90`, `v2_se`, `v2_n` and `source`. Plant climate is fitted once
+province-wide in v2, so those rows carry `region = "all"`. Two builds share the
+schema: `abmiexplorer/` (the published species, from `_setup/08`; exp_000's
+default) and the network-drive build (every species v2 fitted, from
+`_setup/05`). `v2_results_coverage.csv` records which source each part came
+from.
+
+### `v2_scripts/`
+
+The modelling scripts as received from the taxon leads, unmodified, one
+subfolder per source repository, snapshotted on 2026-09-08. They are the
+reference the pipeline is checked against and are **never run**. Sources and
+commits are in [`0_data/v2_scripts/README.md`](0_data/v2_scripts/README.md).
+The v2 method is restated here rather than copied: what differed between the
+v2 scripts became spec fields, what they shared became harness code, and the
+candidate formulas were spliced verbatim.
+
+## Outputs: `2_pipeline/` and `3_output/`
+
+```mermaid
+%% ----------------------------
+%% What a run writes, in order
+%% ----------------------------
+%%{init: {"themeVariables": {"edgeLabelBackground": "#ffffff"}}}%%
+flowchart LR
+
+    subgraph pipe["2_pipeline/id/ — gitignored"]
+        direction TB
+        ST["result stores<br/>coefficients · metrics · grid_predictions · meta.json"]
+        LG["run_log.csv"]
+    end
+
+    subgraph out["3_output/id/"]
+        direction TB
+        TS["tables/<br/>coverage · metric_summary · grid_summary<br/>coefficient_summary"]
+        PT["tables/<br/>parity_terms · parity_summary"]
+        FG["figures/<br/>parity_taxon · parity_mean · parity_bell"]
+        RP["report.md"]
+        RR["run_record.md"]
+    end
+
+    ST -->|"collect_results()"| TS
+    TS -->|"01_compare_to_v2"| PT
+    PT -->|"02_plot_parity"| FG
+    PT -->|"03_build_report"| RP
+    ST -->|"run_record()"| RR
+
+    %% ----------------------------
+    %% Styles
+    %% ----------------------------
+
+    %% Containers
+    style pipe fill:none,stroke:#2D415B,stroke-width:1px,stroke-dasharray: 5 5
+    style out fill:none,stroke:#2D415B,stroke-width:1px
+
+    %% Stores
+    style ST fill:#A4A88780,stroke:#C8A02C,stroke-width:2px
+    style LG fill:#ffffff,stroke:#2D415B,stroke-width:1px
+
+    %% Every experiment
+    style TS fill:#E8A396,stroke:#2D415B,stroke-width:2px
+    style RR fill:#E8A396,stroke:#2D415B,stroke-width:2px
+
+    %% exp_000's own steps
+    style PT fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
+    style FG fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
+    style RP fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
+```
+
+The red files are written for every experiment by the harness; the blue ones
+are exp_000's own steps. A later experiment made from the template writes
+`comparison_*.csv` against exp_000 instead.
+
+A *draw* is one bootstrap iteration; draw 1 is the full data. Every summary
+reduces the draws to a median and a 10th–90th percentile band (`p10`, `p90`)
+rather than a mean and standard deviation, because the spread over draws is
+often skewed. `boot1` is the draw-1 value.
+
+### Result stores (`2_pipeline/<exp_id>/<run>/<region>/`)
 
 | File | Holds |
 | --- | --- |
 | `coefficients.csv` | Every stage's coefficients per species, draw and term |
 | `metrics.csv` | Metrics per species and draw |
-| `grid_predictions.csv` | The final model's prediction for each habitat type on the grid |
-| `unit_predictions.csv` | Only when `unit_predictions` is `"oob"` or `"all"`: the final model's prediction at survey units. Off by default: several GB for birds, and nothing downstream needs it |
-| `meta.json` | What produced the store: stages, engines, selection rules, covariates, resampling scheme, the seed actually used, any model overrides, and the spec's notes |
+| `grid_predictions.csv` | The final model's prediction for each habitat type |
+| `unit_predictions.csv` | Only when `unit_predictions` is `"oob"` or `"all"`: predictions at survey units. Off by default: several GB for birds |
+| `meta.json` | What produced the store: stages, engines, selection rules, covariates, resampling, the seed, any model overrides |
 
-`<exp_id>/run_log.csv` records the outcome of every species, region and
-draw — `ok`, or why not. The stores are too large to commit: 100 draws by
-every species by every term. While a run is fitting, each species writes to
-`<run>/_shards/`; the shards are joined into the region stores at the end,
-row for row as a serial run would write them.
+`2_pipeline/<exp_id>/run_log.csv` records every species, region and draw:
+`ok`, or why not.
 
-`v2_reference/` holds v2 references rebuilt by `_setup/03` and `04`, which
-`_setup/05` reads. `logs/` holds the logs of the long `_setup` runs.
+### What is committed
 
-### `3_output/`
-
-Deliverables, organized by experiment. Only derived artefacts belong here:
-summary tables, figures, and the report.
-
-Only the small summaries are committed, so experiments can be compared across
-time from the repository alone without large files changing on every run:
-
-| Committed | Gitignored |
+| Committed | Gitignored (rebuilt with `run_experiment(config, fit = FALSE)`) |
 | --- | --- |
 | `run_record.md`, `report.md` | `figures/` |
-| `tables/parity_summary.csv` | `tables/coefficient_summary.csv` |
-| `tables/coverage.csv` | `tables/parity_terms.csv` |
-| `tables/metric_summary.csv` | |
+| `tables/coverage.csv` | `tables/coefficient_summary.csv` |
+| `tables/metric_summary.csv` | `tables/parity_terms.csv` |
 | `tables/grid_summary.csv` | |
+| `tables/parity_summary.csv`, `tables/v2_self_agreement_summary.csv` | |
 
-The gitignored tables hold per-species, per-term detail. They grow with the
-species list — a full plant run is tens of thousands of rows — and are rebuilt
-from the `2_pipeline/` stores by `run_experiment(config, fit = FALSE)`.
-Keep the stores for as long as that detail may be needed.
+**Commit only runs that count.** A trial writes the same files as a full run.
+Commit `3_output/` after a run with the full species list and
+`n_bootstraps = 100`, and check that `run_record.md` says so. Output folders
+are named by experiment rather than by version; each experiment is its own
+record, and its history is in git.
 
-**Commit only runs that count.** A trial run writes to the same files as a
-full run, so committing after a smoke test would record trial numbers as the
-experiment's result. Commit `3_output/` after a run with the full species
-list and `n_bootstraps` equal to `v2_bootstraps`, and check that
-`run_record.md` describes that run.
+### Tables written for every experiment
 
-Output folders are named by experiment (`3_output/<exp_id>/`) rather than by
-version (`3_output/v0.1/`) as the Science Centre code standards suggest. Each
-experiment is its own record, and a rerun replaces it; its history is in git.
-
-#### Output key
-
-A run writes its outputs in this order:
-
-```
-2_pipeline stores ─► collect_results()   ─► coverage · metric_summary · grid_summary · coefficient_summary
-                    01_compare_to_v2    ─► parity_terms · parity_summary
-                    02_plot_parity      ─► figures/parity_<taxon>.png · parity_mean.png · parity_bell.png
-                    03_build_report     ─► report.md
-                    run_record()        ─► run_record.md
-```
-
-`collect_results()` and `run_record()` belong to the harness and run for
-every experiment; the three numbered scripts are exp_000's own steps.
-
-A *draw* is one bootstrap iteration. Every summary reduces the draws to a
-median and a 10th–90th percentile band (`p10`, `p90`) rather than a mean and
-standard deviation, because the spread over draws is often skewed.
-
-**`run_record.md`** — which run the other files came from. Read it first: if
-its configuration is not a full run (full species list, `n_bootstraps` equal
-to `v2_bootstraps`), the tables describe a trial.
+**`run_record.md`** — what ran. Read it first: if it is not a full run, the
+tables describe a trial.
 
 | Section | Holds |
 | --- | --- |
-| Provenance | Git commit, R version, time written, pipeline folder. Volatile; ignored when comparing records |
-| Configuration | Taxa, focal species, `n_bootstraps`, `boot_seed`, candidate model sets, engines, selection rules, jobs ok / not ok |
-| Coverage | Rows written per taxon and region |
-| Metrics | A short metric summary |
+| Provenance | Git commit, R version, time written. Volatile; ignored when comparing records |
+| Configuration | Runs, focal species, draws, seed, candidate model sets, engines, selection rules, jobs ok / not ok |
+| Coverage | Rows written per run and region |
+| Metrics | Metrics pooled over species and draws |
 
-**`tables/coverage.csv`** — what ran. One row per run × region.
-
-| Column | Meaning |
-| --- | --- |
-| `taxon` | Data slug, from the store's `meta.json` |
-| `run` | The spec's key in `run.R`, which names the store; the two mammal runs are `mammal_summer` and `mammal_winter` |
-| `region` | Model region (`north`, `south`) |
-| `season`, `part` | Mammals only: season, and hurdle part (`presence`, `abundance`) |
-| `species` | Species that produced output |
-| `draws` | Draws that produced output |
-| `stages` | Stages with stored coefficients |
-| `has_coefficients` | Whether coefficients were stored |
-| `has_grid` | Whether predictions onto the habitat prediction grid were stored |
-
-A row with `species = 0` means that taxon and region produced nothing; the
-reason is in `2_pipeline/<exp_id>/run_log.csv`.
+**`tables/coverage.csv`** — what ran, one row per run × region: `taxon`,
+`run`, `region`, `season` and `part` (mammals), `species`, `draws`, `stages`,
+`has_coefficients`, `has_grid`. A row with `species = 0` produced nothing;
+the reason is in `run_log.csv`.
 
 **`tables/metric_summary.csv`** — how well the models fit. One row per
-taxon × region × species × metric, with `n`, `median`, `p10` and `p90` over
-draws. Each harness metric comes twice, prefixed by where it is scored:
+taxon × region × species × metric, with `n`, `median`, `p10` and `p90`.
 
 | Prefix | Scored on |
 | --- | --- |
 | `insample_` | The units the draw fitted |
-| `oob_` | The units the draw left out: the held-out read. NA for iteration 1, the full data |
-| `v2val_` | v2's own validation (plants): seven AUCs scored from the coefficients on the draw's units, as v2 does |
-| `oob_v2val_` | The same seven, on the units the draw left out |
+| `oob_` | The units the draw left out: the held-out read. NA for draw 1 |
+| `v2val_` | v2's own validation (plants): seven AUCs from the coefficients |
+| `oob_v2val_` | The same seven, out-of-bag |
 
 | Metric | Meaning |
 | --- | --- |
@@ -658,185 +774,146 @@ draws. Each harness metric comes twice, prefixed by where it is scored:
 | `rmse` | Typical prediction error |
 | `spearman` | Rank agreement between observed and predicted |
 | `calibration_slope` | 1 is well calibrated; below 1, predictions are over-confident |
-| `prevalence` | Observed detection rate |
-| `n` | Survey units scored |
-| `Climate`, `Climate_Truncated`, `Landcover`, `Full`, `Full_Truncated`, `Full_Joint`, `Full_Joint_Truncated` | v2's validation AUCs: climate alone (and capped at its 99th percentile), landcover alone, the two combined, and combined per habitat type |
+| `prevalence`, `n` | Observed detection rate; survey units scored |
+| `Climate` … `Full_Joint_Truncated` | v2's seven validation AUCs: climate alone (and capped), landcover alone, the two combined, and combined per habitat type |
 
-The harness metrics score each run's **final model**: the combined model where
-a rule averages candidates, and for plants v2's own prediction from its
-coefficient tables (`final_prediction` in the spec), so for plants
-`insample_auc` equals `v2val_Full`. Earlier runs scored the best single
-candidate instead; their metric summaries are not comparable with these.
+Metrics score each run's final model, so for plants `insample_auc` equals
+`v2val_Full`. Runs before 2026-10-03 scored the best single candidate; their
+metric summaries are not comparable with these.
 
-**`tables/grid_summary.csv`** — the final model's prediction for each habitat
-type. One row per taxon × region × species × `grid_unit`, with `n`,
-`median`, `p10`, `p90` and `boot1` over draws, on the response scale
-(probability of detection or presence, or count for birds). Each grid row is
-a pure stand of that type, at the stage's constants: `Climate` 0, the new
-protocol where fitted, 100 sampling days for mammals. This is the quantity
-every engine can produce, so it is what a method without coefficients is
-compared on. Bird grids are v2's coefficient translation matrix rebuilt in
-covariate space; v2's later adjustments to coefficients (the plant stand-age
-splines, the bird linear-feature re-expression) are in the coefficients, not
-the grid.
+**`tables/grid_summary.csv`** — the final model's prediction for each
+habitat type, one row per taxon × region × species × `grid_unit`, on the
+response scale. Each row is a pure stand of that type at the stage's
+constants (`Climate` 0, the new protocol where fitted, 100 sampling days for
+mammals). v2's later coefficient adjustments, such as the plant stand-age
+splines, are in the coefficients, not the grid.
 
-**`tables/coefficient_summary.csv`** (gitignored) — what the models
-estimated. One row per run × region × stage × species × term, with the
-labels from `coverage.csv`, `n`, `median`, `p10` and `p90` over draws, and
-`boot1`, the iteration-1 (full-data) value. Every stage is stored, and a term
-means something different by taxon and stage:
+**`tables/coefficient_summary.csv`** (gitignored) — one row per run ×
+region × stage × species × term. A term means something different by taxon
+and stage:
 
 | Taxon and stage | `term` holds |
 | --- | --- |
-| Any, `climate` | Model-averaged climate coefficients, on the link scale |
-| Plant group, `habitat` | Effect of each habitat type on the logit scale, plus `Intercept`, `Climate` and, for bryophytes and lichens, `Protocol` |
-| Mammals, `habitat` | Probability of presence per habitat type in the winning model |
+| Any, `climate` | Model-averaged climate coefficients, link scale |
+| Plant group, `habitat` | Effect of each habitat type, logit scale, plus `Intercept`, `Climate` and, for bryophytes and lichens, `Protocol` |
+| Mammals, `habitat_presence` / `_abundance` / `_total` | Per habitat type, from v2's hurdle model |
 | Birds, `landcover` | Raw `glm` coefficients (e.g. `vegcCrop`) |
-| Birds, `habitat` | The same, translated onto v2's standardized habitat types by `modules/birds/standardize.R`, log scale |
+| Birds, `habitat` | The same, translated onto v2's standardized habitat types, log scale |
 
-**`tables/parity_terms.csv`** (gitignored) — the term-by-term comparison
-with v2: `coefficient_summary.csv` joined to `0_data/v2_results/v2_results.csv`
-on taxon, region, stage, part, species and term. Plant habitat terms are
-relabelled as v2 publishes them; mammal seasons are averaged first. Use it to
-find which terms or species disagree.
+**`tables/comparison_*.csv`** (experiments made from the template) — against
+exp_000: `comparison_summary.csv` per taxon, region and metric, with the
+median difference and the share of species that did better;
+`comparison_metrics.csv` per species; `comparison_grid.csv` with the rank
+correlation of habitat effects on the grid. "Better" is higher AUC, deviance
+explained and Spearman, lower RMSE, and a calibration slope closer to 1.
+
+### exp_000's parity outputs
+
+**`tables/parity_terms.csv`** (gitignored) — the term-by-term comparison:
+`coefficient_summary.csv` joined to the v2 reference on taxon, region, stage,
+part, species and term, with plant habitat terms relabelled as v2 publishes
+them and mammal seasons averaged.
 
 | Column | Meaning |
 | --- | --- |
-| `ref_region`, `ref_part` | The reference rows joined to: climate joins region `all`, because v2 fits it province-wide |
-| `seasons` | Mammals: the seasons averaged (`summer+winter`) |
-| `median`, `p10`, `p90`, `boot1`, `n` | This run's summary over draws |
-| `v2_median`, `v2_p10`, `v2_p90`, `v2_n`, `source` | The v2 summary and where it came from; `v2_n = 1` means v2 fitted once |
-| `comparison`, `run_value` | `median`, or `iteration 1` where v2 fitted once, and the run value used |
-| `unreachable_reason`, `reachable` | Why a term cannot match yet (age spline, cutblock convergence, pooled with a spline term, v2 placeholder), from `v2_unreachable_terms()` in `01_compare_to_v2.R` |
+| `ref_region`, `ref_part` | The reference rows joined to; climate joins region `all` |
+| `median`, `p10`, `p90`, `boot1`, `n` | This run over draws |
+| `v2_median`, `v2_p10`, `v2_p90`, `v2_n`, `source` | v2's summary; `v2_n = 1` means v2 fitted once |
+| `comparison`, `run_value` | `median`, or `iteration 1` where v2 fitted once, and the value used |
+| `reachable`, `unreachable_reason` | Whether v2 fixes the term at a placeholder |
 | `in_band` | `TRUE` where the v2 median falls inside this run's `p10`–`p90` band |
-| `absolute_difference` | \|run value − v2 median\| |
-| `standardized_difference` | The absolute difference ÷ half this run's band width. Below 1 is close; far above 1 is a systematic difference |
+| `absolute_difference`, `standardized_difference` | The gap, raw and ÷ half this run's band. Below 1 is close |
 
-**`tables/parity_summary.csv`** — the gate result. One row per
-taxon × region × stage.
+**`tables/parity_summary.csv`** — the gate, one row per taxon × region ×
+stage: `species`, `terms_compared`, `min_draws`, `in_band_pct`,
+`reachable_terms`, `reachable_in_band_pct`, the median and maximum gaps,
+`negligible_terms`, `median_spearman` (reported, not gated),
+`median_band_ratio` (this run's band width ÷ v2's; gated between 0.75 and
+1.33), `verdict` and `indicative_verdict` (a 100-draw run on a species
+subset: the same test, **not** the gate).
 
-| Column | Meaning |
-| --- | --- |
-| `comparison` | `median` or `iteration 1` |
-| `species` | Species with at least one joined term |
-| `terms_compared` | Terms joined to a v2 value |
-| `min_draws` | Fewest draws the store holds for any compared term; a `median` row below v2's 100 gets no verdict |
-| `in_band_pct` | Percentage of compared terms in band |
-| `reachable_terms` | Compared terms v2 does not set by missing machinery or a placeholder |
-| `reachable_in_band_pct` | Percentage of reachable terms in band |
-| `median_standardized_difference` | Typical size of the gap, over reachable terms |
-| `median_absolute_difference` | Typical absolute gap, over reachable terms |
-| `max_absolute_difference` | Largest absolute gap, over reachable terms; the numerical test for `iteration 1` rows |
-| `negligible_terms` | Reachable terms both runs shrink to nothing (below a millionth of the term's typical size); left out of the two columns below |
-| `median_spearman` | Median, over species, of the rank correlation between run and v2 medians. Reported, not gated |
-| `median_band_ratio` | Median, over species, of the median of this run's 10–90% band width ÷ v2's. Near 1 when the run is as variable as v2; gated between 0.75 and 1.33 |
-| `verdict` | `pass`, `fail`, `no comparison`, `not gated (trial run)`, or `not gated (store holds N draws)`, against the targets in `utils/parity_targets.R` |
-| `indicative_verdict` | For a 100-draw run on a species subset: the same test, **not** the gate |
+**`figures/`** — `parity_<taxon>.png` draws each term's run and v2 median
+and 10–90% band, relative to v2 (0 is v2's median, one unit half v2's band);
+`parity_mean.png` averages them per taxon; `parity_bell.png` shows v2 and the
+run as distributions, so a shift is a difference in location and a wider or
+narrower curve a difference in spread.
 
-The targets are proposed from `v2_self_agreement.R`, which measures how
-closely two v2 runs agree with each other; see the experiment README. A trial
-run — fewer draws than v2's 100, or a species subset — is not gated: with few
-draws the run's 10–90% band is estimated from a handful of values, and is
-typically narrower than v2's 100-draw band, so `standardized_difference` is
-inflated and the in-band tests are unreliable in both directions.
-
-**`tables/v2_self_agreement_summary.csv`** — how closely v2 agrees with itself
-on the bryophyte climate stage, the evidence the distributional targets are
-set from. Written once by `v2_self_agreement.R`, not by `run.R`.
-
-**`figures/parity_<taxon>.png`** — one figure per taxon, drawn from
-`parity_terms.csv` by `02_plot_parity.R`. Panels are stage × region (and
-hurdle part, for mammals) by species; each row is a term. v2 and exp_000 are
-drawn in different colours as a median and a 10th–90th percentile bar, which
-is all v2's reference keeps of its draws. Terms span 1e-144 to 1e2, so each
-is drawn relative to v2: 0 is v2's median and one unit is half v2's band,
-the scale of `standardized_difference`. Where v2 fitted once (mammals), the
-unit is half the run's band, v2 is a point, and the run's iteration 1 — what
-the gate compares — is drawn in a third colour. Unreachable terms are left
-out and counted in the caption.
-
-**`figures/parity_mean.png`** — the same scaled values averaged over every
-species and term: one facet per taxon, one row per stage and region (and
-hurdle part). Each row is labelled with `|d|`, the mean absolute difference of
-the run's median from v2's, and the share of terms in band. Setting
-`mean_facet <- "group"` in `02_plot_parity.R` pools the four plant taxa into
-one facet beside mammals and birds. Averages use values clamped at ±4, so one
-far-off term cannot dominate a row.
-
-**`figures/parity_bell.png`** — v2 and exp_000 as distributions. One
-facet per taxon (or group, as above) and one pair of curves per stage and
-region, v2 in blue and exp_000 in orange. Each term's median and 10–90%
-band is read as a normal curve, in v2 units, and a row's curve is the
-average over its terms, negligible ones left out. A shifted orange curve is
-a difference in location; a wider or narrower one, a difference in spread
-(what `median_band_ratio` measures). The normal shape is a drawing
-convenience: v2 keeps only three summaries of its draws. Where v2 fitted
-once (mammals) it is a blue line at 0.
-
-**`report.md`** — a readable summary, generated rather than written:
-
-| Section | Comes from |
-| --- | --- |
-| Run kind and seed | `run.R`: full or trial run, and `boot_seed` |
-| What each spec reproduces of v2 | Each spec's `v2_coverage` |
-| v2 references | `0_data/v2_results/v2_results_coverage.csv`, and what this run's comparison could not reach |
-| What ran | `tables/coverage.csv` |
-| Parity against v2, by stage | `tables/parity_summary.csv` |
-| Model fit | Median AUC from `tables/metric_summary.csv` |
-
-### `docs/`
-
-| File | Holds |
-| --- | --- |
-| [`framework_design.md`](docs/framework_design.md) | How the three v2 pipelines became one harness: the spec and result contracts, covariate choice, the parity ledger, and the build order |
-| [`taxon_quirks.md`](docs/taxon_quirks.md) | Every taxon-specific behaviour in the v2 pipelines, and whether the harness reproduces it |
-| `reviews/` | Dated code reviews and their remediation plans |
-| `images/` | Logos used in this README |
+**`report.md`** — generated: run kind and seed, what each spec reproduces of
+v2, the v2 references reached, what ran, parity by stage, and model fit.
 
 ## Parity gate
 
-`exp_000` is the validation gate. It runs the v2.0 configuration of every
-taxon through this repository's harness and compares the results against the
-v2.0 outputs. Later experiments are compared against `exp_000`, so a
-difference there is a difference in method rather than in plumbing.
+exp_000 is the validation gate: it runs every taxon's v2.0 configuration
+through the pipeline and compares the result with the published v2.0 output.
 
-Two things are needed before the gate can be closed:
+v2 sets no random seed, so two v2 runs of the same code give different
+coefficients, and parity is **distributional**: each term passes when the v2
+median falls inside this run's 10–90% band. Where v2 fits once (mammals), the
+run's full-data fit is compared directly. The proposed targets, in
+`utils/parity_targets.R`, are set from how closely two v2 runs agree with each
+other (`v2_self_agreement.R`): at least 90% of reachable terms in band, a
+median standardized difference of 0.25 or less, and a band-width ratio between
+0.75 and 1.33.
 
-- The harness has to reproduce v2 where it currently does not; see
-  [Known gaps](#known-gaps).
-- The minimum acceptable parity target, which has not been defined and will
-  need to be agreed per taxon.
+`seed` in `run.R` makes this side repeatable: each species draws from its own
+seed, derived from the base seed and the species name. `NULL` restores v2's
+unseeded behaviour. Birds replay v2's stored draws.
 
-The v2 bootstrap resamples without a fixed seed, so two v2 runs of the same
-code do not produce identical coefficients, and the comparison is between
-distributions rather than numbers. `boot_seed` in `run.R` makes this side
-repeatable: each species draws from its own seed, derived from `boot_seed`
-and the species name. Setting it to `NULL` reproduces v2's unseeded
-behaviour. Birds are unaffected, because their draws are v2's stored ones.
+Two things are needed before the gate is closed:
+
+- **Agree the parity targets** above, per taxon, or change them.
+- **Run the full species queues at 100 draws** and commit the report and
+  record. Only a full run is gated; a run on a species subset gets an
+  indicative verdict.
 
 ## Known gaps
 
-Per stage and taxon, each spec's `v2_coverage` is the authoritative
-statement, and `report.md` prints it. The full list, with evidence and a
-remediation plan, is in
-[`docs/reviews/2026-09-28_alignment_review.md`](docs/reviews/2026-09-28_alignment_review.md).
-The main ones:
+Each spec's `v2_coverage` is the authoritative statement per stage and taxon,
+and `report.md` prints it. The full list, with evidence, is in
+[`docs/reviews/2026-09-28_alignment_review.md`](docs/reviews/2026-09-28_alignment_review.md)
+and [`docs/taxon_quirks.md`](docs/taxon_quirks.md).
 
-- **Some published v2 results cannot be reproduced exactly.** The harness
-  matches v2's own code to numerical precision (plants and birds, climate
-  and habitat). But the published lichen models were fitted on bootstrap
-  draws v2 did not keep, so parity against those is approximate. Birds
-  reproduce exactly, but only from the `Stratified.Rdata` in
-  `remote/birds_data_v2/`; the BirdModels drive's copy was rebuilt
-  after v2 and no longer matches.
-  See [`docs/taxon_quirks.md`](docs/taxon_quirks.md).
+- **Some published v2 results cannot be matched exactly.** The pipeline
+  matches v2's own code to numerical precision, but the published lichen,
+  mite and vascular plant models were fitted on bootstrap draws v2 did not
+  keep, so parity against those is distributional.
+- **Birds reproduce only from the right data.** v2's birds were fitted on the
+  `Stratified.Rdata` in `remote/birds_data_v2/`; the BirdModels drive's copy
+  was rebuilt after v2 and no longer matches.
 - **No parity target has been agreed.**
 
-The v2 machinery is now all in the harness: the plant age splines, cutblock
-convergence and validation (`modules/_shared/plant_group.R`), and the mammal
-hurdle with its splines, calibration and convergence
-(`modules/mammals/hurdle.R`). Each matches v2 numerically where the
-reference was fitted on data the test dataset holds.
+## Adding an experiment
+
+1. Copy `1_code/experiments/_template/` to `exp_00N_short_description/`.
+2. Set `id` in its `run.R` to the folder's name. Every path derives from it.
+3. State the question and design in its `README.md`.
+4. Change one thing relative to exp_000: `stage_models` for different
+   candidate formulas, or `specs` for a different engine or selection rule.
+   Keep exp_000's species, draws and seed unless they are the question.
+5. Run it, first at 5 draws to check it works. The template's
+   `compare_to_baseline` step writes `tables/comparison_*.csv` against exp_000.
+
+[`docs/getting_started.md`](docs/getting_started.md#test-a-change) walks
+through each lever.
+
+## Contributing a taxon module
+
+1. Put the v2 scripts as received in `0_data/v2_scripts/<source>/`,
+   unmodified, and log the source and commit in its `README.md`.
+2. Extend `_setup/01` to write the taxon's response table, its covariates,
+   its species queue, and any prediction grid or stored draws. Extend
+   `_setup/02` to trace them back to the source.
+3. Add the taxon to `_setup/09`: its species queue rows and its rows in
+   `dataset_manifest.csv`. Re-run `09`.
+4. Splice the v2 candidate formulas into `harness/model_sets.R`, verbatim.
+5. Add `1_code/modules/<taxon>/spec.R`, modelled on `lichens/spec.R` for a
+   plant-group taxon or on `birds/spec.R` or `mammals/spec.R` otherwise, and
+   add its run to `modules/_shared/standard_specs.R`. If v2 does something no
+   registered method covers, add one to `1_code/methods/`.
+6. Add the taxon's published v2 results to `_setup/05`.
+7. Check that `validate_spec()` passes and `run_tests.R` runs clean, then
+   check the result against the originals. Record every taxon-specific
+   behaviour in `docs/taxon_quirks.md`.
 
 ## Naming conventions
 
@@ -847,54 +924,12 @@ reference was fitted on data the test dataset holds.
 | Module folders | Plural taxon name | `vascular_plants/`, `soil_mites/` |
 | Setup scripts | `NN_` run order, in `1_code/_setup/` | `05_harmonize_v2_results.R` |
 
-An experiment identifier is used verbatim in `1_code/experiments/`,
-`2_pipeline/`, and `3_output/`. `run.R` derives all three paths from
-`exp_id` rather than typing the identifier per stage.
-
-## Adding an experiment
-
-1. Copy `1_code/experiments/_template/` to `exp_00N_short_description/`.
-2. Set `id` in its `run.R` to the folder's name. Every path derives from it.
-3. State the question and design in its `README.md`.
-4. Change one thing relative to exp_000: `stage_models` for different
-   candidate formulas, or `specs` for a different engine or selection rule.
-   Keep exp_000's species, draws and seed unless they are the question.
-5. Run it. The template's `compare_to_baseline` step writes
-   `tables/comparison_*.csv` against exp_000.
-
-[`docs/getting_started.md`](docs/getting_started.md#test-a-change) walks
-through each lever. Experiment-specific logic stays in the experiment; a
-change to `harness/`, `methods/` or `modules/` affects every experiment and
-should be reviewed on that basis.
-
-## Contributing a taxon module
-
-1. Put the v2 scripts as received in `0_data/v2_scripts/<source>/`,
-   unmodified, and log the source and commit in its `README.md`. They are
-   the reference, and are never edited and never run.
-2. Extend `1_code/_setup/01_harmonize_model_ready_v2.R` to write the taxon's
-   response table, its rows in `covariates.csv` and `covariate_columns.csv`,
-   its species queue, and any prediction grid or stored bootstrap draws.
-   Extend `02_validate_test_dataset.R` to trace them back to the source.
-3. Add the taxon to `09_harmonize_lookups.R`: its species queue rows and
-   its rows in `dataset_manifest.csv` (response file, offset file, covariate
-   key, grid, stored draws). Re-run `09`.
-4. Splice the v2 candidate formulas into `harness/model_sets.R`, verbatim.
-5. Add `1_code/modules/<taxon>/spec.R`, a function returning the spec. Model
-   it on `lichens/spec.R` for a plant-group taxon, or on `birds/spec.R` or
-   `mammals/spec.R` for a standalone pipeline, and add its run to
-   `modules/_shared/standard_specs.R`. If v2 does something no registered
-   method covers, add one to `1_code/methods/`.
-6. Add the taxon's published v2 results to `_setup/05_harmonize_v2_results.R`,
-   so `v2_results.csv` carries a reference for it.
-7. Check that `validate_spec()` passes and `1_code/tests/run_tests.R` runs
-   clean, then check the result against the originals rather than trusting
-   it. Record every taxon-specific behaviour, and whether the spec reproduces
-   it, in `docs/taxon_quirks.md`.
+An experiment's identifier is used verbatim in `1_code/experiments/`,
+`2_pipeline/` and `3_output/`. Soil mites use the data slug `mite`.
 
 ## Setup
 
-R 4.4 or later, plus the packages the harness and the `_setup` scripts use:
+R 4.4 or later, plus:
 
 ```r
 install.packages(c(
@@ -905,26 +940,23 @@ install.packages(c(
 ))
 ```
 
-Build the test dataset once per snapshot, from the repository root:
+Fitting an experiment needs only `0_data/`. Building the dataset needs the
+network sources, once per snapshot, from the repository root:
 
 ```r
 source("1_code/_setup/01_harmonize_model_ready_v2.R")
-source("1_code/_setup/02_validate_test_dataset.R")
 source("1_code/_setup/06_harmonize_bird_translation_lookup.R")
-source("1_code/_setup/09_harmonize_lookups.R")   # offline; seconds
-```
+source("1_code/_setup/09_harmonize_lookups.R")      # offline; seconds
+source("1_code/_setup/02_validate_test_dataset.R")
 
-Build the v2 reference once, after that. `03` and `04` are long — hours —
-and only need re-running if their sources change:
-
-```r
+# The v2 reference. 03 and 04 take hours; re-run only if their sources change
 source("1_code/_setup/03_rerun_bryophyte_v2_reference.R")
 source("1_code/_setup/04_package_bird_coefficients.R")
 source("1_code/_setup/05_harmonize_v2_results.R")
+source("1_code/_setup/08_harmonize_abmiexplorer_results.R")
 ```
 
-The `_setup` scripts read their sources over the network. Set these when a
-source is not in its default location:
+Set these when a source is not in its default location:
 
 | Variable | Read by | Points at |
 | --- | --- | --- |
@@ -937,17 +969,6 @@ source is not in its default location:
 | `SDM_V2_PROJECT` | `03`, `05` | The v2 plant project (`VegetationModels`) |
 | `SDM_V2_BIRD_ROOT` | `04`, `05` | The v2 bird project (`BirdModels`) |
 | `SDM_V2_MAMMAL_ROOT` | `05` | The v2 mammal habitat-modelling results for 2024 |
-
-Then run an experiment, also from the repository root:
-
-```r
-source("1_code/experiments/exp_000_parity_v2/run.R")
-```
-
-Building the dataset needs the network sources. Fitting an experiment does
-not. `exp_000`'s comparison step still reads v2 from the network drives,
-through `SDM_V2_PLANT_OUTPUT` and `SDM_V2_MAMMAL_OUTPUT`, until it is moved
-onto `0_data/v2_results/`.
 
 ## Related resources
 
