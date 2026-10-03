@@ -101,7 +101,7 @@ Everything lands in `3_output/<id>/`. Read these in order:
    habitat type, per species.
 
 The column definitions are in the
-[README's output key](../README.md#output-key).
+[README's outputs section](../README.md#outputs-2_pipeline-and-3_output).
 
 The model behind every metric and grid prediction is each stage's
 **final** model. That is the averaged one where v2 averages

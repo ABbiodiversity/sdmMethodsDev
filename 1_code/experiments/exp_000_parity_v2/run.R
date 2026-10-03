@@ -49,8 +49,13 @@ config <- experiment_config(
   # Runs, from names(standard_specs()). Mammals run once per
   # season, because v2's mammal references average the two.
   taxa = c(
-    "bryophyte", "lichen", "mite", "vascular_plant",
-    "mammal_summer", "mammal_winter", "bird"
+    "bryophyte",
+    "lichen",
+    "mite",
+    "vascular_plant",
+    "mammal_summer",
+    "mammal_winter",
+    "bird"
   ),
 
   # A named set from focal_species_sets(), a vector named by
@@ -63,7 +68,7 @@ config <- experiment_config(
   # Draws per species. 100 is v2's, and the only setting the gate
   # reads. Below about 20 the 10-90% bands are too unstable for
   # the parity numbers to mean anything; 5 checks the plumbing.
-  n_bootstraps = 100,
+  n_bootstraps = 5,
 
   # One number governs every random draw; each species draws
   # under its own seed derived from it. NULL leaves the draws
@@ -97,13 +102,14 @@ config <- experiment_config(
 config$v2_reference <- "abmiexplorer"
 
 config$v2_reference_dir <- file.path(
-  config$project_root, "0_data", "v2_results",
+  config$project_root,
+  "0_data",
+  "v2_results",
   switch(
     config$v2_reference,
     abmiexplorer = "abmiexplorer",
     drives = "",
-    stop("v2_reference must be \"abmiexplorer\" or \"drives\".",
-         call. = FALSE)
+    stop("v2_reference must be \"abmiexplorer\" or \"drives\".", call. = FALSE)
   )
 )
 
