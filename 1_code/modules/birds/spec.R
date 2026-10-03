@@ -60,7 +60,9 @@ bird_spec <- function() {
     regions = list(
       north = list(
         filter = ~ useNorth == 1,
-        grid = NULL,
+        # One row per habitat type, rebuilt by _setup/09 from
+        # v2's coefficient translation matrix
+        grid = "bird_north",
         term_block = "veg",
         habitat_models = "landcover_bird_north_v2",
         # v2 weights the landcover models by region
@@ -68,7 +70,9 @@ bird_spec <- function() {
       ),
       south = list(
         filter = ~ useSouth == 1,
-        grid = NULL,
+        # One row per habitat type, rebuilt by _setup/09 from
+        # v2's coefficient translation matrix
+        grid = "bird_south",
         term_block = "soil",
         habitat_models = "landcover_bird_south_v2",
         weight_column = "soilw"

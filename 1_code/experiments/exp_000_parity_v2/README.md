@@ -6,6 +6,33 @@
 The validation gate. Runs each taxon's v2 spec through the harness and
 compares the result against the published v2 output.
 
+## How to run
+
+From the repository root:
+
+```r
+source("1_code/experiments/exp_000_parity_v2/run.R")
+```
+
+Every decision is in `run.R`'s `experiment_config()` call: the runs, the
+species set, the draws, the seed, and the workers. `run_experiment()` then
+fits, summarizes the stores with the harness's `collect_results()`, and runs
+this experiment's three steps in order:
+
+| Step | Script | Writes |
+| --- | --- | --- |
+| compare | `01_compare_to_v2.R` | `tables/parity_terms.csv`, `tables/parity_summary.csv` |
+| plot | `02_plot_parity.R` | `figures/parity_*.png` |
+| report | `03_build_report.R` | `report.md` |
+
+Each step runs in an environment of its own and reads only `config` and
+`results`. `fit = FALSE` re-summarizes existing stores without refitting.
+
+Metrics and grid predictions score each run's final model: for plants, v2's
+own prediction from its coefficient tables, so `insample_auc` equals
+`v2val_Full`. Coefficients, and so the parity verdicts, do not depend on
+this.
+
 ## Question
 
 Does the framework, configured as v2, reproduce the v2 results?
@@ -33,9 +60,9 @@ table.
 
 ## What the gate compares today
 
-`02_compare_to_v2.R` compares **every stage** against one
+`01_compare_to_v2.R` compares **every stage** against one
 `v2_results.csv`, so it runs with the network drives unmounted.
-`v2_reference` in `run.R` section 1.3a picks which build of it:
+`config$v2_reference` in `run.R` section 1.3 picks which build of it:
 
 | `v2_reference` | Built by | Source | Holds |
 | -------------- | -------- | ------ | ----- |
@@ -101,7 +128,7 @@ committed gate and cannot be regenerated from it.
 
 ## Parity targets (proposed)
 
-The targets live in `utils/parity_targets.R`, and `02_compare_to_v2.R`
+The targets live in `utils/parity_targets.R`, and `01_compare_to_v2.R`
 reads a `verdict` per taxon, region and stage against them. **They are
 proposals until agreed**; the report says so.
 
@@ -149,8 +176,9 @@ store holds fewer draws than v2 (`min_draws` in `parity_summary.csv`),
 whatever the run was configured for; a store overwritten by a shorter run
 would otherwise be scored on five-draw bands.
 
-**Indicative result (2026-09-30, `parity_check` set, 100 draws).** 18 of
-22 rows pass. Mammal habitat matches v2 to ≤1e-14; every plant climate and
+**Indicative result (2026-10-03, `parity_check` set, 100 draws).** All 22
+rows pass (`3_output/exp_000_parity_v2/tables/parity_summary.csv`), 100% of
+reachable terms in band. The history: on 2026-09-30, 18 of 22 rows passed. Mammal habitat matches v2 to ≤1e-14; every plant climate and
 habitat row passes, with band-width ratios of 0.88–1.05. Only birds fail:
 
 - **Birds, all four rows.** The published bird results (December 2025)
@@ -220,7 +248,7 @@ evidence for each and an ordered plan.
   re-ran the frozen v2 functions: 134 of 134 species, 100 draws of 19
   climate terms each, no failures. Separately, v2's `COEFS.RData` holds
   complete bryophyte arrays, and `v2_results.csv` uses those.
-- **The seed.** `boot_seed` in `run.R` seeds every resampled taxon from
+- **The seed.** `seed` in `run.R` seeds every resampled taxon from
   one number, with a derived seed per species. v2 is unseeded, so
   parity stays distributional, but this side of it now repeats.
 

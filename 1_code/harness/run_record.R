@@ -30,14 +30,12 @@
 #        tables stay aligned and a diff points at the value that
 #        changed rather than at a row that moved.
 #   - What the format guarantees is that identical results
-#     render identically. It cannot make an unseeded pipeline
-#     reproduce. The plant-group specs pass `seed = NULL` to
-#     match v2, so two runs of the same configuration draw
-#     different bootstrap samples and their Metrics sections
-#     genuinely differ. Birds resample from stored ids and are
-#     deterministic. So in a diff between two runs, treat the
-#     Configuration and Coverage sections as exact and the
-#     Metrics section as exact only for seeded taxa.
+#     render identically. It cannot make an unseeded run
+#     reproduce: with `seed = NULL` (v2's behaviour) two runs of
+#     the same configuration draw different bootstrap samples
+#     and their Metrics sections genuinely differ. With a seed -
+#     the default - and with the birds' stored draws, every
+#     section is exact.
 #   - File sizes are deliberately not recorded. They vary by a
 #     few bytes between runs that agree, which is noise in a
 #     document whose purpose is comparison. Row counts carry the
@@ -178,79 +176,7 @@ kv_lines <- function(values, digits = 4L) {
   )
 }
 
-# 3. discover_stores() ----
-
-#' Find the Result Stores Under a Pipeline Directory
-#'
-#' Stores are laid out as <pipeline_dir>/<taxon>/<region>/. A
-#' directory holding none of the result files is not a store and
-#' is skipped rather than reported empty.
-#'
-#' @param pipeline_dir Character. The run's pipeline directory.
-#' @return A data frame of dir, taxon and region, ordered
-#'   deterministically.
-#'
-#' @example # Example usage of the function
-#' # discover_stores("2_pipeline/exp_000_parity_v2")
-discover_stores <- function(pipeline_dir) {
-  empty <- data.frame(
-    dir = character(0), taxon = character(0),
-    region = character(0), stringsAsFactors = FALSE
-  )
-
-  if (!dir.exists(pipeline_dir)) {
-    return(empty)
-  }
-
-  known <- c(
-    "metrics.csv", "coefficients.csv", "grid_predictions.csv",
-    "unit_predictions.csv", "meta.json"
-  )
-
-  candidates <- list.dirs(pipeline_dir, recursive = TRUE)
-  candidates <- setdiff(candidates, pipeline_dir)
-
-  is_store <- vapply(
-    candidates,
-    function(one) any(file.exists(file.path(one, known))),
-    logical(1)
-  )
-
-  candidates <- candidates[is_store]
-
-  if (length(candidates) == 0) {
-    return(empty)
-  }
-
-  # Stripped by length rather than by a regex on the path.
-  # tempdir() returns backslashes on Windows while list.dirs()
-  # returns forward slashes, so a pattern built from the raw
-  # path silently fails to match, and every store is then filed
-  # under a taxon named after the drive.
-  normalise <- function(x) {
-    normalizePath(x, winslash = "/", mustWork = FALSE)
-  }
-
-  root <- sub("/+$", "", normalise(pipeline_dir))
-  relative <- substring(normalise(candidates), nchar(root) + 2L)
-
-  parts <- strsplit(relative, "/")
-
-  out <- data.frame(
-    dir = candidates,
-    taxon = vapply(parts, function(p) p[1], character(1)),
-    region = vapply(
-      parts,
-      function(p) if (length(p) > 1) p[2] else NA_character_,
-      character(1)
-    ),
-    stringsAsFactors = FALSE
-  )
-
-  out[order(out$taxon, out$region), , drop = FALSE]
-}
-
-# 4. run_record() ----
+# 3. run_record() ----
 
 #' Write the Committed Record of One Run
 #'
@@ -267,6 +193,9 @@ discover_stores <- function(pipeline_dir) {
 #'   of the same configuration, which is what makes a diff
 #'   between experiments readable.
 #' @param digits Integer. Decimal places for every number.
+#' @param collected The result of collect_results() for this
+#'   pipeline directory, or NULL to read the stores here. Passing
+#'   it saves reading every store a second time.
 #' @return The path written, invisibly.
 #'
 #' @example # Example usage of the function
@@ -280,9 +209,12 @@ run_record <- function(
   exp_id,
   config = list(),
   provenance = TRUE,
-  digits = 4L
+  digits = 4L,
+  collected = NULL
 ) {
-  stores <- discover_stores(pipeline_dir)
+  if (is.null(collected)) {
+    collected <- collect_results(pipeline_dir)
+  }
 
   lines <- c(
     paste("# Run record:", exp_id),
@@ -294,7 +226,7 @@ run_record <- function(
     ""
   )
 
-  ## 4.1 Provenance ----
+  ## 3.1 Provenance ----
   # Everything that differs between two identical runs lives
   # here and nowhere else, so the rest of the file diffs clean.
   if (provenance) {
@@ -325,49 +257,24 @@ run_record <- function(
     )
   }
 
-  ## 4.2 Configuration ----
+  ## 3.2 Configuration ----
   lines <- c(
     lines, "## Configuration", "", kv_lines(config, digits), ""
   )
 
-  ## 4.3 Coverage and artefacts ----
+  ## 3.3 Coverage and artefacts ----
   # The inventory. Row counts rather than file sizes: both say
   # what was produced, only one is stable between runs.
-  coverage <- NULL
-  metrics_all <- list()
+  coverage <- collected$store_rows
 
-  if (nrow(stores) > 0) {
-    rows <- lapply(seq_len(nrow(stores)), function(i) {
-      dir_one <- stores$dir[i]
-      coefficients <- read_results(dir_one, "coefficients")
-      metrics <- read_results(dir_one, "metrics")
-      grid <- read_results(dir_one, "grid_predictions")
-
-      if (!is.null(metrics) && nrow(metrics) > 0) {
-        metrics$taxon <- stores$taxon[i]
-        metrics$region <- stores$region[i]
-        metrics_all[[dir_one]] <<- metrics
-      }
-
-      data.frame(
-        taxon = stores$taxon[i],
-        region = stores$region[i],
-        species = length(unique(c(
-          coefficients$species, metrics$species
-        ))),
-        draws = length(unique(c(coefficients$boot, metrics$boot))),
-        coefficient_rows = if (is.null(coefficients)) {
-          0L
-        } else {
-          nrow(coefficients)
-        },
-        metric_rows = if (is.null(metrics)) 0L else nrow(metrics),
-        grid_rows = if (is.null(grid)) 0L else nrow(grid),
-        stringsAsFactors = FALSE
-      )
-    })
-
-    coverage <- do.call(rbind, rows)
+  if (!is.null(coverage)) {
+    names(coverage)[names(coverage) == "run"] <- "taxon"
+    coverage <- coverage[order(coverage$taxon, coverage$region), ]
+    coverage$coefficient_rows <- as.integer(coverage$coefficient_rows)
+    coverage$metric_rows <- as.integer(coverage$metric_rows)
+    coverage$grid_rows <- as.integer(coverage$grid_rows)
+    coverage$species <- as.integer(coverage$species)
+    coverage$draws <- as.integer(coverage$draws)
   }
 
   lines <- c(
@@ -375,58 +282,24 @@ run_record <- function(
     md_table(coverage, digits), ""
   )
 
-  ## 4.4 Metrics ----
-  # One row per taxon, region and metric, ordered so that two
-  # records line up row for row.
+  ## 3.4 Metrics ----
+  # One row per run, region and metric, pooled over species and
+  # draws, ordered so that two records line up row for row.
   metric_summary <- NULL
 
-  if (length(metrics_all) > 0) {
-    combined <- do.call(rbind, metrics_all)
-
-    split_key <- interaction(
-      combined$taxon, combined$region, combined$metric,
-      drop = TRUE
-    )
-
-    metric_summary <- do.call(rbind, lapply(
-      split(combined, split_key),
-      function(block) {
-        values <- block$value[is.finite(block$value)]
-
-        data.frame(
-          taxon = block$taxon[1],
-          region = block$region[1],
-          metric = block$metric[1],
-          n = length(values),
-          median = if (length(values)) {
-            stats::median(values)
-          } else {
-            NA_real_
-          },
-          p10 = if (length(values)) {
-            stats::quantile(values, 0.1, names = FALSE)
-          } else {
-            NA_real_
-          },
-          p90 = if (length(values)) {
-            stats::quantile(values, 0.9, names = FALSE)
-          } else {
-            NA_real_
-          },
-          stringsAsFactors = FALSE
-        )
-      }
-    ))
-
-    rownames(metric_summary) <- NULL
-
-    metric_summary <- metric_summary[
-      order(
-        metric_summary$taxon, metric_summary$region,
-        metric_summary$metric
-      ), ,
-      drop = FALSE
+  if (!is.null(collected$metrics) && nrow(collected$metrics) > 0) {
+    pooled <- as.data.table(collected$metrics)[
+      is.finite(value),
+      list(
+        n = .N,
+        median = stats::median(value),
+        p10 = stats::quantile(value, 0.1, names = FALSE),
+        p90 = stats::quantile(value, 0.9, names = FALSE)
+      ),
+      by = list(taxon = run, region, metric)
     ]
+    setorder(pooled, taxon, region, metric)
+    metric_summary <- as.data.frame(pooled)
   }
 
   lines <- c(
@@ -434,7 +307,7 @@ run_record <- function(
     md_table(metric_summary, digits), ""
   )
 
-  ## 4.5 Write ----
+  ## 3.5 Write ----
   # A .txt record drops the table pipes rather than the tables,
   # so the same content survives in a plain-text reader.
   if (grepl("[.]txt$", out_file, ignore.case = TRUE)) {

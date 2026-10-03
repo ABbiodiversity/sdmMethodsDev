@@ -5,19 +5,21 @@
 # inputs:
 #   in 0_data/test_dataset/:
 #     - sites.csv
-#     - <taxon>.csv
 #     - covariates.csv
-#     - <taxon>_offsets.csv (birds only)
+#     - each taxon's response and offset files, as named in
+#       lookup/dataset_manifest.csv
+#     - lookup/factor_levels.csv
 # outputs: none; returns objects in memory
 # notes:
 #   - The taxon-agnostic data layer. Every reader takes the taxon
 #     as an argument and knows nothing else about it; what a taxon
 #     means is carried by its spec, not by this file.
-#   - covariates.csv is keyed on survey_unit_id and a covariate
-#     key, which is the taxon for most taxa but the taxon and
-#     region for mammals, whose north and south files carry
-#     different values for the same deployment. covariate_key()
-#     is the one place that difference is expressed.
+#   - Where each taxon's files are, and the key its rows carry in
+#     covariates.csv, is read from lookup/dataset_manifest.csv
+#     (written by _setup/09). Nothing here names a taxon. The key
+#     is the taxon for most taxa, but the taxon and region for
+#     mammals, whose north and south files carry different values
+#     for the same deployment.
 #   - Reading is column-selective. covariates.csv is 218 MB and
 #     457 columns wide; a run wants a handful, so every reader
 #     takes the columns it needs rather than loading the table.
@@ -43,37 +45,97 @@
 ## 1.1 Load packages ----
 library(data.table) # column-selective CSV reading (version: 1.16.4)
 
-# 2. covariate_key() ----
+# 2. The dataset manifest ----
+
+## 2.1 dataset_manifest() ----
+
+#' Read Where Each Taxon's Files Are
+#'
+#' One row per taxon and region: the response file, the offset
+#' file, the covariate key, the habitat prediction grid, and any
+#' stored bootstrap draws.
+#'
+#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @return A data frame.
+#'
+#' @example # Example usage of the function
+#' # dataset_manifest(data_dir)
+dataset_manifest <- function(data_dir) {
+  path <- file.path(data_dir, "lookup", "dataset_manifest.csv")
+
+  if (!file.exists(path)) {
+    stop(
+      "Dataset manifest not found:
+  ", path,
+      "
+Run 1_code/_setup/09_harmonize_lookups.R first.",
+      call. = FALSE
+    )
+  }
+
+  cached_read(path, function(p) {
+    as.data.frame(fread(p, na.strings = "", colClasses = "character"))
+  })
+}
+
+## 2.2 manifest_entry() ----
+
+#' One Taxon's Manifest Row
+#'
+#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param taxon Character. Taxon slug.
+#' @param region Character, or NULL for the taxon's first region,
+#'   which is enough for anything that does not vary by region.
+#' @return A one-row data frame.
+#'
+#' @example # Example usage of the function
+#' # manifest_entry(data_dir, "mammal", "north")$covariate_key
+manifest_entry <- function(data_dir, taxon, region = NULL) {
+  manifest <- dataset_manifest(data_dir)
+  rows <- manifest[manifest$taxon == taxon, ]
+
+  if (nrow(rows) == 0) {
+    stop(
+      "Taxon `", taxon, "` is not in the dataset manifest. Taxa: ",
+      paste(unique(manifest$taxon), collapse = ", "),
+      call. = FALSE
+    )
+  }
+
+  if (!is.null(region)) {
+    rows <- rows[rows$region == region, ]
+
+    if (nrow(rows) == 0) {
+      stop(
+        "The manifest has no region `", region, "` for ", taxon,
+        ".", call. = FALSE
+      )
+    }
+  }
+
+  rows[1, , drop = FALSE]
+}
+
+## 2.3 covariate_key() ----
 
 #' Name a Taxon's Key in covariates.csv
 #'
-#' Most taxa have one covariate row per survey unit. Mammals have
-#' two models fitted on overlapping deployments, north and south,
-#' whose covariates disagree, so their rows are keyed by taxon and
-#' region together.
-#'
-#' @param taxon Character. Taxon slug, as in the response file
-#'   name (e.g. "bryophyte", "mammal", "bird").
-#' @param region Character. Region name, or NULL when the taxon
-#'   is not split.
-#' @param split_taxa Character vector of taxa whose covariates
-#'   are stored per region.
+#' @param taxon Character. Taxon slug.
+#' @param region Character, or NULL when the taxon's covariates
+#'   are not stored per region.
+#' @param data_dir Character. Path to 0_data/test_dataset.
 #' @return Character. The value to match in the `taxon` column of
 #'   covariates.csv.
 #'
 #' @example # Example usage of the function
-#' # covariate_key("mammal", "north")   # "mammal_north"
-#' # covariate_key("bryophyte", "north") # "bryophyte"
-covariate_key <- function(
-  taxon,
-  region = NULL,
-  split_taxa = c("mammal")
-) {
-  if (is.null(region) || !taxon %in% split_taxa) {
+#' # covariate_key("mammal", "north", data_dir) # "mammal_north"
+#' # covariate_key("bryophyte", NULL, data_dir) # "bryophyte"
+covariate_key <- function(taxon, region = NULL, data_dir) {
+  if (is.null(region)) {
     return(taxon)
   }
 
-  paste(taxon, region, sep = "_")
+  manifest_entry(data_dir, taxon, region)$covariate_key
 }
 
 # 3. load_sites() ----
@@ -151,7 +213,9 @@ load_sites <- function(data_dir, taxon = NULL, columns = NULL) {
 #' # y <- load_response("bryophyte", data_dir,
 #' #                    species = "Aulacomnium.palustre")
 load_response <- function(taxon, data_dir, species = NULL) {
-  path <- file.path(data_dir, paste0(taxon, ".csv"))
+  path <- file.path(
+    data_dir, manifest_entry(data_dir, taxon)$response_file
+  )
   check_dataset_file(path)
 
   if (is.null(species)) {
@@ -196,11 +260,14 @@ load_response <- function(taxon, data_dir, species = NULL) {
 #' @example # Example usage of the function
 #' # off <- load_offsets("bird", data_dir, species = "ALFL")
 load_offsets <- function(taxon, data_dir, species = NULL) {
-  path <- file.path(data_dir, paste0(taxon, "_offsets.csv"))
+  offset_file <- manifest_entry(data_dir, taxon)$offset_file
 
-  if (!file.exists(path)) {
+  if (is.na(offset_file)) {
     return(NULL)
   }
+
+  path <- file.path(data_dir, offset_file)
+  check_dataset_file(path)
 
   if (is.null(species)) {
     return(as.data.frame(fread(path)))
@@ -246,7 +313,7 @@ load_covariates <- function(
   path <- file.path(data_dir, "covariates.csv")
   check_dataset_file(path)
 
-  key <- covariate_key(taxon, region)
+  key <- covariate_key(taxon, region, data_dir)
 
   # Step 1: Check against what this taxon has, not against the
   # file header. covariates.csv is one wide table across every
@@ -282,27 +349,58 @@ load_covariates <- function(
     )
   }
 
-  covariates <- fread(
-    path,
-    select = unique(c("survey_unit_id", "taxon", to_read))
+  # Step 2: Read the columns this key has not read before. The
+  # file is 218 MB, and a spec asks for overlapping column sets -
+  # the province climate, then each region's habitat - so columns
+  # already read for the key are kept for the session and only
+  # the rest are read.
+  info <- file.info(path)
+  cache_key <- paste(
+    "covariates", normalizePath(path, winslash = "/"),
+    format(info$mtime, "%Y%m%d%H%M%OS3"), info$size, key,
+    sep = "|"
   )
+  held <- if (exists(cache_key, envir = .sdm_cache)) {
+    get(cache_key, envir = .sdm_cache)
+  } else {
+    NULL
+  }
+  to_load <- setdiff(to_read, names(held))
 
-  # Step 2: Keep this taxon's rows, then drop the key column so
-  # the result is survey_unit_id plus covariates
-  covariates <- covariates[covariates$taxon == key, ]
-
-  if (nrow(covariates) == 0) {
-    keys <- unique(fread(path, select = "taxon")$taxon)
-    stop(
-      "No covariate rows for key `", key, "`. Keys present: ",
-      paste(keys, collapse = ", "),
-      call. = FALSE
+  if (is.null(held) || length(to_load) > 0) {
+    fresh <- fread(
+      path, select = unique(c("survey_unit_id", "taxon", to_load))
     )
+
+    # Keep this key's rows, then drop the key column so the result
+    # is survey_unit_id plus covariates
+    fresh <- fresh[fresh$taxon == key, ]
+
+    if (nrow(fresh) == 0) {
+      keys <- unique(fread(path, select = "taxon")$taxon)
+      stop(
+        "No covariate rows for key `", key, "`. Keys present: ",
+        paste(keys, collapse = ", "),
+        call. = FALSE
+      )
+    }
+
+    fresh[, taxon := NULL]
+    fresh <- as.data.frame(fresh)
+
+    held <- if (is.null(held)) {
+      fresh
+    } else {
+      # Rows come back in file order every time, so the new
+      # columns line up with the held ones
+      cbind(held, fresh[, to_load, drop = FALSE])
+    }
+
+    assign(cache_key, held, envir = .sdm_cache)
   }
 
-  covariates[, taxon := NULL]
-
-  covariates <- as.data.frame(covariates)
+  covariates <- held[, unique(c("survey_unit_id", to_read)),
+                     drop = FALSE]
 
   # Step 3: Compute whatever was derivable rather than stored,
   # then hand back exactly the columns that were asked for
@@ -321,8 +419,8 @@ load_covariates <- function(
 #' classes, and the survey method. A CSV reads them back as
 #' character, and a model then factors them alphabetically, which
 #' silently changes the reference level and so every contrast
-#' coefficient. `<taxon>_factor_levels.csv` records the order the
-#' source used, and this restores it.
+#' coefficient. lookup/factor_levels.csv records, per taxon, the
+#' order the source used, and this restores it.
 #'
 #' A level present in the data but not in the lookup is an error
 #' rather than an extra level: it means the lookup is stale, and
@@ -336,15 +434,17 @@ load_covariates <- function(
 #' @example # Example usage of the function
 #' # apply_factor_levels(frame, data_dir, "bird")
 apply_factor_levels <- function(frame, data_dir, taxon) {
-  path <- file.path(
-    data_dir, "lookup", paste0(taxon, "_factor_levels.csv")
-  )
+  path <- file.path(data_dir, "lookup", "factor_levels.csv")
+  check_dataset_file(path)
 
-  if (!file.exists(path)) {
+  levels_table <- cached_read(
+    path, function(p) as.data.frame(fread(p))
+  )
+  levels_table <- levels_table[levels_table$taxon == taxon, ]
+
+  if (nrow(levels_table) == 0) {
     return(frame)
   }
-
-  levels_table <- as.data.frame(fread(path))
 
   # The lookup names columns as the source did. A column the
   # harmonizer suffixed because it sits in more than one block -
@@ -355,7 +455,7 @@ apply_factor_levels <- function(frame, data_dir, taxon) {
   # reference level and every contrast.
   map_path <- file.path(data_dir, "lookup", "covariate_columns.csv")
   column_map <- if (file.exists(map_path)) {
-    map <- as.data.frame(fread(map_path))
+    map <- covariate_catalogue(data_dir)
     map[map$taxon == taxon, c("source_column", "master_column")]
   } else {
     data.frame(source_column = character(0),
@@ -456,7 +556,7 @@ reference level and every contrast.",
 #' @param aliases Named list, alias to source column. Lets a
 #'   model set name a column the dataset stores otherwise.
 #' @param site_columns Character vector of sites.csv columns to
-#'   carry, beyond survey_unit_id.
+#'   carry, beyond survey_unit_id, or NULL for site_columns().
 #' @return A list with `covariates` (one row per unit, including
 #'   the site columns), `response`, `offset` (or NULL), `units`,
 #'   `taxon` and `region`.
@@ -476,11 +576,10 @@ build_model_data <- function(
   region_filter = NULL,
   weight_column = NULL,
   aliases = list(),
-  site_columns = c(
-    "lat", "long", "easting", "northing", "nr", "nsr", "luf", "year",
-    "lured", "location", "summer_days", "winter_days"
-  )
+  site_columns = NULL
 ) {
+  site_columns <- site_columns %||% site_columns()
+
   # Step 1: Read each piece, narrowed to what was asked for. The
   # weight is a covariate like any other, so it is added here
   # rather than left for the caller to remember.
@@ -705,7 +804,26 @@ check_dataset_file <- function(path) {
   invisible(NULL)
 }
 
-## 10.2 align_to_units() ----
+## 10.2 site_columns() ----
+
+#' The Site Fields Every Model Frame Carries
+#'
+#' Read from sites.csv rather than covariates.csv, so a region
+#' filter or a formula may name them without loading them as
+#' covariates.
+#'
+#' @return A character vector of sites.csv column names.
+#'
+#' @example # Example usage of the function
+#' # site_columns()
+site_columns <- function() {
+  c(
+    "lat", "long", "easting", "northing", "nr", "nsr", "luf", "year",
+    "lured", "location", "summer_days", "winter_days"
+  )
+}
+
+## 10.3 align_to_units() ----
 
 #' Put a Keyed Frame in a Given Survey Unit Order
 #'
@@ -725,7 +843,7 @@ align_to_units <- function(frame, units) {
   out
 }
 
-## 10.3 apply_response_transform() ----
+## 10.4 apply_response_transform() ----
 
 #' Turn a Recorded Value into a Modelling Response
 #'
@@ -764,7 +882,7 @@ apply_response_transform <- function(
   )
 }
 
-## 10.4 rlang_f_rhs() ----
+## 10.5 rlang_f_rhs() ----
 
 #' Take the Right-Hand Side of a One-Sided Formula
 #'

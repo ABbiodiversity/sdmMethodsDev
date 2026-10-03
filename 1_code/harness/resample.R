@@ -1,25 +1,19 @@
 # ---
-# title: Resampling Schemes
+# title: Resampling - Seeds, Blocks and Dispatch
 # author: Brendan Casey
 # created: 2026-09-09
-# inputs:
-#   in 0_data/test_dataset/lookup/:
-#     - <taxon>_bootstrap_ids.csv (where one is precomputed)
+# inputs: none
 # outputs: none; returns objects in memory
 # notes:
 #   - Produces the survey units one model fit sees. Every scheme
-#     returns the same thing - a character vector of survey unit
-#     ids, with replacement where the scheme resamples - so the
-#     fitting loop does not know which scheme it is running.
-#   - Three schemes. `precomputed` reads ids the source pipeline
-#     already generated, which is how birds reach parity.
-#     `spatial_block` reproduces the plant bootstrap: resample
-#     sites with replacement within coarse latitude and longitude
-#     blocks, so a draw keeps the geographic spread rather than
-#     drifting toward whichever region is best surveyed.
-#     `spatial_cv` holds out whole blocks, which is the scheme a
-#     spatial autocorrelation experiment needs and which v2 has
-#     no equivalent of.
+#     returns the same thing - a list of character vectors of
+#     survey unit ids, one per draw, with replacement where the
+#     scheme resamples - so the fitting loop does not know which
+#     scheme it is running.
+#   - The schemes themselves live in 1_code/methods/resampling/:
+#     `precomputed`, `spatial_block` and `spatial_cv`. This file
+#     holds what they share - seeding and spatial blocks - and
+#     resample_for_species(), which looks a scheme up by name.
 #   - Iteration 1 of a bootstrap is the complete data by
 #     convention, matching v2, so the first fit of every run is
 #     the full-data fit.
@@ -125,7 +119,8 @@ species_seed <- function(base, taxon, species) {
 #' set.seed() changes the session's random state for everything
 #' that follows. Restoring it on exit keeps resampling from
 #' changing any later random call, and makes the result depend
-#' only on the seed given here.
+#' only on the seed given here - not on the session's generator,
+#' which is set explicitly to R's default.
 #'
 #' @param seed Integer or NULL. NULL evaluates the code without
 #'   seeding.
@@ -143,16 +138,28 @@ with_seed <- function(seed, code) {
   env <- globalenv()
   had_state <- exists(".Random.seed", envir = env, inherits = FALSE)
   old_state <- if (had_state) get(".Random.seed", envir = env)
+  old_kind <- RNGkind()
 
   on.exit({
+    # The generator first, because setting it reseeds; then the
+    # caller's exact state on top
+    suppressWarnings(do.call(RNGkind, as.list(old_kind)))
+
     if (had_state) {
       assign(".Random.seed", old_state, envir = env)
-    } else if (exists(".Random.seed", envir = env, inherits = FALSE)) {
+    } else if (exists(".Random.seed", envir = env,
+                      inherits = FALSE)) {
       rm(".Random.seed", envir = env)
     }
   }, add = TRUE)
 
-  set.seed(seed)
+  # R's default generator, named rather than assumed, so the draws
+  # are the same whatever generator the session or a package (a
+  # parallel backend, say) has switched to
+  set.seed(
+    seed, kind = "Mersenne-Twister", normal.kind = "Inversion",
+    sample.kind = "Rejection"
+  )
 
   code
 }
@@ -199,319 +206,52 @@ spatial_blocks <- function(
   labels[match(cells, present)]
 }
 
-# 4. resample_precomputed() ----
 
-#' Read Bootstrap Ids the Source Pipeline Generated
+# 4. resample_for_species() ----
+
+#' Draw the Resampling Sets for One Species
 #'
-#' Two layouts. Birds store one table for the taxon,
-#' `lookup/<taxon>_bootstrap_ids.csv`, one column per draw. The
-#' plant-group taxa store v2's draws per species, because v2
-#' drew them per species:
-#' `lookup/v2_bootstrap_ids/<taxon>/<species>.rds`, written by
-#' 1_code/_setup/07_harmonize_v2_plant_bootstrap_ids.R.
+#' Looks the spec's scheme up in the registry and passes it the
+#' spec's `resample` settings. `scheme`, `seed` and `scope` are
+#' read here and by run_spec(), not by a scheme.
 #'
-#' Replaying v2's own draws is what makes parity numerical rather
-#' than distributional: the harness then fits the same rows v2
-#' fitted, draw by draw.
-#'
-#' @param data_dir Character. Path to 0_data/test_dataset.
-#' @param taxon Character. Taxon slug.
-#' @param iterations Integer vector of bootstrap iterations.
-#' @param id_column Character. The column in the covariate frame
-#'   the stored ids refer to, when they are not survey unit ids.
-#' @param frame A data frame carrying `survey_unit_id` and
-#'   `id_column`, used to translate stored ids into survey unit
-#'   ids. NULL when the stored ids are already unit ids.
-#' @param species Character. The species, for per-species ids.
-#' @param per_species Logical. Read the per-species layout.
-#' @param unique_ids Logical. Keep each unit once per draw. v2's
-#'   bird scripts select a draw with `%in%`, so a unit drawn twice
-#'   is fitted once; the plant scripts index rows, so repeats
-#'   count.
-#' @return A list of character vectors, one per iteration.
+#' @param spec A taxon spec.
+#' @param frame The one-species frame, one row per unit that can
+#'   be drawn.
+#' @param iterations Integer vector.
+#' @param data_dir Character.
+#' @param seed Integer or NULL. This species' seed, from
+#'   species_seed(). NULL leaves the draw unseeded.
+#' @param species Character. Names the stored draws where they
+#'   are kept per species.
+#' @return A list of character vectors of survey unit ids.
 #'
 #' @example # Example usage of the function
-#' # ids <- resample_precomputed(data_dir, "bird", 1:3,
-#' #                             id_column = "surveyid",
-#' #                             frame = md$covariates,
-#' #                             unique_ids = TRUE)
-#' # ids <- resample_precomputed(data_dir, "lichen", 1:3,
-#' #                             species = "Physcia.adscendens",
-#' #                             per_species = TRUE)
-resample_precomputed <- function(
-  data_dir,
-  taxon,
-  iterations,
-  id_column = NULL,
-  frame = NULL,
-  species = NULL,
-  per_species = FALSE,
-  unique_ids = FALSE
+#' # resample_for_species(spec, frame, 1:10, data_dir,
+#' #                      seed = 123L, species = "Physcia.adscendens")
+resample_for_species <- function(
+  spec, frame, iterations, data_dir, seed = NULL, species = NULL
 ) {
-  # Step 1: Read the stored draws, as a list of id vectors
-  if (per_species) {
-    path <- file.path(
-      data_dir, "lookup", "v2_bootstrap_ids", taxon,
-      paste0(species, ".rds")
-    )
+  scheme <- get_method("resampler", spec$resample$scheme)
+  settings <- spec$resample[
+    setdiff(names(spec$resample), c("scheme", "seed", "scope"))
+  ]
 
-    if (is.null(species) || !file.exists(path)) {
-      stop(
-        "No stored v2 bootstrap ids for ", taxon, " ",
-        species, ":\n  ", path,
-        "\nRun 1_code/_setup/07_harmonize_v2_plant_bootstrap_ids.R",
-        " for this species, or use the spatial_block scheme.",
-        call. = FALSE
-      )
-    }
-
-    stored <- readRDS(path)
-
-    # v2 stores a species' draws as a matrix, units by draws
-    if (is.matrix(stored)) {
-      stored <- lapply(seq_len(ncol(stored)), function(j) stored[, j])
-    }
-  } else {
-    path <- file.path(
-      data_dir, "lookup", paste0(taxon, "_bootstrap_ids.csv")
-    )
-
-    if (!file.exists(path)) {
-      stop(
-        "No precomputed bootstrap ids for ", taxon, ":\n  ", path,
-        "\nUse a different resampling scheme, or generate them.",
-        call. = FALSE
-      )
-    }
-
-    stored <- as.list(fread(path))
-  }
-
-  if (max(iterations) > length(stored)) {
-    stop(
-      taxon, " has ", length(stored), " precomputed bootstrap ",
-      "iterations; ", max(iterations), " were requested.",
-      call. = FALSE
-    )
-  }
-
-  lapply(iterations, function(i) {
-    ids <- stored[[i]]
-    ids <- ids[!is.na(ids)]
-
-    if (unique_ids) {
-      ids <- unique(ids)
-    }
-
-    # Step 2: Translate to survey unit ids when the stored ids
-    # are a different key, which is how the bird ids are stored
-    if (is.null(id_column)) {
-      return(as.character(ids))
-    }
-
-    if (is.null(frame) || !id_column %in% names(frame)) {
-      stop(
-        "Translating precomputed ids needs a frame carrying `",
-        id_column, "`.",
-        call. = FALSE
-      )
-    }
-
-    matched <- match(ids, frame[[id_column]])
-    as.character(frame$survey_unit_id[matched[!is.na(matched)]])
-  })
-}
-
-# 5. resample_spatial_block() ----
-
-#' Draw a Spatially Blocked Bootstrap
-#'
-#' Resamples survey units with replacement within each spatial
-#' block, so every block keeps its original number of units and
-#' the draw keeps the geographic spread of the survey.
-#'
-#' Iteration 1 is the complete data, matching v2.
-#'
-#' @param frame A data frame with `survey_unit_id` and the
-#'   coordinate columns.
-#' @param iterations Integer vector of bootstrap iterations.
-#' @param long_column,lat_column Character. Coordinate columns.
-#' @param min_detections Integer. Redraw a block set until at
-#'   least this many detections are present, or 0 to skip the
-#'   check.
-#' @param response Numeric vector, one per row of `frame`, used
-#'   only for the detection check.
-#' @param max_attempts Integer. How many redraws before giving
-#'   up, so a species that can never meet the threshold fails
-#'   rather than looping forever.
-#' @param seed Integer or NULL. Defaults to harness_seed(), so a
-#'   run reproduces. NULL leaves the stream unseeded, which is
-#'   what v2 did.
-#' @return A list of character vectors, one per iteration.
-#'
-#' @example # Example usage of the function
-#' # ids <- resample_spatial_block(frame, 1:5, seed = 42)
-resample_spatial_block <- function(
-  frame,
-  iterations,
-  long_column = "long",
-  lat_column = "lat",
-  min_detections = 0L,
-  response = NULL,
-  max_attempts = 100L,
-  seed = harness_seed()
-) {
-  for (one in c(long_column, lat_column)) {
-    if (!one %in% names(frame)) {
-      stop(
-        "Spatial blocking needs `", one, "` in the frame.",
-        call. = FALSE
-      )
-    }
-  }
-
-  units <- as.character(frame$survey_unit_id)
-  blocks <- spatial_blocks(
-    frame[[long_column]], frame[[lat_column]]
+  context <- list(
+    data_dir = data_dir,
+    taxon = spec$taxon,
+    species = species,
+    spec = spec,
+    response_name = spec$response_name %||% "response"
   )
-  by_block <- split(seq_along(units), blocks)
 
-  draw_once <- function() {
-    unlist(
-      lapply(
-        by_block,
-        function(rows) sample(rows, length(rows), replace = TRUE)
-      ),
-      use.names = FALSE
-    )
-  }
-
-  # Every draw comes from one stream under `seed`, so a species'
-  # draws depend only on its seed and the iterations requested.
-  with_seed(seed, lapply(iterations, function(i) {
-    # Step 1: Iteration 1 is the complete data, as in v2
-    if (i == 1L) {
-      return(units)
-    }
-
-    # Step 2: Redraw until the sample carries enough detections
-    # for a model to be estimable
-    for (attempt in seq_len(max_attempts)) {
-      rows <- draw_once()
-
-      if (min_detections <= 0L || is.null(response)) {
-        return(units[rows])
-      }
-
-      if (sum(response[rows] > 0, na.rm = TRUE) >= min_detections) {
-        return(units[rows])
-      }
-    }
-
-    stop(
-      "No spatially blocked draw reached ", min_detections,
-      " detections in ", max_attempts, " attempts. The species ",
-      "is probably too rare to bootstrap at this threshold.",
-      call. = FALSE
-    )
-  }))
-}
-
-# 6. resample_spatial_cv() ----
-
-#' Split Survey Units into Spatial Cross-Validation Folds
-#'
-#' Holds out whole spatial blocks rather than random units, so a
-#' held-out score is not inflated by a training unit sitting
-#' beside its own test unit. This is the scheme a spatial
-#' autocorrelation experiment needs; v2 has no equivalent.
-#'
-#' @param frame A data frame with `survey_unit_id` and the
-#'   coordinate columns.
-#' @param folds Integer. Number of folds.
-#' @param long_column,lat_column Character. Coordinate columns.
-#' @param seed Integer or NULL. Defaults to harness_seed().
-#' @return A list of lists, each with `train` and `test`
-#'   character vectors of survey unit ids.
-#'
-#' @example # Example usage of the function
-#' # cv <- resample_spatial_cv(frame, folds = 5, seed = 42)
-#' # length(cv[[1]]$train)
-resample_spatial_cv <- function(
-  frame,
-  folds = 5L,
-  long_column = "long",
-  lat_column = "lat",
-  seed = harness_seed()
-) {
-  units <- as.character(frame$survey_unit_id)
-  blocks <- spatial_blocks(
-    frame[[long_column]], frame[[lat_column]]
-  )
-  present <- unique(blocks[!is.na(blocks)])
-
-  if (length(present) < folds) {
-    stop(
-      "Only ", length(present), " spatial block(s) present; ",
-      folds, " folds were asked for. Use finer block breaks or ",
-      "fewer folds.",
-      call. = FALSE
-    )
-  }
-
-  # Step 1: Deal whole blocks into folds, so no fold shares a
-  # block with another
-  assignment <- with_seed(
-    seed, sample(rep_len(seq_len(folds), length(present)))
-  )
-  fold_of_block <- assignment[match(blocks, present)]
-
-  lapply(seq_len(folds), function(k) {
+  do.call(scheme, c(
     list(
-      train = units[!is.na(fold_of_block) & fold_of_block != k],
-      test = units[!is.na(fold_of_block) & fold_of_block == k]
-    )
-  })
-}
-
-# 7. resample_units() ----
-
-#' Produce the Survey Units for Each Model Fit
-#'
-#' The single entry point the fitting loop calls. Dispatches on
-#' the scheme name so a spec names a scheme rather than calling
-#' one.
-#'
-#' @param scheme Character. "precomputed", "spatial_block" or
-#'   "spatial_cv".
-#' @param frame A data frame with `survey_unit_id`.
-#' @param iterations Integer vector of iterations, or the number
-#'   of folds for spatial_cv.
-#' @param ... Passed to the scheme's own function.
-#' @return For the bootstrap schemes, a list of character vectors
-#'   of survey unit ids. For spatial_cv, a list of train and test
-#'   splits.
-#'
-#' @example # Example usage of the function
-#' # resample_units("spatial_block", frame, 1:10, seed = 42)
-resample_units <- function(scheme, frame, iterations, ...) {
-  switch(
-    scheme,
-    precomputed = resample_precomputed(
-      iterations = iterations, frame = frame, ...
+      frame = frame, iterations = iterations, seed = seed,
+      context = context
     ),
-    spatial_block = resample_spatial_block(
-      frame = frame, iterations = iterations, ...
-    ),
-    spatial_cv = resample_spatial_cv(
-      frame = frame, folds = length(iterations), ...
-    ),
-    stop(
-      "Unknown resampling scheme `", scheme, "`. Use ",
-      "\"precomputed\", \"spatial_block\" or \"spatial_cv\".",
-      call. = FALSE
-    )
-  )
+    settings
+  ))
 }
 
 # End of script ----

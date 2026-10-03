@@ -12,9 +12,10 @@
 #     MammalModels: nine binomial GLMs over FFP, MAP, CMD and TD,
 #     averaged by AICc weight. That pipeline is adapted here as a
 #     fitted stage, so a bioclimatic question can be asked of
-#     mammals at all. `climate_source` selects which, but only
-#     "fitted" is implemented: nothing reads the prediction file
-#     yet.
+#     mammals at all. `climate_source` selects which:
+#     "precomputed" (the default, v2's) reads the prediction file
+#     through mammal_precomputed_climate() in hurdle.R; "fitted"
+#     fits climate as the first stage.
 #   - The climate block, CMD and TD included, comes from
 #     abmi-camera-climate_2023.Rdata, the file v2 fitted against,
 #     joined by the harmonizer. The fitted stage runs the full
@@ -315,7 +316,11 @@ mammal_spec <- function(
           selection = select_mammal_v2_hurdle,
           ic = "AICc",
           carry_from = "climate",
-          carry_from_as = "Climate"
+          carry_from_as = "Climate",
+          # The grid prediction reads each habitat type at v2's
+          # 100 sampling days and zero climate, as its one-hot
+          # effects are read. Not passed to the hurdle itself.
+          grid_constants = list(seas_days = 100, Climate = 0)
         )
       } else if (part == "presence") {
         list(
@@ -434,8 +439,13 @@ mammal_spec <- function(
     # Facts about this run's configuration. Coverage is in
     # v2_coverage, not here.
     notes = paste0(
-      "Climate fitted with the full 9-model v2 set. Season: ",
-      season, ". Hurdle part: ", part, ". Tier: ", tier, "."
+      if (climate_source == "fitted") {
+        "Climate fitted with the full 9-model v2 set."
+      } else {
+        "Climate read from v2's precomputed predictions."
+      },
+      " Season: ", season, ". Hurdle part: ", part,
+      ". Tier: ", tier, "."
     )
   )
 }

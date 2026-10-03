@@ -6,7 +6,7 @@
 # inputs:
 #   in 0_data/test_dataset/lookup/:
 #     - mammal_climate_predictions.csv
-#     - mammal_modelled_species.csv
+#     - species_queue.csv (each species' v2 name)
 # outputs: none; returns objects in memory
 # notes:
 #   - A port of the per-species, per-season body of v2's
@@ -64,24 +64,24 @@
 #'
 #' @example # Example usage of the function
 #' # frame <- mammal_precomputed_climate(frame, sp, data_dir, spec)
-mammal_precomputed_climate <- function(frame, species, data_dir, spec) {
-  queue <- data.table::fread(
-    file.path(data_dir, "lookup", "mammal_modelled_species.csv")
+mammal_precomputed_climate <- function(frame, species, data_dir,
+                                       spec) {
+  # The climate file names species as v2 did, without the season
+  v2_name <- sub(
+    "(Summer|Winter)$", "",
+    species_source_name(data_dir, "mammal", species)
   )
-  source_name <- unique(queue$species_season[queue$species == species])
 
-  if (length(source_name) == 0) {
-    stop("No v2 name for mammal species `", species, "`.",
+  # Read whole once per session; every species reads a column
+  climate <- cached_read(
+    file.path(data_dir, "lookup", "mammal_climate_predictions.csv"),
+    function(p) as.data.frame(data.table::fread(p))
+  )
+
+  if (!v2_name %in% names(climate)) {
+    stop("No precomputed climate for mammal `", v2_name, "`.",
          call. = FALSE)
   }
-
-  # The climate file names species as v2 did, without the season
-  v2_name <- sub("(Summer|Winter)$", "", source_name[1])
-
-  climate <- data.table::fread(
-    file.path(data_dir, "lookup", "mammal_climate_predictions.csv"),
-    select = c("survey_unit_id", v2_name)
-  )
 
   frame$Climate <- climate[[v2_name]][
     match(frame$survey_unit_id, climate$survey_unit_id)
@@ -482,16 +482,18 @@ select_mammal_v2_hurdle <- function(
 
   # Step 8: Cutblock convergence, north only (6.11)
   if (ages) {
+    # The same recovery weights as the plant pipeline
+    recovery <- cutblock_recovery_weights()
     convergence <- list(
-      CCSpruce = list("Spruce", c(0.500, 0.849, 0.960)),
-      CCPine = list("Pine", c(0.500, 0.849, 0.960)),
-      CCMixedwood = list("Mixedwood", c(0.705, 0.912, 0.970)),
-      CCDecid = list("Decid", c(0.705, 0.912, 0.970))
+      CCSpruce = list("Spruce", recovery$conifer),
+      CCPine = list("Pine", recovery$conifer),
+      CCMixedwood = list("Mixedwood", recovery$deciduous),
+      CCDecid = list("Decid", recovery$deciduous)
     )
 
     for (cc in names(convergence)) {
       for (k in 1:3) {
-        age <- (2:4)[k]
+        age <- k + 1
         w <- convergence[[cc]][[2]][k]
         cc_name <- paste0(cc, age)
         natural <- paste0(convergence[[cc]][[1]], age)

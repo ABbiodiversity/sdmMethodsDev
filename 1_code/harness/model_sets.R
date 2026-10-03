@@ -47,10 +47,8 @@ model_sets <- function() {
   # in eight combinations.
   #
   # Mammals fit it in full: the camera climate the harmonizer
-  # joins carries CMD and TD. Birds in v2 also fit each of the
-  # eight with linear and with quadratic spatial terms, 25
-  # candidates in all, which this set does not include; see the
-  # bird spec's v2_coverage.
+  # joins carries CMD and TD. Birds fit it with spatial terms
+  # added, 25 candidates in all: climate_bird_v2 below.
   #
   # The null is a candidate, not just the base: v2 averages over
   # `climate.list` including the intercept-only model it starts
@@ -85,17 +83,6 @@ model_sets <- function() {
     )
   )
 
-  # The subset of the above without CMD, five of the nine models.
-  # No spec uses it since the camera climate supplied CMD; kept
-  # for an experiment on a dataset that lacks CMD.
-  climate_mammal_available <- c(
-    ". ~ .",
-    ". ~ . + FFP",
-    ". ~ . + MAP",
-    ". ~ . + TD",
-    ". ~ . + TD + FFP"
-  )
-
   # The plant climate set, spliced from the v2 source. Wider
   # than the bird and mammal one, and includes interaction and
   # squared terms the other two do not use.
@@ -114,18 +101,6 @@ model_sets <- function() {
     ". ~ . + CMD + PET",
     ". ~ . + MAT + MAT2 + MWMT + MWMT2",
     ". ~ . + TD + FFP + MAT"
-  )
-
-  # Applied on top of a chosen climate model, not instead of it.
-  bioclim_plant_v2 <- c(
-    ".~.+ bio9 + bio15"
-  )
-
-  # Spatial trend terms, likewise applied on top.
-  space_plant_v2 <- c(
-    ".~.+ Easting + Northing",
-    ".~.+ Easting + Northing + EastingNorthing",
-    ".~.+ Easting + Northing + Easting2 + Northing2 + EastingNorthing"
   )
 
   # The plant climate candidate set as v2 actually assembles it.
@@ -288,7 +263,7 @@ model_sets <- function() {
   #
   # This is the presence half of a hurdle model; v2 fits a Gamma
   # abundance-given-presence part alongside it and multiplies
-  # the two. Only the presence half is reproduced here.
+  # the two. modules/mammals/hurdle.R fits both.
   habitat_mammal_north_pa_v2 <- c(
     ". ~ . + Decid + Mixedwood + Pine + Spruce + TreedBog + TreedFen + TreedSwamp + GrassHerb + Shrub + Marsh + ShrubbySwamp + ShrubbyBogFen + CCDecidR + CCDecid1 + CCDecid2 + CCMixedwoodR + CCMixedwood1 + CCMixedwood2 + CCPineR + CCPine1 + CCSpruceR + CCSpruce1 + CCSpruce2 + EnSoftLin + EnSeismic + TrSoftLin + TameP + RoughP + Well + RurUrbInd + seas_days + Climate",
     ". ~ . + Decid + Mixedwood + Pine + Spruce + TreedBog + TreedFen + TreedSwamp + GrassHerb + Shrub + Marsh + ShrubbySwamp + ShrubbyBogFen + CCDecidMixed + CCPine + CCSpruce + EnSoftLin + EnSeismic + TrSoftLin + TameP + RoughP + Well + RurUrbInd + seas_days + Climate",
@@ -353,7 +328,6 @@ model_sets <- function() {
     climate_bird_mammal_v2 = climate_bird_mammal_v2,
     climate_bird_v2 = climate_bird_v2,
     climate_plant_v2_full = climate_plant_v2_full,
-    climate_mammal_available = climate_mammal_available,
     climate_plant_v2 = climate_plant_v2,
     habitat_mammal_north_pa_v2 = habitat_mammal_north_pa_v2,
     intercept_mammal_north_pa_v2 =
@@ -364,9 +338,7 @@ model_sets <- function() {
     landcover_bird_north_v2 = landcover_bird_north_v2,
     landcover_bird_south_v2 = landcover_bird_south_v2,
     habitat_veg_plant_v2 = habitat_veg_plant_v2,
-    habitat_soil_plant_v2 = habitat_soil_plant_v2,
-    bioclim_plant_v2 = bioclim_plant_v2,
-    space_plant_v2 = space_plant_v2
+    habitat_soil_plant_v2 = habitat_soil_plant_v2
   )
 }
 

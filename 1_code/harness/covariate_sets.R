@@ -77,12 +77,8 @@ covariate_sets <- function() {
     # a cross-taxa experiment can use without the taxa silently
     # fitting different models.
     #
-    # Five columns, once the mammal camera climate is joined.
-    # It was two before that: mammals carried no TD, CMD or EMT,
-    # because the SpTable climate block is a different and
-    # narrower extraction than the one their models were fitted
-    # against. Birds still have no MAT or PET, which is what
-    # keeps the shared set at five rather than more.
+    # Five columns. Birds have no MAT or PET, which is what keeps
+    # the shared set at five rather than more.
     #
     # Re-derive with common_covariates() after any dataset
     # version change rather than trusting this list.
@@ -302,7 +298,7 @@ covariate_catalogue <- function(data_dir, taxon = NULL) {
     )
   }
 
-  catalogue <- as.data.frame(fread(path))
+  catalogue <- cached_read(path, function(p) as.data.frame(fread(p)))
 
   if (!is.null(taxon)) {
     # The catalogue is keyed the way covariates.csv is, so a
@@ -351,7 +347,7 @@ available_covariates <- function(
   block = NULL,
   include_derived = TRUE
 ) {
-  key <- covariate_key(taxon, region)
+  key <- covariate_key(taxon, region, data_dir)
   catalogue <- covariate_catalogue(data_dir)
   rows <- catalogue[catalogue$taxon == key, ]
 
@@ -467,7 +463,7 @@ term_map <- function(
   region = NULL,
   block = NULL
 ) {
-  key <- covariate_key(taxon, region)
+  key <- covariate_key(taxon, region, data_dir)
   catalogue <- covariate_catalogue(data_dir)
   rows <- catalogue[catalogue$taxon == key, ]
 

@@ -486,4 +486,31 @@ standardize_bird_coefficients <- function(
   out
 }
 
+# 5. bird_habitat_translation() ----
+
+#' Translate a Store's Bird Landcover onto v2's Habitat Template
+#'
+#' The form collect_results() takes in `translate`: given a
+#' store's coefficients, returns the landcover stage translated
+#' onto v2's standardized habitat types as extra rows, stage
+#' "habitat". The raw "landcover" rows stay as they are.
+#'
+#' @param coefficients A store's coefficients.
+#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param region Character. "north" or "south".
+#' @return A data frame of coefficient rows, or NULL.
+#'
+#' @example # Example usage of the function
+#' # collect_results(pipeline_dir, data_dir,
+#' #   translate = list(bird = bird_habitat_translation))
+bird_habitat_translation <- function(coefficients, data_dir, region) {
+  landcover <- coefficients[coefficients$stage == "landcover", ]
+
+  if (nrow(landcover) == 0) {
+    return(NULL)
+  }
+
+  standardize_bird_coefficients(landcover, data_dir, region)
+}
+
 # End of script ----

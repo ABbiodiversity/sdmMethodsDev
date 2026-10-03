@@ -14,14 +14,18 @@
 #     the quantity v2 reports and the Biodiversity Browser shows.
 #   - This is the comparison currency. Coefficients cannot compare
 #     a GLM against a boosted tree, because a tree has none, but
-#     every engine can predict onto these rows.
+#     every engine can predict onto these rows. Every taxon has a
+#     grid; the bird ones are rebuilt by _setup/09 from v2's
+#     coefficient translation matrix.
+#   - The grid prediction is the stage's final model - the
+#     averaged or combined one where the rule combines candidates.
+#     v2's later coefficient adjustments (the plant stand-age
+#     splines, say) are in the coefficients, not the grid.
 #   - Terms the grid does not carry are set to zero, not dropped.
 #     A grid row describes a pure stand, so a human footprint term
-#     is genuinely absent from it rather than unknown, and zero is
-#     what "none of this here" means. Terms that carry a stage
-#     forward are the exception and are set to their mean, because
-#     a habitat effect is read at average climate, not at zero
-#     climate.
+#     is genuinely absent from it rather than unknown. Terms the
+#     stage holds fixed - Climate, Protocol, sampling effort - are
+#     set to the stage's constants.
 #   - A grid whose VegType column is missing is an error rather
 #     than a silent positional fallback, because the row order of
 #     a prediction matrix is not something to guess at.
@@ -77,69 +81,70 @@ load_prediction_grid <- function(data_dir, name) {
 
 # 3. predict_grid() ----
 
-#' Predict a Fitted Model onto a Grid
+#' Predict a Selection's Final Model onto a Grid
 #'
-#' Builds a prediction frame carrying every term the model needs:
-#' the grid's own columns where it has them, zero where it does
-#' not, and the mean where a term carries a previous stage.
+#' Builds a prediction frame carrying every column the model
+#' reads: the grid's own where it has them, the stage's constants
+#' (v2 holds Climate at zero, and Protocol at the new protocol),
+#' and zero for anything else. Predicts with the selection's own
+#' predictor, so an averaged or combined model is projected as a
+#' whole, whatever the engine.
 #'
-#' @param selected A selection result, from selection_run().
-#' @param engine An engine definition.
+#' @param selected A selection result, carrying `predict`.
 #' @param grid A prediction grid, from load_prediction_grid().
-#' @param carried Named list of values for terms that carry a
-#'   previous stage forward, or NULL to use zero.
+#' @param constants Named list of values for columns held fixed
+#'   across the grid.
 #' @param type Character. "response" or "link".
 #' @return A named numeric vector, one value per grid row, or
 #'   NULL when the model cannot be predicted.
 #'
 #' @example # Example usage of the function
-#' # predict_grid(selected, engine, grid,
-#' #              carried = list(Climate = 0.4))
+#' # predict_grid(selected, grid, constants = list(Climate = 0))
 predict_grid <- function(
   selected,
-  engine,
   grid,
-  carried = NULL,
+  constants = list(),
   type = "response"
 ) {
-  if (is.null(grid) || is.null(selected$fit)) {
+  if (is.null(grid) || !is.function(selected$predict)) {
     return(NULL)
   }
 
-  terms <- model_terms(selected)
-
-  if (length(terms) == 0) {
-    return(NULL)
-  }
-
-  # Step 1: Start from the grid, so every term it carries takes
-  # the composition of a pure stand of that habitat type
   newdata <- grid
 
-  # Step 2: Fill in the terms the grid has no column for. Zero is
-  # what a grid row means by omission - none of that here - and a
-  # carried stage is the exception, held at its supplied value.
-  for (one in setdiff(terms, names(newdata))) {
-    newdata[[one]] <- if (!is.null(carried[[one]])) {
-      carried[[one]]
-    } else {
-      0
-    }
+  # Step 1: Hold the stage's constants
+  for (one in names(constants)) {
+    newdata[[one]] <- constants[[one]]
+  }
+
+  # Step 2: Every column any candidate formula reads, at zero
+  # where the grid and the constants have none. A grid row is a
+  # pure stand, so a term it omits is absent rather than unknown.
+  formulas <- selected$formulas %||% list(selected$formula)
+  needed <- unique(unlist(lapply(
+    Filter(function(f) !is.null(f) && !identical(f, NA_character_),
+           formulas),
+    formula_variables
+  )))
+
+  for (one in setdiff(needed, names(newdata))) {
+    newdata[[one]] <- 0
   }
 
   # Step 3: An offset is a property of a survey, not of a habitat
   # type, so a grid prediction is made without one
-  if ("offset" %in% names(newdata) == FALSE) {
-    newdata$offset <- 0
-  }
+  newdata$offset <- 0
 
-  predicted <- engine$predict(selected$fit, newdata, type)
+  predicted <- tryCatch(
+    selected$predict(newdata, type),
+    error = function(e) NULL
+  )
 
-  if (is.null(predicted)) {
+  if (is.null(predicted) || length(predicted) != nrow(grid)) {
     return(NULL)
   }
 
-  stats::setNames(predicted, rownames(grid))
+  stats::setNames(as.numeric(predicted), rownames(grid))
 }
 
 # 4. predict_from_coefficients() ----
@@ -225,37 +230,6 @@ predict_from_coefficients <- function(
   }
 
   linear
-}
-
-# 5. model_terms() ----
-
-#' Name the Terms a Selected Model Uses
-#'
-#' Taken from the coefficients where the engine has them, and
-#' from the formula otherwise, so an engine without coefficients
-#' still reaches a grid prediction.
-#'
-#' @param selected A selection result.
-#' @return A character vector of term names, without the
-#'   intercept.
-#'
-#' @example # Example usage of the function
-#' # model_terms(selected)
-model_terms <- function(selected) {
-  if (!is.null(selected$coefficients)) {
-    terms <- selected$coefficients$term
-
-    return(setdiff(terms, c("(Intercept)", "Intercept")))
-  }
-
-  if (!is.na(selected$formula)) {
-    return(setdiff(
-      all.vars(stats::as.formula(selected$formula)),
-      c("response", "offset", "weight")
-    ))
-  }
-
-  character(0)
 }
 
 # End of script ----

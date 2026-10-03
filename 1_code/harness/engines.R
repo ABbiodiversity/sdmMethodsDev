@@ -1,409 +1,368 @@
 # ---
-# title: Fitting Engines
+# title: Engine Interface
 # author: Brendan Casey
 # created: 2026-09-09
 # inputs: none
-# outputs: none; returns objects in memory
+# outputs: none; defines functions in memory
 # notes:
-#   - A engine is a fitting method behind one interface, so that
-#     swapping GLM for a boosted tree is a one-word change in an
-#     experiment rather than a rewrite. Every engine supplies
-#     fit, coef, predict and ic; an engine that has no
-#     coefficients returns NULL from coef, and the result writer
-#     records that rather than failing.
-#   - Registered here: `glm` and `bayesglm`. `gbm` and `brms`
-#     come later; the registry is what they slot into.
-#   - bayesglm and glm sit on different axes and should not be
-#     read as "frequentist versus Bayesian". bayesglm is
-#     penalized maximum likelihood - augmented IRLS under weakly
-#     informative Cauchy priors - giving a point estimate and a
-#     standard error, with no posterior. It belongs on a
-#     regularization axis. A Bayesian framework comparison needs
-#     brms or rstanarm.
-#   - The plant v2 models use bayesglm because rare species fitted
-#     against 30-term habitat formulas separate completely, and
-#     plain glm then returns infinite coefficients. The
-#     regularization is load-bearing there, not incidental, so
-#     swapping plants to glm as a control will fail outright for
-#     the rare end of the species list rather than give a clean
-#     comparison.
-#   - predict() takes an `se` flag. Inverse-variance averaging
-#     weights each candidate by the precision of its prediction,
-#     so an engine that cannot return a standard error cannot
-#     use that selection rule. Tree and boosting engines will
-#     need a different weighting when they arrive.
-#   - Fitting failures are caught and returned, not raised. A
-#     candidate model set is expected to contain models that
-#     cannot be estimated for a given species and bootstrap, and
-#     the selection rule needs to see which ones failed.
+#   - An engine is a fitting method behind one interface, so that
+#     swapping a GLM for a boosted tree is a one-word change in a
+#     spec rather than a rewrite. The engines themselves live in
+#     1_code/methods/engines/, one file each; this file is how the
+#     harness talks to them.
+#   - The contract, in full, is in 1_code/methods/README.md:
+#     `fit(formula, data, family, weights, offset, control)`
+#     returns list(fit, ok, message) and never raises;
+#     `predict(fit, newdata, type, se)` returns a numeric vector
+#     (or list(fit, se.fit) when se = TRUE), or NULL on failure;
+#     `coef(fit)` and `ic(fit, type)` exist when the engine
+#     declares the `coefficients` and `ic` capabilities.
+#   - check_engine() runs that contract on small synthetic data,
+#     so a new engine can be tested before it meets the dataset.
 # ---
 
 # 1. Setup ----
 
 ## 1.1 Load packages ----
-# arm is loaded lazily by the bayesglm engine rather than here,
-# so a run that never uses it does not need it installed.
+# Base R only.
 
-# 2. Engine registry ----
-
-## 2.1 engine_registry() ----
-
-#' The Available Fitting Engines
-#'
-#' Each entry supplies four functions: `fit`, `coef`, `predict`
-#' and `ic`. Adding an engine means adding an entry, not
-#' touching the fitting loop.
-#'
-#' @return A named list of engine definitions.
-#'
-#' @example # Example usage of the function
-#' # names(engine_registry())
-engine_registry <- function() {
-  list(
-    glm = engine_glm(),
-    bayesglm = engine_bayesglm()
-  )
-}
-
-## 2.2 get_engine() ----
+# 2. get_engine() ----
 
 #' Look Up One Engine
 #'
-#' @param name Character. Engine name.
-#' @param registry Named list of engine definitions.
+#' @param name Character. A registered engine name.
 #' @return The engine definition.
 #'
 #' @example # Example usage of the function
 #' # get_engine("glm")
-get_engine <- function(name, registry = engine_registry()) {
-  if (!name %in% names(registry)) {
-    stop(
-      "Unknown engine `", name, "`. Registered: ",
-      paste(names(registry), collapse = ", "),
-      call. = FALSE
-    )
-  }
-
-  registry[[name]]
+get_engine <- function(name) {
+  get_method("engine", name)
 }
 
-# 3. engine_glm() ----
+# 3. Capabilities ----
 
-#' Plain Generalized Linear Model
+## 3.1 engine_has() ----
+
+#' Does an Engine Declare a Capability
 #'
-#' @return An engine definition.
+#' @param engine An engine definition.
+#' @param capability Character. One of engine_capabilities().
+#' @return Logical.
 #'
 #' @example # Example usage of the function
-#' # e <- engine_glm()
-#' # fit <- e$fit(response ~ MAP, data, family = "binomial")
-engine_glm <- function() {
-  list(
-    name = "glm",
-    has_coefficients = TRUE,
-    fit = function(formula, data, family, weights = NULL,
-                   offset = NULL, control = list()) {
-      fit_glm_family(
-        stats::glm, formula, data, family, weights, offset,
-        control
-      )
-    },
-    coef = function(fit) fit_coefficients(fit),
-    predict = function(fit, newdata, type = "link", se = FALSE) {
-      fit_predict(fit, newdata, type, se)
-    },
-    ic = function(fit, type = "AICc") information_criterion(fit, type)
-  )
+#' # engine_has(get_engine("glm"), "se")
+engine_has <- function(engine, capability) {
+  capability %in% engine$capabilities
 }
 
-# 4. engine_bayesglm() ----
+## 3.2 engine_coef() ----
 
-#' Penalized GLM with Weakly Informative Priors
+#' Coefficients from a Fit, Where the Engine Has Them
 #'
-#' `arm::bayesglm` with its default Cauchy priors, which is what
-#' the v2 plant models use. See the header on why this is not a
-#' Bayesian framework in the sense a framework comparison means.
+#' A fit made through fit_with() carries its coefficients
+#' already, so they are computed once per fit however many times
+#' a rule reads them.
 #'
-#' @return An engine definition.
-#'
-#' @example # Example usage of the function
-#' # e <- engine_bayesglm()
-engine_bayesglm <- function() {
-  list(
-    name = "bayesglm",
-    has_coefficients = TRUE,
-    fit = function(formula, data, family, weights = NULL,
-                   offset = NULL, control = list()) {
-      if (!requireNamespace("arm", quietly = TRUE)) {
-        stop(
-          "The bayesglm engine needs the arm package.",
-          call. = FALSE
-        )
-      }
-
-      # maxit defaults to the v2 value, which was raised from the
-      # arm default because rare species converge slowly
-      if (is.null(control$maxit)) {
-        control$maxit <- 250
-      }
-
-      fit_glm_family(
-        arm::bayesglm, formula, data, family, weights, offset,
-        control
-      )
-    },
-    coef = function(fit) fit_coefficients(fit),
-    predict = function(fit, newdata, type = "link", se = FALSE) {
-      fit_predict(fit, newdata, type, se)
-    },
-    ic = function(fit, type = "AICc") information_criterion(fit, type)
-  )
-}
-
-# 5. Shared implementations ----
-# glm and bayesglm take the same arguments and return objects of
-# the same shape, so the four operations are written once.
-
-## 5.1 fit_glm_family() ----
-
-#' Fit a GLM-Family Model, Catching Failure
-#'
-#' @param fitter Function. stats::glm or arm::bayesglm.
-#' @param formula A model formula.
-#' @param data A data frame.
-#' @param family Character or family object.
-#' @param weights Numeric vector or NULL.
-#' @param offset Numeric vector or NULL.
-#' @param control Named list of extra arguments to the fitter.
-#' @return A list with `fit` (or NULL), `ok`, and `message`.
+#' @param engine An engine definition.
+#' @param fit A fit from engine$fit().
+#' @return A data frame of term, estimate and se, or NULL.
 #'
 #' @example # Example usage of the function
-#' # fit_glm_family(stats::glm, y ~ x, d, "binomial")
-fit_glm_family <- function(
-  fitter,
-  formula,
-  data,
-  family,
-  weights = NULL,
-  offset = NULL,
-  control = list()
-) {
-  args <- c(
-    list(formula = formula, data = data, family = family),
-    control
-  )
-
-  # Weights and offsets are passed as values rather than named in
-  # the formula, so the same formula serves a taxon that has them
-  # and one that does not.
-  if (!is.null(weights)) {
-    args$weights <- weights
-  }
-
-  if (!is.null(offset)) {
-    args$offset <- offset
-  }
-
-  # A candidate set is expected to hold models that cannot be
-  # estimated for a given species and draw. The selection rule
-  # needs to see which failed, so failure is returned, not raised.
-  #
-  # A convergence warning still leaves a usable fit, so it is
-  # recorded rather than treated as a failure. It is caught with
-  # withCallingHandlers() and muffled, so the model is fitted
-  # once; catching it with tryCatch() would abandon the fit and
-  # force a second one.
-  warnings_seen <- character(0)
-
-  tryCatch(
-    {
-      fit <- withCallingHandlers(
-        do.call(fitter, args),
-        warning = function(w) {
-          warnings_seen <<- c(warnings_seen, conditionMessage(w))
-          invokeRestart("muffleWarning")
-        }
-      )
-
-      list(
-        fit = fit,
-        ok = TRUE,
-        message = if (length(warnings_seen) == 0) {
-          NA_character_
-        } else {
-          paste(unique(warnings_seen), collapse = "; ")
-        }
-      )
-    },
-    error = function(e) {
-      list(fit = NULL, ok = FALSE, message = conditionMessage(e))
-    }
-  )
-}
-
-## 5.2 fit_coefficients() ----
-
-#' Take Coefficients and Standard Errors from a Fit
-#'
-#' @param fit A list from fit_glm_family().
-#' @return A data frame of term, estimate and se, or NULL when
-#'   the fit failed.
-#'
-#' @example # Example usage of the function
-#' # fit_coefficients(fit)
-fit_coefficients <- function(fit) {
-  if (is.null(fit) || !isTRUE(fit$ok) || is.null(fit$fit)) {
+#' # engine_coef(engine, fit)
+engine_coef <- function(engine, fit) {
+  if (is.null(fit) || !isTRUE(fit$ok)) {
     return(NULL)
   }
 
-  estimates <- stats::coef(fit$fit)
-  errors <- tryCatch(
-    stats::coef(summary(fit$fit))[, "Std. Error"],
-    error = function(e) rep(NA_real_, length(estimates))
-  )
+  if (!is.null(fit$coefficients)) {
+    return(fit$coefficients)
+  }
 
-  data.frame(
-    term = names(estimates),
-    estimate = as.numeric(estimates),
-    se = as.numeric(errors[match(names(estimates), names(errors))]),
-    stringsAsFactors = FALSE
-  )
-}
-
-## 5.3 fit_predict() ----
-
-#' Predict from a Fit
-#'
-#' @param fit A list from fit_glm_family().
-#' @param newdata A data frame to predict onto.
-#' @param type Character. "link" or "response".
-#' @param se Logical. Return standard errors alongside the fit.
-#'   Inverse-variance averaging needs them, and an engine that
-#'   cannot supply them cannot use that selection rule.
-#' @return A numeric vector, or when `se` is TRUE a list of `fit`
-#'   and `se.fit`. NULL when the fit failed.
-#'
-#' @example # Example usage of the function
-#' # fit_predict(fit, prediction_grid, type = "response")
-#' # fit_predict(fit, grid, "link", se = TRUE)$se.fit
-fit_predict <- function(fit, newdata, type = "link", se = FALSE) {
-  if (is.null(fit) || !isTRUE(fit$ok) || is.null(fit$fit)) {
+  if (!engine_has(engine, "coefficients")) {
     return(NULL)
   }
 
-  tryCatch(
-    {
-      predicted <- stats::predict(
-        fit$fit, newdata = newdata, type = type, se.fit = se
-      )
-
-      if (!se) {
-        return(as.numeric(predicted))
-      }
-
-      list(
-        fit = as.numeric(predicted$fit),
-        se.fit = as.numeric(predicted$se.fit)
-      )
-    },
-    error = function(e) NULL
-  )
+  engine$coef(fit)
 }
 
-## 5.4 information_criterion() ----
+## 3.3 engine_converged() ----
 
-#' Score a Fit for Model Selection
+#' Did a Fit Converge, as Far as the Engine Can Say
 #'
-#' AICc rather than AIC, because the candidate sets are large
-#' relative to the number of survey units a rare species is
-#' detected at.
-#'
-#' @param fit A list from fit_glm_family().
-#' @param type Character. "AIC", "AICc" or "BIC".
-#' @return A numeric value; Inf when the fit failed, so a failed
-#'   model never wins a selection.
+#' @param engine An engine definition.
+#' @param fit A fit from engine$fit().
+#' @return Logical. FALSE for a failed fit; TRUE for a fit whose
+#'   engine cannot report convergence.
 #'
 #' @example # Example usage of the function
-#' # information_criterion(fit, "BIC")
-information_criterion <- function(fit, type = "AICc") {
-  if (is.null(fit) || !isTRUE(fit$ok) || is.null(fit$fit)) {
-    return(Inf)
-  }
-
-  value <- tryCatch(
-    switch(
-      type,
-      AIC = stats::AIC(fit$fit),
-      BIC = stats::BIC(fit$fit),
-      AICc = {
-        # The parameter count is the log-likelihood's degrees of
-        # freedom, as MuMIn uses, not the length of the
-        # coefficient vector, which also counts aliased (NA)
-        # terms and so over-penalizes a rank-deficient model.
-        k <- attr(stats::logLik(fit$fit), "df")
-        n <- stats::nobs(fit$fit)
-        # The correction is undefined once the parameter count
-        # reaches the sample size; Inf keeps such a model out of
-        # the selection rather than returning a negative score.
-        if (is.na(n) || n - k - 1 <= 0) {
-          Inf
-        } else {
-          stats::AIC(fit$fit) + (2 * k * (k + 1)) / (n - k - 1)
-        }
-      },
-      stop(
-        "Unknown information criterion `", type, "`.",
-        call. = FALSE
-      )
-    ),
-    error = function(e) Inf
-  )
-
-  if (is.na(value)) Inf else value
-}
-
-## 5.5 fit_converged() ----
-
-#' Did a Fit Converge
-#'
-#' Inverse-variance averaging drops non-converged candidates
-#' rather than down-weighting them, which is what the v2 plant
-#' code does.
-#'
-#' @param fit A list from fit_glm_family().
-#' @return Logical. FALSE when the fit failed or did not
-#'   converge.
-#'
-#' @example # Example usage of the function
-#' # fit_converged(fit)
-fit_converged <- function(fit) {
-  if (is.null(fit) || !isTRUE(fit$ok) || is.null(fit$fit)) {
+#' # engine_converged(engine, fit)
+engine_converged <- function(engine, fit) {
+  if (is.null(fit) || !isTRUE(fit$ok)) {
     return(FALSE)
   }
 
-  converged <- fit$fit$converged
-
-  if (is.null(converged)) {
+  if (!is.function(engine$converged)) {
     return(TRUE)
   }
 
-  isTRUE(converged)
+  isTRUE(engine$converged(fit))
 }
 
-## 5.6 fit_nobs() ----
+## 3.4 engine_nobs() ----
 
 #' Number of Observations a Fit Used
 #'
-#' @param fit A list from fit_glm_family().
-#' @return An integer, or NA when the fit failed.
+#' @param engine An engine definition, or NULL.
+#' @param fit A fit from engine$fit().
+#' @return An integer, or NA when it cannot be said.
 #'
 #' @example # Example usage of the function
-#' # fit_nobs(fit)
-fit_nobs <- function(fit) {
-  if (is.null(fit) || !isTRUE(fit$ok) || is.null(fit$fit)) {
+#' # engine_nobs(engine, fit)
+engine_nobs <- function(engine, fit) {
+  if (is.null(fit) || !isTRUE(fit$ok)) {
     return(NA_integer_)
   }
 
-  as.integer(stats::nobs(fit$fit))
+  if (!is.null(engine) && is.function(engine$nobs)) {
+    return(tryCatch(
+      as.integer(engine$nobs(fit)),
+      error = function(e) NA_integer_
+    ))
+  }
+
+  tryCatch(
+    as.integer(stats::nobs(fit$fit)),
+    error = function(e) NA_integer_
+  )
+}
+
+## 3.5 fit_with() ----
+
+#' Fit One Formula Through an Engine
+#'
+#' The one place a candidate is fitted, so every rule gets the
+#' same thing back: the engine's fit, with its coefficients
+#' computed once and kept on it.
+#'
+#' @param engine An engine definition.
+#' @param formula A model formula.
+#' @param data,family,weights,offset,control As engine$fit takes.
+#' @return The engine's fit list, with `coefficients` added when
+#'   the engine has them.
+#'
+#' @example # Example usage of the function
+#' # fit_with(get_engine("glm"), response ~ MAP, d, "binomial")
+fit_with <- function(
+  engine, formula, data, family, weights = NULL, offset = NULL,
+  control = list()
+) {
+  fit <- engine$fit(
+    formula = formula, data = data, family = family,
+    weights = weights, offset = offset, control = control
+  )
+
+  if (isTRUE(fit$ok) && engine_has(engine, "coefficients")) {
+    fit$coefficients <- engine$coef(fit)
+  }
+
+  fit
+}
+
+# 4. check_engine() ----
+
+#' Test an Engine Against the Contract
+#'
+#' Fits small synthetic binomial and Poisson data - with weights,
+#' an offset in the formula, and a factor - and checks each part
+#' of the contract the engine claims. Run it on a new engine
+#' before using it in a spec.
+#'
+#' @param engine An engine definition, or a registered name.
+#' @param n Integer. Rows of synthetic data.
+#' @param seed Integer. Seed for the synthetic data.
+#' @param quiet Logical. Suppress the printed table.
+#' @return A data frame of check, family, pass and note,
+#'   invisibly. Every `pass` should be TRUE.
+#'
+#' @example # Example usage of the function
+#' # check_engine("glm")
+#' # check_engine(my_new_engine())
+check_engine <- function(engine, n = 400L, seed = 1L, quiet = FALSE) {
+  if (is.character(engine)) {
+    engine <- get_engine(engine)
+  }
+
+  # Step 1: Synthetic data with a known signal, built under its
+  # own seed so the session's random state is left alone.
+  data <- with_seed(seed, {
+    x1 <- stats::rnorm(n)
+    x2 <- stats::runif(n)
+    habitat <- factor(sample(c("A", "B", "C"), n, replace = TRUE))
+    effort <- stats::runif(n, 0.5, 2)
+    eta <- -0.5 + 0.8 * x1 - 0.6 * x2 + (habitat == "B") * 0.7
+
+    data.frame(
+      x1 = x1, x2 = x2, habitat = habitat,
+      offset = log(effort),
+      weight = stats::runif(n, 0.5, 1.5),
+      presence = stats::rbinom(n, 1, stats::plogis(eta)),
+      count = stats::rpois(n, exp(eta + log(effort)))
+    )
+  })
+
+  checks <- list()
+
+  record <- function(check, family, pass, note = "") {
+    checks[[length(checks) + 1]] <<- data.frame(
+      check = check, family = family, pass = isTRUE(pass),
+      note = note, stringsAsFactors = FALSE
+    )
+  }
+
+  newdata <- data[1:20, ]
+
+  for (family in c("binomial", "poisson")) {
+    formula <- if (family == "binomial") {
+      presence ~ x1 + x2 + habitat
+    } else {
+      count ~ x1 + x2 + habitat + offset(offset)
+    }
+
+    # Step 2: Fitting succeeds, weighted, and reports itself
+    fit <- tryCatch(
+      engine$fit(
+        formula = formula, data = data, family = family,
+        weights = data$weight, offset = NULL, control = list()
+      ),
+      error = function(e) {
+        list(ok = FALSE, message = conditionMessage(e))
+      }
+    )
+    record(
+      "fit returns list(fit, ok, message) with ok = TRUE", family,
+      is.list(fit) && isTRUE(fit$ok) &&
+        all(c("fit", "ok", "message") %in% names(fit)),
+      if (!isTRUE(fit$ok)) format(fit$message) else ""
+    )
+
+    if (!isTRUE(fit$ok)) {
+      next
+    }
+
+    # Step 3: Predictions on both scales
+    link <- tryCatch(
+      engine$predict(fit, newdata, "link"),
+      error = function(e) NULL
+    )
+    response <- tryCatch(
+      engine$predict(fit, newdata, "response"),
+      error = function(e) NULL
+    )
+    record(
+      "predict returns one finite value per row", family,
+      is.numeric(link) && length(link) == nrow(newdata) &&
+        all(is.finite(link))
+    )
+    record(
+      "response-scale prediction is in range", family,
+      is.numeric(response) && length(response) == nrow(newdata) &&
+        if (family == "binomial") {
+          all(response >= 0 & response <= 1)
+        } else {
+          all(response >= 0)
+        }
+    )
+
+    # The offset is part of a survey, not of the model: changing
+    # it on new data must change a Poisson prediction.
+    if (family == "poisson") {
+      shifted <- newdata
+      shifted$offset <- shifted$offset + log(2)
+      doubled <- tryCatch(
+        engine$predict(fit, shifted, "response"),
+        error = function(e) NULL
+      )
+      record(
+        "an offset in the formula is applied to new data", family,
+        is.numeric(doubled) &&
+          isTRUE(all.equal(doubled, 2 * response, tolerance = 1e-6))
+      )
+    }
+
+    # Step 4: The optional capabilities the engine declares
+    if (engine_has(engine, "coefficients")) {
+      cf <- tryCatch(engine$coef(fit), error = function(e) NULL)
+      record(
+        "coef returns term, estimate and se", family,
+        is.data.frame(cf) &&
+          all(c("term", "estimate", "se") %in% names(cf)) &&
+          nrow(cf) > 0
+      )
+    }
+
+    if (engine_has(engine, "ic")) {
+      scores <- vapply(
+        c("AIC", "AICc", "BIC"),
+        function(type) {
+          tryCatch(engine$ic(fit, type), error = function(e) NA_real_)
+        },
+        numeric(1)
+      )
+      record(
+        "ic returns a finite AIC, AICc and BIC", family,
+        all(is.finite(scores))
+      )
+    }
+
+    if (engine_has(engine, "se")) {
+      with_se <- tryCatch(
+        engine$predict(fit, newdata, "link", se = TRUE),
+        error = function(e) NULL
+      )
+      record(
+        "predict(se = TRUE) returns fit and se.fit", family,
+        is.list(with_se) &&
+          length(with_se$fit) == nrow(newdata) &&
+          length(with_se$se.fit) == nrow(newdata) &&
+          all(with_se$se.fit >= 0)
+      )
+    }
+  }
+
+  # Step 5: Failure is returned, not raised, so a selection rule
+  # can see which candidates failed
+  failed <- tryCatch(
+    engine$fit(
+      formula = presence ~ no_such_column, data = data,
+      family = "binomial", weights = NULL, offset = NULL,
+      control = list()
+    ),
+    error = function(e) "raised"
+  )
+  record(
+    "a failed fit returns ok = FALSE rather than raising", "-",
+    is.list(failed) && identical(failed$ok, FALSE)
+  )
+
+  if (is.list(failed)) {
+    record(
+      "predict on a failed fit returns NULL", "-",
+      is.null(tryCatch(
+        engine$predict(failed, newdata, "response"),
+        error = function(e) "raised"
+      ))
+    )
+  }
+
+  result <- do.call(rbind, checks)
+
+  if (!quiet) {
+    cat("Engine `", engine$name, "`: ", sum(result$pass), " of ",
+        nrow(result), " checks pass\n", sep = "")
+    print(result, row.names = FALSE, right = FALSE)
+  }
+
+  invisible(result)
 }
 
 # End of script ----

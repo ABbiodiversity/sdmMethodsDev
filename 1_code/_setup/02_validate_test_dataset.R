@@ -1282,6 +1282,78 @@ if (file.exists(bird_data_file)) {
   )
 }
 
+## 3.6.3 Harmonized lookups ----
+# _setup/09 writes one species queue, one factor-level table, the
+# bird grids and the dataset manifest from the files checked
+# above. They are checked here against those files, so a lookup
+# left stale by a rebuild of 01 or 06 fails rather than passing.
+lookup_dir <- file.path(data_dir, "lookup")
+harmonized <- c(
+  "species_queue.csv", "factor_levels.csv", "dataset_manifest.csv",
+  "bird_north_prediction_matrix.csv",
+  "bird_south_prediction_matrix.csv"
+)
+present <- file.exists(file.path(lookup_dir, harmonized))
+
+note(
+  "lookups", "harmonized lookups written", all(present),
+  if (all(present)) "" else paste0(
+    "missing ", paste(harmonized[!present], collapse = ", "),
+    "; run 09_harmonize_lookups.R"
+  )
+)
+
+if (all(present)) {
+  queue <- fread(file.path(lookup_dir, "species_queue.csv"),
+                 na.strings = "")
+  manifest <- fread(file.path(lookup_dir, "dataset_manifest.csv"),
+                    na.strings = "")
+
+  # Every queued species is a column of its taxon's response file
+  queued_ok <- vapply(unique(queue$taxon), function(one) {
+    file <- manifest$response_file[manifest$taxon == one][1]
+    columns <- names(fread(file.path(data_dir, file), nrows = 0))
+    all(queue$species[queue$taxon == one] %in% columns)
+  }, logical(1))
+
+  note(
+    "lookups", "queued species are response columns",
+    all(queued_ok),
+    paste(names(queued_ok)[!queued_ok], collapse = ", ")
+  )
+
+  # The queue holds what the three source lookups hold
+  plant_rows <- fread(file.path(lookup_dir, "modelled_species.csv"))
+  bird_rows <- fread(
+    file.path(lookup_dir, "bird_modelled_species.csv")
+  )
+  mammal_rows <- fread(
+    file.path(lookup_dir, "mammal_modelled_species.csv")
+  )
+  expected <- sum(plant_rows$in_veg_models) +
+    sum(plant_rows$in_soil_models) + nrow(bird_rows) +
+    sum(mammal_rows$in_models) + sum(mammal_rows$in_ua_models)
+
+  note(
+    "lookups", "queue rows match the source lookups",
+    nrow(queue) == expected,
+    paste0(nrow(queue), " queued, ", expected, " in the sources")
+  )
+
+  # Every file the manifest names exists
+  named <- c(
+    file.path(data_dir, manifest$response_file),
+    file.path(data_dir, stats::na.omit(manifest$offset_file)),
+    file.path(lookup_dir,
+              paste0(manifest$grid, "_prediction_matrix.csv"))
+  )
+
+  note(
+    "lookups", "manifest files exist", all(file.exists(named)),
+    paste(basename(named[!file.exists(named)]), collapse = ", ")
+  )
+}
+
 ## 3.7 Verdict ----
 # Every check, then the tally. A FAIL means the CSVs no longer
 # match the snapshot they claim to come from.

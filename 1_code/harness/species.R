@@ -4,20 +4,19 @@
 # created: 2026-09-09
 # inputs:
 #   in 0_data/test_dataset/lookup/:
-#     - modelled_species.csv         (plant groups)
-#     - mammal_modelled_species.csv
-#     - bird_modelled_species.csv
+#     - species_queue.csv, from _setup/09_harmonize_lookups.R
 # outputs: none; returns objects in memory
 # notes:
-#   - The three source lookups have three different schemas, one
-#     per taxon lead. This flattens them to one, so an experiment
-#     asks for species the same way whatever the taxon.
-#   - The unified schema is taxon, species, region, tier, order
-#     and season. `tier` separates a taxon's model classes where
-#     it has them - mammals fit a full habitat model for species
-#     with at least 20 detections and a use-availability model
-#     for those with at least 3 - and is "modelled" elsewhere.
-#     `season` is NA for everything but mammals.
+#   - One species queue for every taxon, in one schema: taxon,
+#     region, season, tier, species, order and source_name. The
+#     three taxon leads' lookups are flattened into it once, by
+#     _setup/09, so an experiment asks for species the same way
+#     whatever the taxon.
+#   - `tier` separates a taxon's model classes where it has them -
+#     mammals fit a full habitat model for species with at least
+#     20 detections and a use-availability model for those with
+#     at least 3 - and is "modelled" elsewhere. `season` is empty
+#     for everything but mammals.
 #   - `order` preserves each source list's own ordering, so a
 #     narrowed run visits species in the order v2 would have.
 #   - resolve_species() is the entry point an experiment uses to
@@ -31,132 +30,37 @@
 ## 1.1 Load packages ----
 library(data.table) # lookup table reading (version: 1.16.4)
 
-# 2. Source lookup declarations ----
+# 2. species_catalogue() ----
 
-## 2.1 species_lookup_files() ----
-
-#' Name Each Taxon's Species Lookup
-#'
-#' @return A named character vector of file names within
-#'   0_data/test_dataset/lookup/.
-#'
-#' @example # Example usage of the function
-#' # species_lookup_files()[["mammal"]]
-species_lookup_files <- function() {
-  c(
-    plants = "modelled_species.csv",
-    mammal = "mammal_modelled_species.csv",
-    bird = "bird_modelled_species.csv"
-  )
-}
-
-## 2.2 plant_taxa() ----
-
-#' Name the Taxa Held in the Plant-Group Lookup
-#'
-#' "Plant group" names a file layout rather than a taxonomy: the
-#' four share one survey design and one lookup, soil mites
-#' included.
-#'
-#' @return A character vector of taxon slugs.
-#'
-#' @example # Example usage of the function
-#' # plant_taxa()
-plant_taxa <- function() {
-  c("vascular_plant", "bryophyte", "lichen", "mite")
-}
-
-# 3. species_catalogue() ----
-
-#' Flatten Every Species Lookup into One Table
+#' Read the Species Queue
 #'
 #' @param data_dir Character. Path to 0_data/test_dataset.
 #' @param taxon Character. Keep one taxon, or NULL for all.
-#' @return A data frame of taxon, species, region, tier, order
-#'   and season.
+#' @return A data frame of taxon, region, season, tier, species,
+#'   order and source_name.
 #'
 #' @example # Example usage of the function
 #' # species_catalogue(data_dir, taxon = "bryophyte")
 species_catalogue <- function(data_dir, taxon = NULL) {
-  lookup_dir <- file.path(data_dir, "lookup")
-  files <- species_lookup_files()
+  path <- file.path(data_dir, "lookup", "species_queue.csv")
 
-  read_lookup <- function(name) {
-    path <- file.path(lookup_dir, files[[name]])
-
-    if (!file.exists(path)) {
-      stop(
-        "Species lookup not found:\n  ", path,
-        "\nRun 1_code/_setup/01_harmonize_model_ready_v2.R first.",
-        call. = FALSE
-      )
-    }
-
-    as.data.frame(fread(path))
+  if (!file.exists(path)) {
+    stop(
+      "Species queue not found:\n  ", path,
+      "\nRun 1_code/_setup/09_harmonize_lookups.R first.",
+      call. = FALSE
+    )
   }
 
-  parts <- list()
-
-  # Step 1: Plant groups. One row per species, with membership
-  # of the north (veg) and south (soil) model sets as flags, so
-  # each flag becomes a region row.
-  plants <- read_lookup("plants")
-
-  parts$plants <- rbind(
-    unified_rows(
-      plants[plants$in_veg_models, ],
-      taxon = plants$taxon[plants$in_veg_models],
-      region = "north",
-      order = plants$veg_order[plants$in_veg_models]
-    ),
-    unified_rows(
-      plants[plants$in_soil_models, ],
-      taxon = plants$taxon[plants$in_soil_models],
-      region = "south",
-      order = plants$soil_order[plants$in_soil_models]
-    )
-  )
-
-  # Step 2: Mammals. Region and season are already columns, and
-  # the two occurrence thresholds become tiers.
-  mammals <- read_lookup("mammal")
-
-  parts$mammal <- rbind(
-    unified_rows(
-      mammals[mammals$in_models, ],
-      taxon = "mammal",
-      region = mammals$region[mammals$in_models],
-      order = mammals$model_order[mammals$in_models],
-      tier = "modelled",
-      season = mammals$season[mammals$in_models]
-    ),
-    unified_rows(
-      mammals[mammals$in_ua_models, ],
-      taxon = "mammal",
-      region = mammals$region[mammals$in_ua_models],
-      order = mammals$ua_order[mammals$in_ua_models],
-      tier = "ua",
-      season = mammals$season[mammals$in_ua_models]
-    )
-  )
-
-  # Step 3: Birds. One row per species and region already.
-  birds <- read_lookup("bird")
-
-  parts$bird <- unified_rows(
-    birds,
-    taxon = "bird",
-    region = birds$region,
-    order = stats::ave(
-      seq_len(nrow(birds)), birds$region, FUN = seq_along
-    )
-  )
-
-  catalogue <- do.call(rbind, parts)
-  rownames(catalogue) <- NULL
+  catalogue <- cached_read(path, function(p) {
+    queue <- as.data.frame(fread(p, na.strings = ""))
+    queue$season <- as.character(queue$season)
+    queue
+  })
 
   if (!is.null(taxon)) {
     known <- unique(catalogue$taxon)
+
     if (!taxon %in% known) {
       stop(
         "Unknown taxon `", taxon, "`. Taxa in the catalogue: ",
@@ -172,7 +76,7 @@ species_catalogue <- function(data_dir, taxon = NULL) {
   catalogue
 }
 
-# 4. list_species() ----
+# 3. list_species() ----
 
 #' List the Species Available for a Taxon
 #'
@@ -219,17 +123,42 @@ list_species <- function(
   unique(catalogue$species)
 }
 
+# 4. species_source_name() ----
+
+#' The Name a Source Pipeline Used for a Species
+#'
+#' v2's files sometimes name a species differently from the
+#' dataset's column: mammals are "Black BearSummer" there and
+#' "BlackBear_Summer" here.
+#'
+#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param taxon,species Character.
+#' @return Character, the source name.
+#'
+#' @example # Example usage of the function
+#' # species_source_name(data_dir, "mammal", "BlackBear_Summer")
+species_source_name <- function(data_dir, taxon, species) {
+  catalogue <- species_catalogue(data_dir, taxon)
+  name <- unique(catalogue$source_name[catalogue$species == species])
+
+  if (length(name) == 0) {
+    stop(
+      "`", species, "` is not in the ", taxon, " species queue.",
+      call. = FALSE
+    )
+  }
+
+  name[1]
+}
+
 # 5. resolve_species() ----
 
 #' Choose the Focal Species for a Run
 #'
-#' NULL means every species the source lookup declares as
-#' modelled. A character vector means those species, and an
-#' unknown name stops the run here rather than failing inside a
-#' bootstrap hours later.
-#'
-#' Selection is how a trial run is shortened. Three species is a
-#' smoke test; the full list is the parity run.
+#' NULL means every species the queue declares as modelled. A
+#' character vector means those species, and an unknown name
+#' stops the run here rather than failing inside a bootstrap
+#' hours later.
 #'
 #' @param species Character vector of species, or NULL for all.
 #' @param data_dir Character. Path to 0_data/test_dataset.
@@ -294,16 +223,7 @@ resolve_species <- function(
 #'   lichen = "Bryoria.fremontii",
 #'   mite   = "Oppiella.nova"
 #' )
-#'
-#' covariates <- c(
-#'   "climate_common",          # every taxon
-#'   lichen = "topography"      # lichens as well
-#' )
 #' }
-#'
-#' One convention for both keeps the two selections symmetrical,
-#' and lets a single vector configure a run across taxa without a
-#' nested list.
 #'
 #' @param x A named character vector, or NULL.
 #' @param taxon Character. The taxon to read.
@@ -335,51 +255,6 @@ taxon_values <- function(x, taxon) {
   }
 
   out
-}
-
-# 7. Helpers ----
-
-## 6.1 unified_rows() ----
-
-#' Build Rows in the Unified Schema
-#'
-#' @param frame A data frame with a `species` column.
-#' @param taxon,region,order,tier,season Values recycled to the
-#'   number of rows in `frame`.
-#' @return A data frame in the unified schema, or an empty one
-#'   when `frame` has no rows.
-#'
-#' @example # Example usage of the function
-#' # unified_rows(birds, "bird", birds$region, seq_len(nrow(birds)))
-unified_rows <- function(
-  frame,
-  taxon,
-  region,
-  order,
-  tier = "modelled",
-  season = NA_character_
-) {
-  if (nrow(frame) == 0) {
-    return(data.frame(
-      taxon = character(0),
-      species = character(0),
-      region = character(0),
-      tier = character(0),
-      order = integer(0),
-      season = character(0),
-      stringsAsFactors = FALSE
-    ))
-  }
-
-  data.frame(
-    taxon = as.character(taxon),
-    species = as.character(frame$species),
-    region = as.character(region),
-    tier = as.character(tier),
-    order = as.integer(order),
-    season = as.character(season),
-    stringsAsFactors = FALSE
-  )
 }
 
 # End of script ----

@@ -1,6 +1,6 @@
 # Modelling framework design
 
-![Status](https://img.shields.io/badge/Status-Steps%201--3%20built-yellow)
+![Status](https://img.shields.io/badge/Status-Steps%201--5%20built-yellow)
 
 How the three taxon pipelines become one configurable framework, so that
 a methods question can be asked once and answered across taxa.
@@ -72,49 +72,85 @@ requires a separate pipeline.
 ```
 1_code/
 ├── harness/                 # taxon-agnostic; the framework
-│   ├── data_load.R          # readers + build_model_data + model_frame
+│   ├── harness.R            # load_framework(): everything below, in order
+│   ├── registry.R           # register_*(), get_method(), list_methods()
+│   ├── spec.R               # validate_spec() and spec helpers
+│   ├── data_load.R          # dataset manifest, readers, model frames
 │   ├── covariate_sets.R     # named bundles → the column catalogue
-│   ├── species.R            # one species catalogue across three schemas
-│   ├── resample.R           # precomputed | spatial_block | spatial_cv
-│   ├── engines.R            # registry: glm, bayesglm
-│   ├── selection.R          # single, aic_best, aic_average, staged_bic
-│   ├── eval_metrics.R       # scores computed from predictions only
-│   ├── result.R             # the five-file result store
-│   └── utils/step_runner.R  # timing and logging
+│   ├── species.R            # the one species queue
+│   ├── resample.R           # seeds, spatial blocks, scheme dispatch
+│   ├── engines.R            # engine interface, check_engine()
+│   ├── selection.R          # candidate fitting, combined predictors
+│   ├── eval_metrics.R       # compute_metrics()
+│   ├── predict_grid.R       # final model onto a habitat grid
+│   ├── result.R             # the result store, and shards
+│   ├── run_model.R          # run_specs(): prepare, fit (parallel), merge
+│   ├── summarise.R          # collect_results()
+│   ├── compare.R            # compare_experiments()
+│   └── experiment.R         # experiment_config(), run_experiment()
+├── methods/                 # one file per method, each self-registering
+│   ├── engines/             # glm, bayesglm
+│   ├── selection/           # single, aic_best, aic_average, staged_bic,
+│   │                        #   ivw_grid, aic_best_grid, aic_best_onehot
+│   ├── resampling/          # precomputed, spatial_block, spatial_cv
+│   └── metrics/             # auc, deviance_explained, rmse, …
 ├── modules/
-│   ├── _shared/plant_group.R # the four plant-group taxa share this
-│   └── <taxon>/spec.R        # that taxon's v2 configuration   (step 4)
-├── experiments/exp_NNN_*/
-│   └── run.R                # taxon, species, covariates, engine
-└── _deprecated/             # superseded; see its README
+│   ├── _shared/             # plant_group.R; standard_specs.R
+│   └── <taxon>/spec.R       # that taxon's v2 configuration
+├── experiments/
+│   ├── _shared/             # focal-species sets
+│   ├── _template/           # the starting point for a new one
+│   └── exp_NNN_*/run.R      # configuration, then run_experiment()
+└── tests/                   # contract tests; store comparison
 ```
 
-The harness knows nothing about any taxon. A module contributes only a
-spec. An experiment overrides parts of a spec.
+The harness knows nothing about any taxon, and nothing about any
+particular method: it looks methods up by the name a spec gives. A
+module contributes only a spec. An experiment changes parts of a
+spec, or names different methods in it.
 
 There are six taxon modules: `bryophytes`, `lichens`, `soil_mites`,
-`vascular_plants`, `mammals` and `birds`. The first four were one
-`plants` module until they were split, so that a taxon-specific
-quirk has one obvious home and the four can diverge. What they still
-share is the v2 pipeline shape, which lives in
-`_shared/plant_group.R` so four copies cannot drift apart.
+`vascular_plants`, `mammals` and `birds`. The first four share the v2
+pipeline shape in `_shared/plant_group.R`, so four copies cannot
+drift apart. Directory names are plural and readable; **taxon slugs
+are the data keys and are not**. Soil mites live in `soil_mites/` and
+key on `mite`.
 
-Directory names are plural and readable; **taxon slugs are the data
-keys and are not**. Soil mites live in `soil_mites/` and key on
-`mite`, which is what `run_taxa`, `focal_species` and every harness
-call expect.
+### Methods are plug-ins
 
-Files are consolidated rather than one function per file: `engines.R`
-holds the registry and both engines, and splits when `gbm` and `brms`
-arrive. Two pieces named in the original sketch are deliberately not
-built yet, because both depend on decisions a spec makes:
+An engine, selection rule, resampling scheme or metric is one file in
+`1_code/methods/` that registers itself. Each kind has a contract,
+stated in `1_code/methods/README.md`, and a rule states the engine
+capabilities it needs (`coefficients`, `ic`, `se`). `validate_spec()`
+checks a spec against the registry before any data is read, so an
+engine paired with a rule it cannot serve - a boosted tree with
+inverse-variance averaging, say - stops with a sentence rather than
+silently returning nothing hours into a run. `check_engine()` tests a
+new engine against the contract on synthetic data.
 
-- `predict_grid.R` — projecting a fitted model onto a prediction matrix.
-  v2 does this inside its habitat-model functions, and how the terms map
-  onto grid rows is spec-dependent. `write_grid_predictions()` is ready
-  for it; nothing produces grid predictions yet.
-- `run_model.R` — the species-by-bootstrap loop. It is the glue a spec
-  drives, so it lands with the first spec.
+The rules talk to an engine only through its interface: coefficients
+come from `engine$coef()`, computed once per fit, and every rule's
+result carries a `predict()` for its final model. That is what lets
+an engine without coefficients run any stage with the `single` rule,
+be carried into a later stage, and be projected onto the grid.
+
+### The data is described, not assumed
+
+`0_data/test_dataset/lookup/dataset_manifest.csv`, written by
+`_setup/09`, names each taxon's response, offset and grid files, its
+key in `covariates.csv`, and its stored draws. The species queue and
+factor levels are one table each for every taxon. The harness reads
+file locations from the manifest and nowhere else, so a new taxon is
+manifest rows plus its files.
+
+### Runs are parallel and reproducible
+
+Each species of each spec is one job. Jobs run on a cluster of R
+sessions, each writing a shard of its own, and the shards are joined
+in queue order, so a parallel run writes byte for byte what a serial
+one does. Draws are seeded per species from one base seed, under R's
+default generator named explicitly, so a run's results do not depend
+on the number of workers or the order jobs finish in.
 
 ## Contract 1: the taxon spec
 
@@ -170,18 +206,22 @@ run_experiment(
 
 ## Contract 2: the result object
 
-Every run writes the same five files, whatever the engine. This is what
+Every run writes the same files, whatever the engine. This is what
 makes a GLM run and a BRT run comparable.
 
 | File | Columns | Notes |
 | --- | --- | --- |
 | `grid_predictions.csv` | species, region, boot, grid_unit, prediction | **the common currency** |
-| `unit_predictions.csv` | species, region, boot, survey_unit_id, prediction, observed | held-out scoring |
+| `unit_predictions.csv` | species, region, boot, survey_unit_id, prediction, observed | optional (`unit_predictions = "oob"` or `"all"`); metrics are scored in memory |
 | `coefficients.csv` | species, region, boot, term, estimate, se | absent for engines without coefficients |
 | `metrics.csv` | species, region, boot, metric, value | AUC, deviance, calibration |
 | `meta.json` | engine, selection, covariate set, spec hash, seed, timing | provenance |
 
-`grid_predictions` is the linchpin. Coefficients cannot compare a GLM to
+`grid_predictions` is the linchpin. It is the stage's **final** model
+projected onto the grid: the averaged or combined one where a rule
+combines candidates, not the best single candidate. Every taxon has a
+grid; the bird grids are v2's coefficient translation matrix rebuilt
+in covariate space by `_setup/09`. Coefficients cannot compare a GLM to
 a boosted tree — a tree has no `Peatland` coefficient — but every engine
 can predict onto the 43 rows of the vegetation prediction matrix or the
 16 of the soil matrix. Comparing there keeps the comparison on the
@@ -389,39 +429,30 @@ It sits on a regularization axis. A Bayesian framework comparison needs
 
 ## Build order
 
-1. **Built.** Harness data layer and covariate sets —
-   `data_load.R`, `covariate_sets.R`, `species.R`.
-2. **Built.** Result object and its writers — `result.R`.
-3. **Built.** Engines `glm` and `bayesglm` (`engines.R`); selection
-   `single`, `aic_best`, `aic_average`, `staged_bic` (`selection.R`);
-   resample `precomputed`, `spatial_block`, `spatial_cv`
-   (`resample.R`); metrics (`eval_metrics.R`).
-4. **Built.** Specs for all six taxa, in
-   `1_code/modules/<taxon>/spec.R`, plus `run_model.R` (the
-   species-by-draw-by-stage loop) and `predict_grid.R`.
+1. **Built.** Harness data layer and covariate sets.
+2. **Built.** Result object and its writers.
+3. **Built.** Engines `glm` and `bayesglm`; selection `single`,
+   `aic_best`, `aic_average`, `staged_bic`; resample `precomputed`,
+   `spatial_block`, `spatial_cv`; metrics.
+4. **Built.** Specs for all six taxa, the fitting loop and grid
+   prediction.
 5. **Built.** `exp_000_parity_v2` runs each spec and compares
-   against the published v2 output, on both the climate and the
-   habitat stage, for all three taxa. Plants reach **90.9% of
-   terms in band** among those the harness fits; the mammal
-   presence stage correlates **0.98** with `Coef.pa.all`. Birds
-   run but have no reachable reference. Coverage and the
-   remaining gaps are in the experiment's README and report.
-
-   Five selection rules now cover the three pipelines'
-   different ideas of what a coefficient is: `aic_average`
-   (plants and birds, climate), `ivw_grid` (plants, habitat -
-   precision-weighted predictions onto a prediction matrix),
-   `staged_bic` (birds, landcover), and `aic_best_onehot`
-   (mammals - one-hot predictions on the probability scale with
-   a calibration shift).
-6. Engines `gbm` and `brms`; the topography and remote-sensing covariate
-   extension; exp_001 onward.
-
-Steps 1–3 are taxon-agnostic and were built and exercised before any
-taxon spec exists. All four taxon-and-region combinations —
-bryophyte north, mammal north, mammal south, bird north — run through
-one interface, covering the three response types, the offset path and
-the weighted path.
+   against the published v2 output, on every stage, for all three
+   taxa. Five selection rules cover the three pipelines' different
+   ideas of what a coefficient is: `aic_average`, `ivw_grid`,
+   `staged_bic`, `aic_best_grid` and `aic_best_onehot`.
+5a. **Built (2026-10-03).** The plug-in method layer
+   (`1_code/methods/`, the registry, `validate_spec()`,
+   `check_engine()`); the dataset manifest and harmonized lookups
+   (`_setup/09`); parallel species with byte-identical shards;
+   metrics and grids from each stage's final model, and grids for
+   every taxon; `experiment_config()` and `run_experiment()`; the
+   experiment template and `compare_experiments()`; contract tests.
+   Checked against the previous code at 5 draws for the 14 parity
+   species: every stage's coefficients identical.
+6. New engines (`gbm`, `mgcv` GAMs, `brms`) as method files; the
+   topography and remote-sensing covariate extension; spatial
+   prediction onto the 1 km grid; exp_001 onward.
 
 ### What steps 1-3 settled
 
