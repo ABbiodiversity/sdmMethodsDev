@@ -103,6 +103,28 @@ pipeline_dir <- file.path(project_root, "2_pipeline", exp_id)
 
 out_dir <- file.path(project_root, "3_output", exp_id)
 
+## 1.3a Choose the v2 reference ----
+# Which build of the published v2 coefficients the run is scored
+# against. Both write the same schema.
+#
+#   abmiexplorer  ABMI's ABMIexploreR package, pinned to a commit;
+#                 1_code/_setup/08_harmonize_abmiexplorer_results.R.
+#                 The published species only; every taxon.
+#   drives        the v2 project outputs on the network drives;
+#                 1_code/_setup/05_harmonize_v2_results.R.
+#                 Every species v2 fitted.
+v2_reference <- "abmiexplorer"
+
+v2_reference_dir <- switch(
+  v2_reference,
+  abmiexplorer = file.path(
+    project_root,
+    "0_data/v2_results/abmiexplorer"
+  ),
+  drives = file.path(project_root, "0_data/v2_results"),
+  stop("v2_reference must be \"abmiexplorer\" or \"drives\".", call. = FALSE)
+)
+
 ## 1.4 Set the taxa to run ----
 # Each entry names a spec. Comment one out to skip it.
 # A key names the run and its folder under pipeline_dir; the
@@ -335,7 +357,7 @@ boot_seed <- 20260909L
 ## 1.7 Set the stages to run ----
 run_models <- FALSE
 run_collect <- FALSE
-run_compare <- FALSE
+run_compare <- TRUE
 run_plots <- TRUE
 run_report <- TRUE
 

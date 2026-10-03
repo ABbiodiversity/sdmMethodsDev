@@ -10,7 +10,7 @@
 #     - notes, the references it could not reach
 #   in out_dir/tables/:
 #     - coverage.csv, metric_summary.csv, parity_summary.csv
-#   in 0_data/v2_results/:
+#   in v2_reference_dir, chosen in run.R:
 #     - v2_results_coverage.csv
 # outputs:
 #   in out_dir/:
@@ -37,10 +37,23 @@
 tables_dir <- file.path(out_dir, "tables")
 report_file <- file.path(out_dir, "report.md")
 
-# v2_results/ sits beside test_dataset/ in 0_data/.
-v2_coverage_path <- file.path(
-  dirname(data_dir), "v2_results", "v2_results_coverage.csv"
+# run.R's v2_reference picks the build. Without it, the drive
+# build in 0_data/v2_results/, beside test_dataset/.
+v2_reference_dir <- get0(
+  "v2_reference_dir",
+  ifnotfound = file.path(dirname(data_dir), "v2_results")
 )
+v2_coverage_path <- file.path(
+  v2_reference_dir, "v2_results_coverage.csv"
+)
+
+v2_reference_builder <- if (
+  grepl("abmiexplorer", v2_reference_dir)
+) {
+  "1_code/_setup/08_harmonize_abmiexplorer_results.R"
+} else {
+  "1_code/_setup/05_harmonize_v2_results.R"
+}
 
 read_table <- function(path) {
   if (!file.exists(path)) {
@@ -58,7 +71,7 @@ metric_summary <- read_table(
 parity_summary <- read_table(
   file.path(tables_dir, "parity_summary.csv")
 )
-v2_reference <- read_table(v2_coverage_path)
+v2_coverage <- read_table(v2_coverage_path)
 
 # The specs that ran, not every spec defined, so the coverage
 # table describes this run.
@@ -136,16 +149,16 @@ seed_text <- if (is.null(boot_seed)) {
 }
 
 ## 2.3 v2 references ----
-reference_lines <- if (is.null(v2_reference)) {
+reference_lines <- if (is.null(v2_coverage)) {
   paste0(
     "_`v2_results_coverage.csv` not found; run ",
-    "`1_code/_setup/05_harmonize_v2_results.R`._"
+    "`", v2_reference_builder, "`._"
   )
 } else {
   markdown_table(
-    v2_reference[, intersect(
+    v2_coverage[, intersect(
       c("source_label", "reachable", "rows", "species", "note"),
-      names(v2_reference)
+      names(v2_coverage)
     )]
   )
 }
@@ -221,7 +234,11 @@ lines <- c(
   "",
   "## v2 references",
   "",
-  "What `0_data/v2_results/` holds, from `v2_results_coverage.csv`:",
+  paste0(
+    "Scored against `", get0("v2_reference", ifnotfound = "drives"),
+    "`, built by `", v2_reference_builder, "`. What it holds, ",
+    "from `v2_results_coverage.csv`:"
+  ),
   "",
   reference_lines,
   "",

@@ -90,11 +90,18 @@ bird_spec <- function() {
         scope = "province",
         weighted = FALSE,
         # v2 carries the averaged prediction on the response
-        # scale with the QPAD offset in it: the expected count,
-        # exp(link + offset).
+        # scale WITHOUT the QPAD offset: exp(link), the rate.
+        # 06.ModelClimate.R asks for predict(type = "link") on a
+        # MuMIn average, which is built from the averaged
+        # coefficients and drops the offset. Checked 2026-10-02:
+        # v2's stored AMRO draw-1 prediction averages 0.118;
+        # exp(link) on the same surveys gives 0.118, and
+        # exp(link + offset) gives 0.315. Carrying the offset cut
+        # the landcover Climate coefficient about threefold
+        # (AMRO draw 1: 1.60 against v2's 4.91; 4.76 without).
         carry_as = "Climate",
         carry_scale = "exp",
-        carry_offset = TRUE
+        carry_offset = FALSE
       ),
       list(
         name = "landcover",
@@ -131,7 +138,7 @@ bird_spec <- function() {
         paste(
           "v2's 25 candidates, AICc averaged, fitted once on the",
           "province-wide draw, unweighted, and carried as",
-          "exp(link + offset)."
+          "exp(link) without the offset, as MuMIn predicts it."
         )
       ),
       landcover = v2_status(
@@ -148,7 +155,11 @@ bird_spec <- function() {
         "reproduced",
         paste(
           "v2's 100 stored draws, keyed on surveyid, each survey",
-          "once per draw as v2's %in% selects them."
+          "once per draw as v2's %in% selects them. Only when",
+          "harmonized from the Stratified.Rdata v2 was fitted on",
+          "(58,210 surveys per draw); the BirdModels",
+          "Data/Archive/2025 copy was rewritten on 2026-08-19 with",
+          "different draws."
         )
       )
     ),

@@ -33,9 +33,44 @@ table.
 
 ## What the gate compares today
 
-`02_compare_to_v2.R` compares **every stage** against
-`0_data/v2_results/v2_results.csv` alone, so it runs with the network
-drives unmounted. Every taxon, bryophytes included, has a reference there.
+`02_compare_to_v2.R` compares **every stage** against one
+`v2_results.csv`, so it runs with the network drives unmounted.
+`v2_reference` in `run.R` section 1.3a picks which build of it:
+
+| `v2_reference` | Built by | Source | Holds |
+| -------------- | -------- | ------ | ----- |
+| `"abmiexplorer"` (default) | `_setup/08_harmonize_abmiexplorer_results.R` | `data/species-coefs.RData` from [ABMIexploreR](https://github.com/ABbiodiversity/ABMIexploreR), pinned to commit `848eeed` | Only the published species. Every taxon, plus amphibians. |
+| `"drives"` | `_setup/05_harmonize_v2_results.R` | `COEFS.RData`, the Mammals drive, `Birds2024.RData` | Every species v2 fitted. |
+
+The two builds use the same models for every taxon. On 2026-10-02
+every shared species and term matched to about 1e-15, except where
+some v2 draws failed. `05` drops failed draws; the package stores 100 finite
+draws for every cell. Re-scoring the `parity_check` run against both
+builds gave the same in-band rates, standardized differences and
+verdicts wherever both had the species. The differences are in
+coverage:
+
+- **Species.** `Bryum.All`, plus `Trhypochthonius.tectorum` in the
+  north, are not published, so they have no package reference.
+- **Bird `TreedFen`.** The package holds one `TreedFen` coefficient
+  where v2 has nine age classes, so those terms do not join. The
+  package's value correlates at about 0.99 with each age class.
+- **Mammals.** The package's mammal data were replaced on 2026-07-27.
+  The pinned commit holds the 2024 coefficient tables the harness
+  reproduces (an earlier July 2025 set was a different fit, presence
+  in the north only). The package stores them on the link scale, and
+  `08` back-transforms them (logit for presence, log for abundance
+  and total). Its 100 draws are one fit repeated, so they are scored
+  on iteration 1, as against `05`. South `WetlandMargin` and the
+  placeholder `Bare` are not in the package. Woodland caribou and
+  deer are not published.
+
+`08` adds the package's relabelled terms under the harness's names
+(`TreedBog*` → `BlackSpruce*` for birds, `TreedFen` → each plant fen
+age, `RuralResidential` → `Rural`, mammals' `WhiteSpruce*` → `Spruce*`,
+and so on). It adds these only where
+the values were checked to be identical. It also drops the template's
+all-zero padding cells.
 
 - **Climate:** scored against v2's single province-wide fit
   (`region = "all"`), which the harness now reproduces: one fit per draw,

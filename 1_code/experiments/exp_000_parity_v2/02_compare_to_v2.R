@@ -5,8 +5,9 @@
 # inputs:
 #   in out_dir/tables/:
 #     - coefficient_summary.csv
-#   in 0_data/v2_results/, built by _setup/05:
-#     - v2_results.csv
+#   in v2_reference_dir, chosen in run.R:
+#     - v2_results.csv, built by _setup/08 (ABMIexploreR) or
+#       _setup/05 (the network drives)
 # outputs:
 #   in out_dir/tables/:
 #     - parity_terms.csv
@@ -14,8 +15,8 @@
 # notes:
 #   - The gate itself. Compares this run's coefficients against
 #     the published v2 ones, per stage, species and term.
-#   - Reads only 0_data/v2_results/v2_results.csv, so it runs
-#     with the network drives unmounted.
+#   - Reads only the one v2_results.csv, so it runs with the
+#     network drives unmounted.
 #   - What is joined to what:
 #     - Climate is fitted once, province-wide, in v2, so its
 #       reference rows carry region "all". A run's north and
@@ -51,10 +52,21 @@
 tables_dir <- file.path(out_dir, "tables")
 dir.create(tables_dir, recursive = TRUE, showWarnings = FALSE)
 
-# v2_results/ sits beside test_dataset/ in 0_data/.
-reference_path <- file.path(
-  dirname(data_dir), "v2_results", "v2_results.csv"
+# run.R's v2_reference picks the build. Without it, the drive
+# build in 0_data/v2_results/, beside test_dataset/.
+v2_reference_dir <- get0(
+  "v2_reference_dir",
+  ifnotfound = file.path(dirname(data_dir), "v2_results")
 )
+reference_path <- file.path(v2_reference_dir, "v2_results.csv")
+
+reference_builder <- if (
+  grepl("abmiexplorer", v2_reference_dir)
+) {
+  "1_code/_setup/08_harmonize_abmiexplorer_results.R"
+} else {
+  "1_code/_setup/05_harmonize_v2_results.R"
+}
 
 ## 1.2 Read this run and the reference ----
 summary_path <- file.path(tables_dir, "coefficient_summary.csv")
@@ -74,7 +86,7 @@ reference <- if (file.exists(reference_path)) {
 } else {
   message(
     "No v2 reference at ", reference_path,
-    "; run 1_code/_setup/05_harmonize_v2_results.R."
+    "; run ", reference_builder, "."
   )
   NULL
 }

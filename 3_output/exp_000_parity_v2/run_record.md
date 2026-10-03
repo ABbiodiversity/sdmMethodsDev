@@ -6,10 +6,10 @@ Written by `run_record()`. The result stores this describes are gitignored; this
 
 _Volatile. Excluded from cross-run comparison._
 
-- **git_commit**: 5b61d5c
+- **git_commit**: c6852d4
 - **pipeline_dir**: D:/local_projects/active/sdmMethodsDev/2_pipeline/exp_000_parity_v2
 - **r_version**: 4.5.0
-- **written_at**: 2026-09-30 18:15:45
+- **written_at**: 2026-10-03 11:16:41
 
 ## Configuration
 
@@ -29,8 +29,8 @@ _Volatile. Excluded from cross-run comparison._
 
 | taxon | region | species | draws | coefficient_rows | metric_rows | grid_rows |
 | --- | --- | --- | --- | --- | --- | --- |
-| bird | north | 2 | 100 | 9375 | 2800 | 0 |
-| bird | south | 2 | 100 | 7034 | 2800 | 0 |
+| bird | north | 2 | 100 | 9380 | 2800 | 0 |
+| bird | south | 2 | 100 | 6986 | 2800 | 0 |
 | bryophyte | north | 2 | 100 | 22000 | 5600 | 0 |
 | bryophyte | south | 2 | 100 | 7800 | 5600 | 0 |
 | lichen | north | 2 | 100 | 22000 | 5600 | 0 |
@@ -48,34 +48,34 @@ _Volatile. Excluded from cross-run comparison._
 
 | taxon | region | metric | n | median | p10 | p90 |
 | --- | --- | --- | --- | --- | --- | --- |
-| bird | north | insample_auc | 200 | 0.7400 | 0.7230 | 0.7564 |
-| bird | north | insample_calibration_slope | 200 | 0.8009 | 0.7808 | 0.8183 |
-| bird | north | insample_deviance_explained | 200 | 0.1786 | 0.1395 | 0.2204 |
-| bird | north | insample_n | 200 | 46703.0000 | 46698.9000 | 46707.0000 |
-| bird | north | insample_prevalence | 200 | 0.1852 | 0.1192 | 0.2526 |
-| bird | north | insample_rmse | 200 | 0.6073 | 0.5429 | 0.6675 |
-| bird | north | insample_spearman | 200 | 0.3159 | 0.2882 | 0.3449 |
-| bird | north | oob_auc | 200 | 0.7182 | 0.7054 | 0.7310 |
-| bird | north | oob_calibration_slope | 200 | 0.8064 | 0.7378 | 0.8679 |
-| bird | north | oob_deviance_explained | 200 | 0.1452 | 0.1367 | 0.1513 |
-| bird | north | oob_n | 200 | 124921.0000 | 124917.0000 | 124925.1000 |
-| bird | north | oob_prevalence | 200 | 0.1873 | 0.1338 | 0.2414 |
-| bird | north | oob_rmse | 200 | 0.6236 | 0.5857 | 0.6593 |
-| bird | north | oob_spearman | 200 | 0.2968 | 0.2459 | 0.3490 |
-| bird | south | insample_auc | 200 | 0.7022 | 0.6912 | 0.7138 |
-| bird | south | insample_calibration_slope | 200 | 0.8422 | 0.8054 | 0.8941 |
-| bird | south | insample_deviance_explained | 200 | 0.1477 | 0.0927 | 0.2048 |
-| bird | south | insample_n | 200 | 23580.0000 | 23578.0000 | 23583.0000 |
-| bird | south | insample_prevalence | 200 | 0.2159 | 0.1712 | 0.2606 |
-| bird | south | insample_rmse | 200 | 0.7002 | 0.6483 | 0.7481 |
-| bird | south | insample_spearman | 200 | 0.2902 | 0.2834 | 0.2977 |
-| bird | south | oob_auc | 200 | 0.6942 | 0.6889 | 0.6993 |
-| bird | south | oob_calibration_slope | 200 | 0.8378 | 0.7871 | 0.9204 |
-| bird | south | oob_deviance_explained | 200 | 0.1270 | 0.0961 | 0.1638 |
-| bird | south | oob_n | 200 | 67227.0000 | 67224.0000 | 67229.0000 |
-| bird | south | oob_prevalence | 200 | 0.2175 | 0.1752 | 0.2604 |
-| bird | south | oob_rmse | 200 | 0.7015 | 0.6597 | 0.7366 |
-| bird | south | oob_spearman | 200 | 0.2799 | 0.2692 | 0.2930 |
+| bird | north | insample_auc | 200 | 0.7500 | 0.7218 | 0.7798 |
+| bird | north | insample_calibration_slope | 200 | 0.7722 | 0.6665 | 0.8113 |
+| bird | north | insample_deviance_explained | 200 | 0.1986 | 0.1403 | 0.2614 |
+| bird | north | insample_n | 200 | 46751.0000 | 46746.9000 | 46756.1000 |
+| bird | north | insample_prevalence | 200 | 0.1847 | 0.1183 | 0.2520 |
+| bird | north | insample_rmse | 200 | 0.6168 | 0.5471 | 0.6665 |
+| bird | north | insample_spearman | 200 | 0.3268 | 0.3129 | 0.3440 |
+| bird | north | oob_auc | 200 | 0.7300 | 0.7283 | 0.7318 |
+| bird | north | oob_calibration_slope | 200 | 0.7890 | 0.6073 | 0.8883 |
+| bird | north | oob_deviance_explained | 200 | 0.1637 | 0.1508 | 0.1808 |
+| bird | north | oob_n | 200 | 124873.0000 | 124867.9000 | 124877.1000 |
+| bird | north | oob_prevalence | 200 | 0.1874 | 0.1341 | 0.2415 |
+| bird | north | oob_rmse | 200 | 0.6356 | 0.5854 | 0.6588 |
+| bird | north | oob_spearman | 200 | 0.3108 | 0.2728 | 0.3502 |
+| bird | south | insample_auc | 200 | 0.7048 | 0.6906 | 0.7212 |
+| bird | south | insample_calibration_slope | 200 | 0.8737 | 0.8625 | 0.9017 |
+| bird | south | insample_deviance_explained | 200 | 0.1578 | 0.0908 | 0.2349 |
+| bird | south | insample_n | 200 | 23638.0000 | 23635.0000 | 23641.0000 |
+| bird | south | insample_prevalence | 200 | 0.2151 | 0.1714 | 0.2596 |
+| bird | south | insample_rmse | 200 | 0.6840 | 0.6223 | 0.7470 |
+| bird | south | insample_spearman | 200 | 0.2942 | 0.2895 | 0.2994 |
+| bird | south | oob_auc | 200 | 0.7012 | 0.6882 | 0.7164 |
+| bird | south | oob_calibration_slope | 200 | 0.8829 | 0.8479 | 0.9478 |
+| bird | south | oob_deviance_explained | 200 | 0.1475 | 0.0919 | 0.2042 |
+| bird | south | oob_n | 200 | 67169.0000 | 67166.0000 | 67172.0000 |
+| bird | south | oob_prevalence | 200 | 0.2175 | 0.1751 | 0.2606 |
+| bird | south | oob_rmse | 200 | 0.6870 | 0.6369 | 0.7370 |
+| bird | south | oob_spearman | 200 | 0.2911 | 0.2888 | 0.2936 |
 | bryophyte | north | insample_auc | 200 | 0.6685 | 0.6364 | 0.6965 |
 | bryophyte | north | insample_calibration_slope | 200 | 0.9694 | 0.9335 | 1.0068 |
 | bryophyte | north | insample_deviance_explained | 200 | 0.0680 | 0.0445 | 0.0890 |
