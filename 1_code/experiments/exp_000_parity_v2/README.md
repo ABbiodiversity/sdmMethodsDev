@@ -158,7 +158,14 @@ habitat row passes, with band-width ratios of 0.88–1.05. Only birds fail:
   2026-08-19; the test dataset is built from the rebuilt one. v2's own
   code on the test data matches a 2026-08 v2 re-run to 1.5e-12 and the
   published files only to 40%, and the harness matches v2's code to
-  2.5e-15. Not a harness fault; see `docs/taxon_quirks.md`.
+  2.5e-15. See `docs/taxon_quirks.md`.
+
+  **Resolved 2026-10-02.** Two causes, both fixed. The test dataset is
+  now harmonized from the pre-rebuild `Stratified.Rdata`, kept in
+  `remote/birds_data_v2/`. The bird spec had also been carrying the
+  climate prediction with the QPAD offset in it, which v2 does not.
+  With both fixed, birds reproduce v2's per-draw coefficients to
+  ~1e-10 and pass.
 
 Assumptions, stated because they carry the targets:
 

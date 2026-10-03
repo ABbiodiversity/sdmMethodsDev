@@ -27,8 +27,9 @@
 #   from 0_data/data_snapshots/model_ready_v2/ on ABMI-DATA2:
 #     - the four plant-group .Rdata files
 #     - the two mammal SpTable .RData files
-#   from the BirdModels shared drive, read-only:
-#     - Data/Archive/2025/Stratified.Rdata
+#   from the work_abmi shared drive, read-only:
+#     - 1_projects/active/sdmMethodsDev/remote/birds_data_v2/
+#       Stratified.Rdata, the copy 01 harmonizes from
 # outputs:
 #   - none; every result is printed to the console
 # notes:
@@ -85,13 +86,13 @@ taxa <- c(
   "bird"
 )
 
-# The bird data package, read-only on the BirdModels drive.
+# The bird data package 01 harmonizes from: the copy v2's birds
+# were fitted on, not the BirdModels drive's rebuilt one.
 bird_data_file <- Sys.getenv(
   "SDM_BIRD_DATA",
   unset = paste0(
-    "G:/.shortcut-targets-by-id/",
-    "17Ymt13eHfKvIiuoMl6x-Kn74Z2uVbbzS/BirdModels/Data/",
-    "Archive/2025/Stratified.Rdata"
+    "G:/Shared drives/work_abmi/1_projects/active/",
+    "sdmMethodsDev/remote/birds_data_v2/Stratified.Rdata"
   )
 )
 

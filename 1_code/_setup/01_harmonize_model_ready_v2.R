@@ -14,8 +14,9 @@
 #       coefficients 2024.RData
 #   from the ABMI Mammals shared drive:
 #     - Lookup Tables/WildTrax Species Strings.RData
-#   from the BirdModels shared drive, read-only:
-#     - Data/Archive/2025/Stratified.Rdata
+#   from the work_abmi shared drive, read-only:
+#     - 1_projects/active/sdmMethodsDev/remote/birds_data_v2/
+#       Stratified.Rdata, the copy v2's birds were fitted on
 # outputs:
 #   in 0_data/test_dataset/:
 #     - sites.csv           one row per survey unit, all sources
@@ -448,19 +449,21 @@ wt_species_file <- Sys.getenv(
 # stratification stage, which is not in 0_data/v2_scripts/birds/
 # - those start at 06 and take this file as given.
 #
-# It currently lives under Data/Archive/2025/ rather than at
-# Data/, which is where 06, 07, 08 and 10 all look for it. That
-# is a property of the shared drive, not of this script, so the
-# path is set here rather than assumed.
+# The copy read is the one v2's archived bird results were
+# fitted on, kept in this project's remote/birds_data_v2/. The
+# BirdModels drive's Data/Archive/2025/Stratified.Rdata is NOT
+# it: that file was rebuilt in place on 2026-08-19 with 175
+# fewer surveys per draw and different draws, so no bird draw
+# could match v2. With this copy, the harness reproduces v2's
+# per-draw bird coefficients to ~1e-10 (checked 2026-10-02).
 #
 # The BirdModels drive is read-only for this repository. Nothing
 # below writes to it.
 bird_data_file <- Sys.getenv(
   "SDM_BIRD_DATA",
   unset = paste0(
-    "G:/.shortcut-targets-by-id/",
-    "17Ymt13eHfKvIiuoMl6x-Kn74Z2uVbbzS/BirdModels/Data/",
-    "Archive/2025/Stratified.Rdata"
+    "G:/Shared drives/work_abmi/1_projects/active/",
+    "sdmMethodsDev/remote/birds_data_v2/Stratified.Rdata"
   )
 )
 

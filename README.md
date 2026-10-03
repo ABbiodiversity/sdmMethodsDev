@@ -729,8 +729,10 @@ The main ones:
 - **Some published v2 results cannot be reproduced exactly.** The harness
   matches v2's own code to numerical precision (plants and birds, climate
   and habitat). But the published lichen models were fitted on bootstrap
-  draws v2 did not keep, and the published bird results on a different
-  vintage of `Stratified.Rdata`, so parity against those is approximate.
+  draws v2 did not keep, so parity against those is approximate. Birds
+  reproduce exactly, but only from the `Stratified.Rdata` in
+  `remote/birds_data_v2/`; the BirdModels drive's copy was rebuilt
+  after v2 and no longer matches.
   See [`docs/taxon_quirks.md`](docs/taxon_quirks.md).
 - **No parity target has been agreed.**
 
@@ -834,7 +836,7 @@ source is not in its default location:
 | `SDM_MAMMAL_CLIMATE_PRED` | `01`, `02` | `All Species Climate Predictions.csv` |
 | `SDM_V2_LOOKUP` | `01` | The v2 folder holding the two plant prediction-matrix CSVs |
 | `SDM_WT_SPECIES` | `01` | `WildTrax Species Strings.RData` |
-| `SDM_BIRD_DATA` | `01`, `02` | The bird `Stratified.Rdata` |
+| `SDM_BIRD_DATA` | `01`, `02`, `04` | The bird `Stratified.Rdata` v2 was fitted on; defaults to `work_abmi/1_projects/active/sdmMethodsDev/remote/birds_data_v2/` |
 | `SDM_V2_PROJECT` | `03`, `05` | The v2 plant project (`VegetationModels`) |
 | `SDM_V2_BIRD_ROOT` | `04`, `05` | The v2 bird project (`BirdModels`) |
 | `SDM_V2_MAMMAL_ROOT` | `05` | The v2 mammal habitat-modelling results for 2024 |

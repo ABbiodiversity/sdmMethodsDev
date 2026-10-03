@@ -6,9 +6,11 @@
 #   in the BirdModels project (SDM_V2_BIRD_ROOT):
 #     - Results/ClimateModels/Coefficients/<sp>/*.csv
 #     - Results/LandcoverModels/Coefficients/<region>/<sp>/*.csv
-#     - Data/Archive/2025/Stratified.Rdata
 #     - Data/lookups/Xn-veg-v2024.Rdata
 #     - Data/lookups/birdlist.csv, birds-v2024.csv
+#   on the work_abmi shared drive (SDM_BIRD_DATA):
+#     - 1_projects/active/sdmMethodsDev/remote/birds_data_v2/
+#       Stratified.Rdata
 #   in this repository:
 #     - 0_data/v2_scripts/birds/00.NorthModels.R
 #     - 0_data/v2_scripts/birds/00.SouthModels.R
@@ -38,8 +40,10 @@
 #     names vegcCrop and soilcLoamy. That is what makes birds
 #     comparable to the other taxa at all.
 #
-#   - Stratified.Rdata has moved. The original loads it from
-#     Data/; it now lives in Data/Archive/2025/. Both are tried.
+#   - Stratified.Rdata is read from the copy v2's birds were
+#     fitted on, the same one 01 harmonizes from, not from the
+#     BirdModels drive. Its Data/Archive/2025/ copy was rebuilt
+#     in place on 2026-08-19 and no longer matches v2's results.
 #
 #   - Reads are serial and that is deliberate. Measured on this
 #     mount: 400 consecutive serial reads succeeded with no
@@ -123,26 +127,21 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 out_file <- file.path(out_dir, "Birds2024.RData")
 
 ## 0.5 Locate the stratified modelling data ----
-# Archived since the original was written, so both are tried and
-# the failure names what it looked for.
-stratified_path <- NULL
+# The copy v2's birds were fitted on, shared with 01 through the
+# same SDM_BIRD_DATA override.
+stratified_path <- Sys.getenv(
+  "SDM_BIRD_DATA",
+  unset = paste0(
+    "G:/Shared drives/work_abmi/1_projects/active/",
+    "sdmMethodsDev/remote/birds_data_v2/Stratified.Rdata"
+  )
+)
 
-for (candidate in c(
-  file.path(v2_bird_root, "Data/Archive/2025/Stratified.Rdata"),
-  file.path(v2_bird_root, "Data/Stratified.Rdata")
-)) {
-  if (file.exists(candidate)) {
-    stratified_path <- candidate
-    break
-  }
-}
-
-if (is.null(stratified_path)) {
+if (!file.exists(stratified_path)) {
   stop(
-    "Stratified.Rdata not found under\n  ",
-    file.path(v2_bird_root, "Data"),
+    "Stratified.Rdata not found at\n  ", stratified_path,
     "\nIt holds the modelling frame the coefficient ",
-    "translation needs.",
+    "translation needs. Set SDM_BIRD_DATA.",
     call. = FALSE
   )
 }

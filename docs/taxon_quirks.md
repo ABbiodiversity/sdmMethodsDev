@@ -117,8 +117,28 @@ check:
 v2's own climate code, run on the test dataset's draw 1 for ALFL,
 matches the 2026-08-25 re-run to 1.5e-12 and the 2025-12-12 archive
 only to 40%. The published results were fitted on a
-`Stratified.Rdata` that was overwritten, and no copy of it is on the
-drive.
+`Stratified.Rdata` that was overwritten on the bird drive.
+
+**Resolved 2026-10-02.** A copy of the pre-rebuild file was
+recovered and is kept at
+`work_abmi/1_projects/active/sdmMethodsDev/remote/birds_data_v2/Stratified.Rdata`,
+which `SDM_BIRD_DATA` now defaults to in `_setup/01`, `02` and `04`.
+Its draws hold 58,210 surveys (the rebuilt file's hold 58,035), and
+v2's own climate code run on it reproduces the published AMRO draw-1
+coefficients to 2e-15. With the test dataset re-harmonized from it,
+and the offset fix below, the harness reproduces v2's published
+per-draw bird coefficients, climate and landcover, north and south,
+to ~1e-10 (AMRO and YEWA, draws 1–5).
+
+**The climate carry excludes the offset.** v2's `06.ModelClimate.R`
+carries `exp(predict(model.avg, type = "link", full = TRUE))` into the
+landcover stage. MuMIn builds that prediction from the averaged
+coefficients, so the QPAD offset is not in it: v2's stored AMRO
+draw-1 prediction averages 0.118, `exp(link)` gives 0.118, and
+`exp(link + offset)` gives 0.315. The bird spec carried the offset
+until 2026-10-02 (`carry_offset = TRUE`), which cut the landcover
+`Climate` coefficient about threefold and shifted every habitat term
+to compensate. It is now `FALSE`.
 
 **The offset trap.** Passing the offset as an argument rather than
 in the formula does not error. `predict()` recycles it, silently. It
