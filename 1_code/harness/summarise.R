@@ -147,31 +147,44 @@ store_meta <- function(dir) {
 #' @param rows A data frame with `boot` and the value column.
 #' @param value Character. The column to summarize.
 #' @param keys Character vector of grouping columns.
+#' @param moments Logical. Add the mean and standard deviation.
 #' @return A data.table of the keys plus n, median, p10, p90 and
-#'   boot1. n counts the finite values; boot1 is the iteration-1
-#'   value where there is exactly one.
+#'   boot1, and mean and sd when `moments` is TRUE. n counts the
+#'   finite values; boot1 is the iteration-1 value where there is
+#'   exactly one.
 #'
 #' @example # Example usage of the function
-#' # summarise_draws(metrics, "value", c("species", "metric"))
-summarise_draws <- function(rows, value, keys) {
+#' # summarise_draws(metrics, "value", c("species", "metric"),
+#' #                 moments = TRUE)
+summarise_draws <- function(rows, value, keys, moments = FALSE) {
   rows <- as.data.table(rows)
 
   # The column is passed through .SDcols rather than named inside
   # the call, because a column may itself be called `value`
-  rows[, draw_summary(.SD[[1L]], boot), by = keys, .SDcols = value]
+  rows[, draw_summary(.SD[[1L]], boot, moments),
+       by = keys, .SDcols = value]
 }
 
 ## 3.2 draw_summary() ----
 
 #' Summarize One Value over Its Draws
 #'
+#' The median and 10-90% band are the summary every comparison
+#' reads, because a distribution over draws is often skewed. The
+#' mean and standard deviation are added where asked, for readers
+#' and tools that expect them; with a skewed distribution they
+#' describe it less well.
+#'
 #' @param x Numeric vector, one value per draw.
 #' @param boot Integer vector of the draw each value came from.
-#' @return A list of n, median, p10, p90 and boot1.
+#' @param moments Logical. Add the mean and standard deviation.
+#' @return A list of n, median, p10, p90 and boot1, then mean and
+#'   sd when `moments` is TRUE. sd is NA with fewer than two
+#'   values.
 #'
 #' @example # Example usage of the function
-#' # draw_summary(c(0.1, 0.3, 0.2), 1:3)
-draw_summary <- function(x, boot) {
+#' # draw_summary(c(0.1, 0.3, 0.2), 1:3, moments = TRUE)
+draw_summary <- function(x, boot, moments = FALSE) {
   first <- x[boot == 1L]
   first <- if (length(first) == 1 && is.finite(first)) {
     first
@@ -180,17 +193,25 @@ draw_summary <- function(x, boot) {
   }
   finite <- x[is.finite(x)]
 
-  if (length(finite) == 0) {
-    return(list(n = 0, median = NA_real_, p10 = NA_real_,
-                p90 = NA_real_, boot1 = first))
+  out <- if (length(finite) == 0) {
+    list(n = 0, median = NA_real_, p10 = NA_real_,
+         p90 = NA_real_, boot1 = first)
+  } else {
+    quantiles <- stats::quantile(
+      finite, c(0.1, 0.5, 0.9), names = FALSE
+    )
+
+    list(n = as.numeric(length(finite)), median = quantiles[2],
+         p10 = quantiles[1], p90 = quantiles[3], boot1 = first)
   }
 
-  quantiles <- stats::quantile(
-    finite, c(0.1, 0.5, 0.9), names = FALSE
-  )
+  # Appended, so the columns before them keep their positions
+  if (moments) {
+    out$mean <- if (length(finite) == 0) NA_real_ else mean(finite)
+    out$sd <- if (length(finite) < 2) NA_real_ else stats::sd(finite)
+  }
 
-  list(n = as.numeric(length(finite)), median = quantiles[2],
-       p10 = quantiles[1], p90 = quantiles[3], boot1 = first)
+  out
 }
 
 # 4. collect_results() ----
@@ -258,12 +279,12 @@ collect_results <- function(pipeline_dir, data_dir = NULL,
       }
     }
 
-    summarised <- function(rows, value, keys) {
+    summarised <- function(rows, value, keys, moments = FALSE) {
       if (is.null(rows) || nrow(rows) == 0) {
         return(NULL)
       }
 
-      cbind(labels, summarise_draws(rows, value, keys))
+      cbind(labels, summarise_draws(rows, value, keys, moments))
     }
 
     list(
@@ -283,7 +304,7 @@ collect_results <- function(pipeline_dir, data_dir = NULL,
         coefficients, "estimate", c("stage", "species", "term")
       ),
       metric_summary = summarised(
-        metrics, "value", c("species", "metric")
+        metrics, "value", c("species", "metric"), moments = TRUE
       ),
       grid_summary = summarised(
         grid, "prediction", c("species", "grid_unit")

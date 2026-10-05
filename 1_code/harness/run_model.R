@@ -345,7 +345,8 @@ prepare_region <- function(spec, region, species, data_dir) {
     region = region,
     region_filter = region_spec$filter,
     weight_column = weight_column,
-    aliases = spec$aliases %||% list()
+    aliases = spec$aliases %||% list(),
+    covariate_files = spec$covariate_files
   )
 
   # Step 4: The grid. A spec may name its own; otherwise the
@@ -444,7 +445,8 @@ province_context <- function(spec, data_dir, species) {
       region = NULL,
       region_filter = NULL,
       weight_column = NULL,
-      aliases = spec$aliases %||% list()
+      aliases = spec$aliases %||% list(),
+      covariate_files = spec$covariate_files
     ),
     stages = province_stages,
     draws = province_draws

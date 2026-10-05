@@ -110,3 +110,74 @@ test_that("spatial cross-validation holds out whole folds", {
   )
   expect_equal(sum(lengths(held_out)), 400)
 })
+
+test_that("an experiment is compared with its baseline by key", {
+  root <- file.path(tempdir(), "compare_test")
+  unlink(root, recursive = TRUE)
+  on.exit(unlink(root, recursive = TRUE))
+
+  write_summary <- function(dir, auc, draws) {
+    dir.create(file.path(dir, "tables"), recursive = TRUE)
+    data.table::fwrite(
+      data.frame(
+        taxon = "lichen", run = c("lichen", "lichen"),
+        region = "north", season = NA, part = NA,
+        species = c("sp1", "sp2"), metric = "oob_auc",
+        n = draws, median = auc, p10 = auc - 0.05,
+        p90 = auc + 0.05, boot1 = NA
+      ),
+      file.path(dir, "tables", "metric_summary.csv")
+    )
+  }
+
+  write_summary(file.path(root, "base"), c(0.70, 0.80), 100)
+  write_summary(file.path(root, "same"), c(0.75, 0.78), 100)
+  write_summary(file.path(root, "short"), c(0.75, 0.78), 5)
+
+  out <- compare_experiments(
+    file.path(root, "same"), file.path(root, "base")
+  )
+  expect_equal(out$summary$share_better, 0.5)
+  expect_equal(out$summary$draws_baseline, 100)
+  expect_true(file.exists(
+    file.path(root, "same", "tables", "comparison_summary.csv")
+  ))
+
+  # A trial against a full run is warned about
+  expect_warning(
+    compare_experiments(
+      file.path(root, "short"), file.path(root, "base")
+    ),
+    "different numbers of draws"
+  )
+})
+
+test_that("the baseline does not compare with itself", {
+  expect_null(experiment_config("exp_000_parity_v2")$baseline)
+  expect_equal(
+    experiment_config("exp_009_test")$baseline, "exp_000_parity_v2"
+  )
+})
+
+test_that("metric summaries carry the mean and standard deviation", {
+  rows <- data.frame(
+    species = "sp", metric = "oob_auc", boot = 1:4,
+    value = c(0.6, 0.7, 0.8, NA)
+  )
+  out <- summarise_draws(rows, "value", c("species", "metric"),
+                         moments = TRUE)
+
+  expect_equal(out$n, 3)
+  expect_equal(out$mean, 0.7)
+  expect_equal(out$sd, 0.1)
+  # Appended, so earlier columns keep their positions
+  expect_equal(
+    names(out),
+    c("species", "metric", "n", "median", "p10", "p90", "boot1",
+      "mean", "sd")
+  )
+  # Coefficient and grid summaries are unchanged
+  expect_false("mean" %in% names(
+    summarise_draws(rows, "value", c("species", "metric"))
+  ))
+})

@@ -18,8 +18,9 @@ One sentence: what does this experiment ask?
 
 ## How to read the result
 
+Every experiment is compared with the v2 baseline (exp_000):
 `run_experiment()` writes three comparison tables to
-`3_output/<id>/tables/`, against the v2 baseline (exp_000):
+`3_output/<id>/tables/`:
 
 | File | One row per | Read it for |
 | --- | --- | --- |

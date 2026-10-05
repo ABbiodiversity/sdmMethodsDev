@@ -50,7 +50,7 @@ spec_fields <- function() {
       "weight_column", "tier", "season", "part", "aliases",
       "regions", "stages", "resample", "v2_coverage", "validate",
       "final_prediction", "species_frame", "supplied_columns",
-      "notes", "models_overridden",
+      "notes", "models_overridden", "covariate_files",
       # Recorded facts a module keeps for its own reports
       "use_protocol", "protocol_is_v2", "climate_source"
     ),
@@ -418,9 +418,115 @@ apply_stage_models <- function(spec, stage_models) {
   spec
 }
 
-# 6. v2 coverage ----
+# 6. replace_stage_method() ----
 
-## 6.1 v2_status() ----
+#' Fit One Stage of a v2 Spec with a Different Method
+#'
+#' The lever for a methods experiment: the rest of the spec stays
+#' v2's, so a difference in the result is the method's. Sets the
+#' stage's engine, selection rule and settings, and gives it one
+#' formula holding every covariate its v2 candidates use (see
+#' models_union()), per region where the region supplies the
+#' models.
+#'
+#' Removed, because they read v2 coefficient tables a different
+#' engine may not produce:
+#'
+#' - the stage's `post_process` steps (the plant stand-age
+#'   splines, cutblock convergence, pAspen and footprint pooling);
+#' - stage fields only the old rule took (`head_terms`, say);
+#' - when the stage is the last, the spec's `final_prediction` and
+#'   `validate` (v2's plant prediction and validation AUCs), so the
+#'   harness scores the new method's own prediction.
+#'
+#' The stage's `v2_coverage` and the run's `models_overridden`
+#' record the change.
+#'
+#' @param spec A taxon spec.
+#' @param stage Character. The stage's name.
+#' @param engine Character. A registered engine.
+#' @param selection Character. A registered rule; "single" for an
+#'   engine with no information criterion.
+#' @param control Named list of engine settings.
+#' @param union Logical. Replace the candidate set with one formula
+#'   holding all its covariates. FALSE keeps the candidates, for a
+#'   rule that compares them.
+#' @return The spec.
+#'
+#' @example # Example usage of the function
+#' # spec <- replace_stage_method(lichen_spec(), "habitat", "gbm")
+replace_stage_method <- function(
+  spec, stage, engine, selection = "single", control = list(),
+  union = TRUE
+) {
+  names_in <- vapply(spec$stages, `[[`, character(1), "name")
+  index <- match(stage, names_in)
+
+  if (is.na(index)) {
+    stop(
+      "Spec `", spec$taxon, "` has no stage `", stage, "`. Stages: ",
+      paste(names_in, collapse = ", "),
+      call. = FALSE
+    )
+  }
+
+  rule <- get_method("selection", selection)
+  get_engine(engine)
+  old <- spec$stages[[index]]
+
+  # Step 1: The candidate formulas, per region where the region
+  # supplies them
+  if (union) {
+    if (is.null(old$models)) {
+      for (region in names(spec$regions)) {
+        spec$regions[[region]]$habitat_models <- models_union(
+          spec$regions[[region]]$habitat_models
+        )
+        spec$regions[[region]]$intercept_cats <- NULL
+      }
+    } else {
+      old$models <- models_union(old$models)
+    }
+  }
+
+  # Step 2: The stage, keeping only what the harness and the new
+  # rule read
+  known <- c(spec_fields()$stage, names(formals(rule)))
+  new <- old[intersect(names(old), known)]
+  new$engine <- engine
+  new$selection <- selection
+  new$control <- control
+  new$ic <- NULL
+  new$post_process <- NULL
+  spec$stages[[index]] <- new
+
+  # Step 3: Hooks that read v2 coefficient tables
+  if (index == length(spec$stages)) {
+    spec$final_prediction <- NULL
+    spec$validate <- NULL
+  }
+
+  # Step 4: Say so
+  label <- paste0(
+    engine, " with `", selection, "`",
+    if (union) ", on every covariate the v2 candidates use" else ""
+  )
+  spec$v2_coverage[[stage]] <- v2_status(
+    "not reproduced", paste0("Replaced: ", label, ".")
+  )
+  spec$models_overridden <- c(
+    spec$models_overridden, paste0(stage, " <- ", label)
+  )
+  spec$notes <- paste0(
+    spec$notes %||% "", " Stage `", stage, "` fitted with ", label, "."
+  )
+
+  spec
+}
+
+# 7. v2 coverage ----
+
+## 7.1 v2_status() ----
 
 #' State How Much of One v2 Stage a Spec Reproduces
 #'
@@ -455,7 +561,7 @@ v2_status <- function(status, note) {
   list(status = status, note = note)
 }
 
-## 6.2 spec_coverage() ----
+## 7.2 spec_coverage() ----
 
 #' Tabulate What a Set of Specs Reproduces of v2
 #'
@@ -494,9 +600,9 @@ spec_coverage <- function(specs) {
   do.call(rbind, rows)
 }
 
-# 7. Helpers ----
+# 8. Helpers ----
 
-## 7.1 `%||%` ----
+## 8.1 `%||%` ----
 
 #' Default for NULL
 #'

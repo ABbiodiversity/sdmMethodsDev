@@ -29,6 +29,9 @@
 #   - "Better" depends on the metric: higher AUC, deviance
 #     explained and Spearman; lower RMSE; a calibration slope
 #     closer to 1. better_direction() states it once.
+#   - Each side's draw count is kept in the summary
+#     (`draws_baseline`, `draws_candidate`), and a mismatch is
+#     warned about: a trial against a full run is not a result.
 #   - A difference is a difference in medians over draws. Whether
 #     it is larger than draw-to-draw noise is read from
 #     `share_better` across species and from the p10-p90 bands in
@@ -125,6 +128,12 @@ compare_experiments <- function(
     )
   }
 
+  # The mean and sd ride along where both experiments have them;
+  # a baseline summarized before they were added lacks them
+  values <- c(values, intersect(
+    c("mean", "sd"), intersect(names(candidate), names(baseline))
+  ))
+
   pick <- function(rows) {
     rows[metric %in% metrics, c(keys, "metric", values), with = FALSE]
   }
@@ -147,11 +156,28 @@ compare_experiments <- function(
   # Step 2: Per taxon, region and metric
   summary <- joined[, list(
     species = .N,
+    draws_baseline = stats::median(n_baseline, na.rm = TRUE),
+    draws_candidate = stats::median(n_candidate, na.rm = TRUE),
     median_baseline = stats::median(median_baseline, na.rm = TRUE),
     median_candidate = stats::median(median_candidate, na.rm = TRUE),
     median_difference = stats::median(difference, na.rm = TRUE),
     share_better = mean(better, na.rm = TRUE)
   ), by = c("taxon", "region", "season", "part", "metric")]
+
+  # A band from 5 draws is not comparable with one from 100, so a
+  # mismatch is said out loud rather than left in a column
+  mismatched <- summary[draws_baseline != draws_candidate]
+
+  if (nrow(mismatched) > 0) {
+    warning(
+      "The two experiments hold different numbers of draws (",
+      paste(unique(mismatched$draws_baseline), collapse = ", "),
+      " in the baseline, ",
+      paste(unique(mismatched$draws_candidate), collapse = ", "),
+      " here). Compare like with like before reading the result.",
+      call. = FALSE
+    )
+  }
 
   # Step 3: Habitat effects on the grid, per species
   grid_candidate <- read_summary(candidate_dir, "grid_summary")

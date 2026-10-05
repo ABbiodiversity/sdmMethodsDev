@@ -36,6 +36,10 @@
 #     covariate_sets.R. That is how mammals reach TD, which their
 #     own climate model set needs and their source file lacks.
 #     Requires covariate_sets.R to be sourced first.
+#   - An experiment can add covariates the frozen dataset does not
+#     hold, from its own CSVs keyed on survey_unit_id
+#     (experiment_config(covariate_files = )). They are joined on
+#     load; 0_data/ is never changed by an experiment.
 #   - Future improvement - a Parquet or duckdb backing store
 #     would let a bird run select rows as well as columns.
 # ---
@@ -411,6 +415,126 @@ load_covariates <- function(
   covariates[, unique(c("survey_unit_id", columns)), drop = FALSE]
 }
 
+## 6.1 check_covariate_files() ----
+
+#' Check the Covariate Files an Experiment Adds
+#'
+#' Each file must exist, be keyed on a unique survey_unit_id, and
+#' add only columns that neither covariates.csv nor another file
+#' already has, so no column has two possible sources.
+#'
+#' @param files Character vector of CSV paths.
+#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @return `files`, invisibly; stops on the first problem.
+#'
+#' @example # Example usage of the function
+#' # check_covariate_files("2_pipeline/exp_002/inputs/soil.csv",
+#' #                       data_dir)
+check_covariate_files <- function(files, data_dir) {
+  taken <- names(fread(file.path(data_dir, "covariates.csv"),
+                       nrows = 0))
+
+  for (path in files) {
+    if (!file.exists(path)) {
+      stop(
+        "Covariate file not found: ", path, "\nRun the ",
+        "experiment's script that writes it first.",
+        call. = FALSE
+      )
+    }
+
+    header <- names(fread(path, nrows = 0))
+
+    if (!"survey_unit_id" %in% header) {
+      stop("Covariate file ", basename(path), " has no ",
+           "survey_unit_id column.", call. = FALSE)
+    }
+
+    ids <- fread(path, select = "survey_unit_id",
+                 colClasses = "character")$survey_unit_id
+
+    if (anyDuplicated(ids) > 0) {
+      stop("Covariate file ", basename(path), " repeats a ",
+           "survey_unit_id; it needs one row per unit.",
+           call. = FALSE)
+    }
+
+    added <- setdiff(header, "survey_unit_id")
+    clash <- intersect(added, taken)
+
+    if (length(clash) > 0) {
+      stop(
+        "Covariate file ", basename(path), " repeats column(s) ",
+        "already in covariates.csv or another file: ",
+        paste(utils::head(clash, 10), collapse = ", "),
+        ". Give them new names.",
+        call. = FALSE
+      )
+    }
+
+    taken <- c(taken, added)
+  }
+
+  invisible(files)
+}
+
+## 6.2 covariate_file_columns() ----
+
+#' The Columns a Set of Covariate Files Holds
+#'
+#' @param files Character vector of CSV paths, or NULL.
+#' @return A character vector of column names, without
+#'   survey_unit_id.
+#'
+#' @example # Example usage of the function
+#' # covariate_file_columns("2_pipeline/exp_002/inputs/soil.csv")
+covariate_file_columns <- function(files) {
+  unique(unlist(lapply(files, function(path) {
+    setdiff(names(fread(path, nrows = 0)), "survey_unit_id")
+  })))
+}
+
+## 6.3 add_covariate_files() ----
+
+#' Join Covariates from an Experiment's Own Files
+#'
+#' A unit a file does not list gets NA, as a unit missing a value
+#' in covariates.csv does, and drops out of any model using it.
+#'
+#' @param x A data frame with survey_unit_id, from
+#'   load_covariates().
+#' @param files Character vector of CSV paths, or NULL.
+#' @param columns Character vector of the columns to add.
+#' @return `x` with the columns added.
+#'
+#' @example # Example usage of the function
+#' # add_covariate_files(x, "2_pipeline/exp_002/inputs/soil.csv",
+#' #                     "sg_clay_0_5cm")
+add_covariate_files <- function(x, files, columns) {
+  for (path in files) {
+    table <- cached_read(path, function(p) {
+      as.data.frame(fread(
+        p, colClasses = list(character = "survey_unit_id")
+      ))
+    }, tag = "covariate_file")
+
+    wanted <- setdiff(
+      intersect(columns, names(table)),
+      c("survey_unit_id", names(x))
+    )
+
+    if (length(wanted) == 0) {
+      next
+    }
+
+    rows <- match(as.character(x$survey_unit_id),
+                  table$survey_unit_id)
+    x[wanted] <- table[rows, wanted, drop = FALSE]
+  }
+
+  x
+}
+
 # 7. apply_factor_levels() ----
 
 #' Restore Stored Factor Levels
@@ -557,6 +681,9 @@ reference level and every contrast.",
 #'   model set name a column the dataset stores otherwise.
 #' @param site_columns Character vector of sites.csv columns to
 #'   carry, beyond survey_unit_id, or NULL for site_columns().
+#' @param covariate_files Character vector of an experiment's own
+#'   covariate CSVs, or NULL. Columns they hold are read from them
+#'   rather than from covariates.csv.
 #' @return A list with `covariates` (one row per unit, including
 #'   the site columns), `response`, `offset` (or NULL), `units`,
 #'   `taxon` and `region`.
@@ -576,7 +703,8 @@ build_model_data <- function(
   region_filter = NULL,
   weight_column = NULL,
   aliases = list(),
-  site_columns = NULL
+  site_columns = NULL,
+  covariate_files = NULL
 ) {
   site_columns <- site_columns %||% site_columns()
 
@@ -587,7 +715,13 @@ build_model_data <- function(
     covariates <- unique(c(covariates, weight_column))
   }
 
-  x <- load_covariates(taxon, data_dir, covariates, region)
+  from_files <- intersect(
+    covariates, covariate_file_columns(covariate_files)
+  )
+  x <- load_covariates(
+    taxon, data_dir, setdiff(covariates, from_files), region
+  )
+  x <- add_covariate_files(x, covariate_files, from_files)
   y <- load_response(taxon, data_dir, species)
   off <- load_offsets(taxon, data_dir, species)
   sites <- load_sites(data_dir, taxon, site_columns)

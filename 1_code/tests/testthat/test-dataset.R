@@ -76,3 +76,38 @@ test_that("the covariate cache returns what a fresh read does", {
   expect_identical(wider, fresh)
   expect_identical(first$MAP, fresh$MAP)
 })
+
+test_that("an experiment's covariate file is checked and joined", {
+  # A stand-in dataset, so the check runs without the 218 MB file
+  fake_dir <- withr::local_tempdir()
+  data.table::fwrite(
+    data.frame(survey_unit_id = c("a", "b"), taxon = "x", MAT = 1:2),
+    file.path(fake_dir, "covariates.csv")
+  )
+  good <- file.path(fake_dir, "good.csv")
+  data.table::fwrite(
+    data.frame(survey_unit_id = c("b", "a"), new_1 = c(20, 10)),
+    good
+  )
+  clash <- file.path(fake_dir, "clash.csv")
+  data.table::fwrite(
+    data.frame(survey_unit_id = "a", MAT = 5), clash
+  )
+  repeated <- file.path(fake_dir, "repeated.csv")
+  data.table::fwrite(
+    data.frame(survey_unit_id = c("a", "a"), new_2 = 1:2), repeated
+  )
+
+  expect_silent(check_covariate_files(good, fake_dir))
+  expect_error(check_covariate_files(clash, fake_dir), "already in")
+  expect_error(check_covariate_files(repeated, fake_dir), "repeats")
+  expect_error(
+    check_covariate_files(file.path(fake_dir, "none.csv"), fake_dir),
+    "not found"
+  )
+
+  # Joined on the id, NA for a unit the file does not list
+  x <- data.frame(survey_unit_id = c("a", "b", "c"))
+  joined <- add_covariate_files(x, good, "new_1")
+  expect_equal(joined$new_1, c(10, 20, NA))
+})

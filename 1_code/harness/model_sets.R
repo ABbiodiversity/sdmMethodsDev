@@ -461,6 +461,38 @@ models_from_covariates <- function(
   unique(models)
 }
 
+## 3.3 models_union() ----
+
+#' One Formula Holding Every Covariate a Candidate Set Uses
+#'
+#' For an engine that selects its own variables and finds its own
+#' curvature and interactions - a boosted tree, say - comparing a
+#' v2 candidate set is meaningless; it is given every covariate any
+#' candidate uses, once, as main effects. `I(x^2)` and `a:b`
+#' contribute x, a and b.
+#'
+#' @param models Character vector of formulas, a list of groups of
+#'   them (a staged set), or a name in model_sets().
+#' @param sets Named list of model sets.
+#' @return One formula, as text, in update form (". ~ . + ...").
+#'
+#' @example # Example usage of the function
+#' # models_union("climate_bird_v2")
+models_union <- function(models, sets = model_sets()) {
+  formulas <- unlist(get_model_set(models, sets), use.names = FALSE)
+
+  terms <- unique(unlist(lapply(formulas, function(one) {
+    all.vars(stats::as.formula(one))
+  })))
+  terms <- setdiff(terms, c(".", "response", "offset", "weight"))
+
+  if (length(terms) == 0) {
+    return(". ~ .")
+  }
+
+  paste0(". ~ . + ", paste(terms, collapse = " + "))
+}
+
 # 4. get_model_set() ----
 
 #' Look Up One Model Set

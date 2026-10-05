@@ -17,8 +17,13 @@
 #       workers - before anything is fitted. Every check that used
 #       to sit in run.R lives here.
 #     - run_experiment() fits (optionally), collects the stores
-#       into summary tables, runs the experiment's own steps in
-#       order, and writes the run record.
+#       into summary tables, compares them with the baseline
+#       experiment (exp_000, the v2 configuration), runs the
+#       experiment's own steps in order, and writes the run
+#       record.
+#   - Every experiment is compared with the baseline without
+#     asking, because that comparison is the point of an
+#     experiment here: a result is read as a difference from v2.
 #   - Everything the steps need travels in the config and the
 #     results passed to them; nothing is read from the global
 #     environment, so a step can be run on its own.
@@ -46,12 +51,20 @@ library(data.table) # run log writing (version: 1.16.4)
 #'   draws unseeded, as v2 did.
 #' @param stage_models Named list of replacement candidate sets,
 #'   or NULL for each spec's v2 sets; see apply_stage_models().
+#' @param covariate_files Character vector of CSVs holding
+#'   covariates the frozen dataset does not, keyed on
+#'   survey_unit_id, or NULL. Written by the experiment's own
+#'   scripts, never into 0_data/; their columns can then be named
+#'   in `stage_models`.
 #' @param specs Named list of specs, or NULL for
 #'   standard_specs(plant_bootstrap). An experiment that changes
 #'   a spec builds its own and passes it here.
 #' @param plant_bootstrap Character. Passed to standard_specs().
 #' @param workers Integer. Species fitted at once.
 #' @param unit_predictions Character. "none", "oob" or "all".
+#' @param baseline Character. The experiment every result is
+#'   compared with, by id; NULL for none. Ignored by the baseline
+#'   itself.
 #' @param v2_bootstraps Integer. v2's draw count, which a run must
 #'   reach to be gated.
 #' @param project_root Character. The repository root.
@@ -70,10 +83,12 @@ experiment_config <- function(
   n_bootstraps = 100L,
   seed = 20260909L,
   stage_models = NULL,
+  covariate_files = NULL,
   specs = NULL,
   plant_bootstrap = "spatial_block",
   workers = 1L,
   unit_predictions = "none",
+  baseline = "exp_000_parity_v2",
   v2_bootstraps = 100L,
   project_root = getOption("sdm.project_root", "."),
   data_dir = NULL,
@@ -142,7 +157,21 @@ experiment_config <- function(
     )
   }
 
-  # Step 3: The species. A taxon the set does not name runs every
+  # Step 3: Covariates the experiment adds from its own files.
+  # Absolute paths, so parallel workers find them too.
+  if (!is.null(covariate_files)) {
+    covariate_files <- normalizePath(
+      covariate_files, winslash = "/", mustWork = FALSE
+    )
+    check_covariate_files(covariate_files, data_dir)
+
+    specs <- lapply(specs, function(spec) {
+      spec$covariate_files <- covariate_files
+      spec
+    })
+  }
+
+  # Step 4: The species. A taxon the set does not name runs every
   # species, because an absent taxon means "no restriction". Said
   # out loud, because it makes a partial set the longest run.
   focal <- get_focal_species(species)
@@ -178,9 +207,12 @@ experiment_config <- function(
       v2_bootstraps = as.integer(v2_bootstraps),
       seed = seed,
       stage_models = stage_models,
+      covariate_files = covariate_files,
       plant_bootstrap = plant_bootstrap,
       workers = as.integer(workers),
       unit_predictions = unit_predictions,
+      # The baseline does not compare with itself
+      baseline = if (identical(baseline, id)) NULL else baseline,
       project_root = project_root,
       data_dir = data_dir,
       pipeline_dir = pipeline_dir %||%
@@ -212,12 +244,15 @@ print.experiment_config <- function(x, ...) {
   cat("  draws:    ", x$n_bootstraps, " (v2: ", x$v2_bootstraps,
       ")\n", sep = "")
   cat("  seed:     ", x$seed %||% "unseeded", "\n", sep = "")
-  cat("  models:   ", if (is.null(x$stage_models)) {
-    "each spec's v2 candidate sets"
+  changes <- experiment_changes(x)
+  cat("  changes:  ", if (length(changes) == 0) {
+    "none; every spec is v2's"
   } else {
-    paste(names(x$stage_models), collapse = ", ")
+    paste(changes, collapse = "\n            ")
   }, "\n", sep = "")
   cat("  workers:  ", x$workers, "\n", sep = "")
+  cat("  baseline: ", x$baseline %||% "none (this is the baseline)",
+      "\n", sep = "")
   cat("  writes:   ", x$pipeline_dir, "\n            ", x$out_dir,
       "\n", sep = "")
 
@@ -226,7 +261,8 @@ print.experiment_config <- function(x, ...) {
 
 # 3. run_experiment() ----
 
-#' Fit, Summarize, Run the Experiment's Steps, and Record
+#' Fit, Summarize, Compare with the Baseline, Run the
+#' Experiment's Steps, and Record
 #'
 #' @param config An experiment_config().
 #' @param fit Logical. FALSE skips fitting and re-summarizes the
@@ -238,11 +274,11 @@ print.experiment_config <- function(x, ...) {
 #'   taxon, passed to collect_results().
 #' @param record Logical. Write run_record.md.
 #' @return The results list, invisibly: the summary tables, the
-#'   run log, and whatever the steps added.
+#'   run log, the comparison with the baseline, and whatever the
+#'   steps added.
 #'
 #' @example # Example usage of the function
-#' # results <- run_experiment(config,
-#' #   steps = list(compare = compare_to_baseline))
+#' # results <- run_experiment(config)
 run_experiment <- function(
   config,
   fit = TRUE,
@@ -282,13 +318,20 @@ run_experiment <- function(
   results$run_log <- run_log
   write_summaries(results, config$out_dir)
 
-  # Step 3: The experiment's own steps, in order
+  # Step 3: Compare with the baseline, for every experiment but
+  # the baseline itself
+  if (!is.null(config$baseline)) {
+    cat("\n== compare with ", config$baseline, " ==\n", sep = "")
+    results <- compare_to_baseline(config, results)
+  }
+
+  # Step 4: The experiment's own steps, in order
   for (name in names(steps)) {
     cat("\n== ", name, " ==\n", sep = "")
     results <- steps[[name]](config, results)
   }
 
-  # Step 4: The committed record of what ran
+  # Step 5: The committed record of what ran
   if (record) {
     record_file <- run_record(
       pipeline_dir = config$pipeline_dir,
@@ -357,8 +400,18 @@ record_config <- function(config, run_log = NULL) {
     } else {
       sort(names(config$stage_models))
     },
+    covariate_files = if (is.null(config$covariate_files)) {
+      "none"
+    } else {
+      basename(config$covariate_files)
+    },
+    changes_from_v2 = {
+      changes <- experiment_changes(config)
+      if (length(changes) == 0) "none" else changes
+    },
     engines = stage_values("engine"),
     selection = stage_values("selection"),
+    compared_with = config$baseline %||% "none (baseline)",
     data_dir = basename(config$data_dir)
   )
 
@@ -375,35 +428,99 @@ record_config <- function(config, run_log = NULL) {
   out
 }
 
+## 4.1 experiment_changes() ----
+
+#' What an Experiment Changes from the v2 Specs
+#'
+#' Changes made through `stage_models`, and through specs changed
+#' with replace_stage_method(), which records them.
+#'
+#' @param config An experiment_config().
+#' @return A character vector, one entry per run and change.
+#'
+#' @example # Example usage of the function
+#' # experiment_changes(config)
+experiment_changes <- function(config) {
+  from_specs <- unlist(lapply(names(config$specs), function(key) {
+    changed <- config$specs[[key]]$models_overridden
+
+    if (is.null(changed)) NULL else paste0(key, ": ", changed)
+  }))
+
+  from_models <- if (is.null(config$stage_models)) {
+    NULL
+  } else {
+    paste0("stage_models: ", names(config$stage_models))
+  }
+
+  from_files <- if (is.null(config$covariate_files)) {
+    NULL
+  } else {
+    paste0("covariate_files: ", basename(config$covariate_files))
+  }
+
+  c(from_specs, from_models, from_files)
+}
+
 # 5. compare_to_baseline() ----
 
-#' An Experiment Step: Compare Against exp_000
+#' Compare an Experiment's Summaries with the Baseline's
 #'
-#' Ready to pass in run_experiment()'s `steps`. Compares this
-#' experiment's summaries with the v2 baseline's; see
-#' compare_experiments().
+#' Run by run_experiment() for every experiment but the baseline.
+#' Writes tables/comparison_summary.csv, comparison_metrics.csv
+#' and comparison_grid.csv; see compare_experiments(). A baseline
+#' that has not been run is reported and skipped rather than
+#' stopping the experiment.
 #'
 #' @param config An experiment_config().
 #' @param results The results so far.
 #' @param baseline Character. The baseline experiment's id.
-#' @return `results`, with `comparison` added.
+#' @return `results`, with `comparison` added when there was a
+#'   baseline to compare with.
 #'
 #' @example # Example usage of the function
-#' # run_experiment(config, steps = list(
-#' #   compare = compare_to_baseline))
+#' # results <- compare_to_baseline(config, results)
 compare_to_baseline <- function(
-  config, results, baseline = "exp_000_parity_v2"
+  config, results, baseline = config$baseline
 ) {
-  comparison <- compare_experiments(
-    candidate_dir = config$out_dir,
-    baseline_dir = file.path(
-      config$project_root, "3_output", baseline
-    )
+  baseline_dir <- file.path(
+    config$project_root, "3_output", baseline
+  )
+  baseline_table <- file.path(
+    baseline_dir, "tables", "metric_summary.csv"
   )
 
-  cat("\nAgainst ", baseline, ", per taxon, region and metric:\n",
-      sep = "")
-  print(comparison$summary, row.names = FALSE)
+  if (!file.exists(baseline_table)) {
+    message(
+      "No comparison: ", baseline, " has no summary tables yet. ",
+      "Run it first, then re-summarize this experiment with ",
+      "run_experiment(config, fit = FALSE)."
+    )
+    return(results)
+  }
+
+  comparison <- compare_experiments(
+    candidate_dir = config$out_dir,
+    baseline_dir = baseline_dir
+  )
+
+  # The headline, for the console; the full tables are written
+  shown <- comparison$summary[
+    comparison$summary$metric %in% c(
+      "oob_auc", "oob_deviance_explained", "oob_calibration_slope"
+    ),
+    c("taxon", "region", "metric", "median_baseline",
+      "median_candidate", "median_difference", "share_better")
+  ]
+  numbers <- vapply(shown, is.numeric, logical(1))
+  shown[numbers] <- lapply(shown[numbers], round, 3)
+
+  cat(
+    "Against ", baseline,
+    " (out-of-bag; full tables in tables/comparison_*.csv):\n",
+    sep = ""
+  )
+  print(shown, row.names = FALSE)
 
   results$comparison <- comparison
   results

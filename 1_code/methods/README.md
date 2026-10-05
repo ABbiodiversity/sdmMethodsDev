@@ -29,6 +29,7 @@ skeleton for an engine and a selection rule; it is not loaded.
 | --- | --- | --- | --- |
 | engine | `glm` | `stats::glm` (v2 mammals, birds) | |
 | engine | `bayesglm` | `arm::bayesglm`, weakly informative priors (v2 plants) | |
+| engine | `gbm` | Boosted regression trees, `gbm::gbm.fit`; no coefficients, information criterion or standard errors, so use the `single` rule | |
 | selection | `single` | Fit the first candidate; no ranking | |
 | selection | `aic_best` | Keep the lowest-scoring candidate | ic |
 | selection | `aic_average` | Average coefficients by Akaike weight (v2 climate) | ic, coefficients |

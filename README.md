@@ -230,13 +230,19 @@ name. Adding a method is adding a file; no harness code changes.
 
 | Kind | Folder | Registered |
 | --- | --- | --- |
-| Engines: how a model is fitted | `methods/engines/` | `glm`, `bayesglm` |
+| Engines: how a model is fitted | `methods/engines/` | `glm`, `bayesglm`, `gbm` (boosted regression trees) |
 | Selection rules: how candidates become one result | `methods/selection/` | `single`, `aic_best`, `aic_average`, `staged_bic`, `ivw_grid`, `aic_best_grid`, `aic_best_onehot` |
 | Resampling: which units each draw fits | `methods/resampling/` | `precomputed`, `spatial_block`, `spatial_cv` |
 | Metrics: how a prediction is scored | `methods/metrics/` | `auc`, `deviance_explained`, `rmse`, `spearman`, `calibration_slope`, `prevalence`, `n` |
 
 A selection rule states the engine capabilities it needs (coefficients, an
 information criterion, standard errors), and `validate_spec()` checks them.
+`replace_stage_method()` swaps one stage of a v2 spec to another engine and
+rule, leaving the rest v2's; `exp_001_gbm` uses it to fit the habitat
+stage with boosted regression trees. `extend_models()` adds terms to every
+candidate in a model set, and `covariate_files` supplies terms the dataset
+does not hold; `exp_002_soilgrids` uses both to add SoilGrids soil
+properties to the climate stage.
 `check_engine()` tests a new engine against the contract on synthetic data.
 The contracts are in [`1_code/methods/README.md`](1_code/methods/README.md).
 
@@ -272,13 +278,14 @@ flowchart TD
         ST["result stores<br/>2_pipeline/id/run/region/"]
         CR["collect_results()<br/>per-species summaries"]
         T["3_output/id/tables/"]
-        X["the experiment's own steps<br/>exp_000: compare to v2 · plot · report<br/>later: compare_to_baseline"]
+        B["compare with exp_000<br/>comparison_*.csv<br/>every experiment but exp_000"]
+        X["the experiment's own steps<br/>exp_000: compare to v2 · plot · report"]
         RR["run_record.md"]
 
         V --> P --> J
         J --> W1 & W2 & WN
         W1 & W2 & WN --> S --> ST
-        ST --> CR --> T --> X --> RR
+        ST --> CR --> T --> B --> X --> RR
     end
 
     C --> V
@@ -307,6 +314,7 @@ flowchart TD
     %% Outputs
     style ST fill:#ffffff,stroke:#2D415B,stroke-width:1px,stroke-dasharray: 5 5
     style T fill:#E8A396,stroke:#2D415B,stroke-width:4px
+    style B fill:#E8A396,stroke:#2D415B,stroke-width:2px
     style X fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
     style RR fill:#E8A396,stroke:#2D415B,stroke-width:2px
 ```
@@ -323,9 +331,12 @@ flowchart TD
    store per run and region in `2_pipeline/<id>/`.
 5. **Summarize.** `collect_results()` reduces the stores to per-species
    tables in `3_output/<id>/tables/`.
-6. **The experiment's own steps**, in order. For exp_000: compare with v2,
-   plot, write the report. For later experiments: compare with exp_000.
-7. **Record.** `run_record.md` says what ran, for the commit.
+6. **Compare with exp_000.** Every experiment except exp_000 itself is
+   compared with the v2 baseline: `tables/comparison_*.csv`, with the
+   headline printed. Set `baseline = NULL` in `experiment_config()` to skip.
+7. **The experiment's own steps**, in order. For exp_000: compare with v2,
+   plot, write the report.
+8. **Record.** `run_record.md` says what ran, for the commit.
 
 Nothing outside `2_pipeline/<id>/` and `3_output/<id>/` is written during a
 run, and `0_data/` is never written outside `1_code/_setup/`.
@@ -555,9 +566,12 @@ sdmMethodsDev/
 │   ├── experiments/
 │   │   ├── _shared/               # named focal-species sets
 │   │   ├── _template/             # copy to start an experiment
-│   │   └── exp_000_parity_v2/     # run.R, 01_compare_to_v2.R, 02_plot_parity.R,
-│   │                              # 03_build_report.R, utils/parity_targets.R
-│   ├── _setup/                    # 01–09: build 0_data/; run by hand
+│   │   ├── exp_000_parity_v2/     # run.R, 01_compare_to_v2.R, 02_plot_parity.R,
+│   │   │                          # 03_build_report.R, utils/parity_targets.R
+│   │   ├── exp_001_gbm/           # test: habitat stage fitted with gbm
+│   │   └── exp_002_soilgrids/     # test: SoilGrids terms in the climate stage;
+│   │                              # 01_extract_soilgrids_covariates.R, run.R
+│   ├── _setup/                    # 01–09: build the v2 data in 0_data/; fixed
 │   ├── tests/                     # run_tests.R; compare_stores.R
 │   └── _scratch.R                 # dated workspace for exploration
 │
@@ -590,8 +604,10 @@ Read-only during experiments, and gitignored except `v2_scripts/`.
 
 ### `test_dataset/`
 
-The frozen cross-taxa dataset. It does not change between experiments; an
-amendment is a rebuild by `_setup/`, checked by `_setup/02`.
+The frozen cross-taxa dataset: the data the v2 models were fitted on. It
+does not change between experiments, and neither do the `_setup/` scripts
+that build it; a rebuild happens only when the v2 sources change, checked by
+`_setup/02`. Anything an experiment adds lives in that experiment's folder.
 
 | File | Holds |
 | --- | --- |
@@ -627,6 +643,11 @@ Things to know about the data:
   v2 excludes them.
 - **The bird grids** are v2's translation matrix rebuilt in covariate space
   by `_setup/09`, checked to reproduce it exactly.
+- **Covariates v2 did not use are not added here.** An experiment that
+  tests new covariates extracts them with a script in its own folder, writes
+  them to `2_pipeline/<id>/inputs/` keyed on `survey_unit_id`, and names that
+  file in `experiment_config(covariate_files = )`; the harness joins it on
+  load. `exp_002_soilgrids` is the example.
 
 ### `v2_results/`
 
@@ -703,8 +724,8 @@ flowchart LR
 ```
 
 The red files are written for every experiment by the harness; the blue ones
-are exp_000's own steps. A later experiment made from the template writes
-`comparison_*.csv` against exp_000 instead.
+are exp_000's own steps. Every other experiment also writes
+`comparison_*.csv` against exp_000.
 
 A *draw* is one bootstrap iteration; draw 1 is the full data. Every summary
 reduces the draws to a median and a 10th–90th percentile band (`p10`, `p90`)
@@ -731,7 +752,8 @@ often skewed. `boot1` is the draw-1 value.
 | `run_record.md`, `report.md` | `figures/` |
 | `tables/coverage.csv` | `tables/coefficient_summary.csv` |
 | `tables/metric_summary.csv` | `tables/parity_terms.csv` |
-| `tables/grid_summary.csv` | |
+| `tables/grid_summary.csv` | `tables/comparison_metrics.csv` |
+| `tables/comparison_summary.csv`, `tables/comparison_grid.csv` (experiments after exp_000) | |
 | `tables/parity_summary.csv`, `tables/v2_self_agreement_summary.csv` | |
 
 **Commit only runs that count.** A trial writes the same files as a full run.
@@ -750,7 +772,7 @@ tables describe a trial.
 | Provenance | Git commit, R version, time written. Volatile; ignored when comparing records |
 | Configuration | Runs, focal species, draws, seed, candidate model sets, engines, selection rules, jobs ok / not ok |
 | Coverage | Rows written per run and region |
-| Metrics | Metrics pooled over species and draws |
+| Metrics | Metrics pooled over species and draws: median, 10–90% band, mean and standard deviation |
 
 **`tables/coverage.csv`** — what ran, one row per run × region: `taxon`,
 `run`, `region`, `season` and `part` (mammals), `species`, `draws`, `stages`,
@@ -758,7 +780,10 @@ tables describe a trial.
 the reason is in `run_log.csv`.
 
 **`tables/metric_summary.csv`** — how well the models fit. One row per
-taxon × region × species × metric, with `n`, `median`, `p10` and `p90`.
+taxon × region × species × metric, with `n`, `median`, `p10`, `p90`,
+`boot1`, `mean` and `sd` over draws. The median and band are what comparisons
+read, because the spread over draws is often skewed; the mean and standard
+deviation are there for readers and tools that expect them.
 
 | Prefix | Scored on |
 | --- | --- |
@@ -800,10 +825,12 @@ and stage:
 | Birds, `landcover` | Raw `glm` coefficients (e.g. `vegcCrop`) |
 | Birds, `habitat` | The same, translated onto v2's standardized habitat types, log scale |
 
-**`tables/comparison_*.csv`** (experiments made from the template) — against
-exp_000: `comparison_summary.csv` per taxon, region and metric, with the
-median difference and the share of species that did better;
-`comparison_metrics.csv` per species; `comparison_grid.csv` with the rank
+**`tables/comparison_*.csv`** (every experiment except exp_000) — against
+exp_000, written automatically by `run_experiment()`: `comparison_summary.csv` per taxon, region and metric, with the
+median difference, the share of species that did better, and each side's
+draw count (a mismatch is warned about);
+`comparison_metrics.csv` per species, with both sides' median, band, mean and
+standard deviation; `comparison_grid.csv` with the rank
 correlation of habitat effects on the grid. "Better" is higher AUC, deviance
 explained and Spearman, lower RMSE, and a calibration slope closer to 1.
 
@@ -890,8 +917,9 @@ and [`docs/taxon_quirks.md`](docs/taxon_quirks.md).
 4. Change one thing relative to exp_000: `stage_models` for different
    candidate formulas, or `specs` for a different engine or selection rule.
    Keep exp_000's species, draws and seed unless they are the question.
-5. Run it, first at 5 draws to check it works. The template's
-   `compare_to_baseline` step writes `tables/comparison_*.csv` against exp_000.
+5. Run it, first at 5 draws to check it works. It is compared with exp_000
+   automatically, in `tables/comparison_*.csv`. Compare like with like: run
+   exp_000 at the same number of draws; a mismatch is warned about.
 
 [`docs/getting_started.md`](docs/getting_started.md#test-a-change) walks
 through each lever.

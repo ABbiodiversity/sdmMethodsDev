@@ -263,7 +263,9 @@ That means a spec cannot name a term it forgot to load, and it means
 selecting covariates on their own would do nothing: loading `elevation`
 while every candidate still fits `MAP + FFP` changes only the I/O.
 
-So **the model set is the lever**, and an experiment sets it directly:
+So **the model set is the lever**, and an experiment sets it directly
+(the extra terms here must be ones the dataset or a covariate file
+holds; see below):
 
 ```r
 stage_models <- list(
@@ -310,6 +312,27 @@ new `1_code/_setup/` script that extends `covariates.csv` and the
 catalogue, with a dataset version bump, so the frozen dataset stays the
 single source of truth and `02_validate_test_dataset.R` keeps covering
 everything.
+
+### Covariates the dataset does not hold
+
+`0_data/test_dataset/` and the `_setup/` scripts that build it are
+the v2 data and stay fixed. An experiment that tests a new covariate
+brings it itself:
+
+1. A script in the experiment's folder (e.g.
+   `exp_002_soilgrids/01_extract_soilgrids_covariates.R`) extracts
+   it and writes a CSV to `2_pipeline/<id>/inputs/`: one row per
+   `survey_unit_id`, one column per covariate, `NA` where a unit has
+   no value.
+2. `run.R` names the file in
+   `experiment_config(covariate_files = )` and the new columns in
+   `stage_models`.
+3. The harness joins the file on `survey_unit_id` when it loads each
+   region. `experiment_config()` checks the file first: unique ids,
+   and no column that `covariates.csv` already has.
+
+A covariate that later becomes part of the standard data goes through
+a new dataset build, not through an experiment.
 
 ## Parity ledger
 
@@ -450,9 +473,16 @@ It sits on a regularization axis. A Bayesian framework comparison needs
    experiment template and `compare_experiments()`; contract tests.
    Checked against the previous code at 5 draws for the 14 parity
    species: every stage's coefficients identical.
-6. New engines (`gbm`, `mgcv` GAMs, `brms`) as method files; the
-   topography and remote-sensing covariate extension; spatial
-   prediction onto the 1 km grid; exp_001 onward.
+6. **Started (2026-10-03).** The `gbm` engine and
+   `replace_stage_method()`; `exp_001_gbm`, a test
+   experiment fitting the habitat stage with boosted regression
+   trees. `covariate_files` lets an experiment add covariates the
+   frozen dataset does not hold, from its own files;
+   `exp_002_soilgrids` adds SoilGrids at 0–5 cm from the
+   sciSpatialR catalogue to the climate stage. Still to come:
+   `mgcv` GAMs and `brms` as method files, the topography and
+   remote-sensing covariates, and
+   spatial prediction onto the 1 km grid.
 
 ### What steps 1-3 settled
 

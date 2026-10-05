@@ -294,7 +294,9 @@ run_record <- function(
         n = .N,
         median = stats::median(value),
         p10 = stats::quantile(value, 0.1, names = FALSE),
-        p90 = stats::quantile(value, 0.9, names = FALSE)
+        p90 = stats::quantile(value, 0.9, names = FALSE),
+        mean = mean(value),
+        sd = if (.N < 2) NA_real_ else stats::sd(value)
       ),
       by = list(taxon = run, region, metric)
     ]

@@ -136,6 +136,25 @@ Keys are `stage` (every taxon) or `taxon.stage` (one taxon).
 `meta.json` records the override, so a run that did not fit the v2
 sets cannot be mistaken for one that did.
 
+A covariate the dataset does not hold comes from the experiment
+itself. Write a script in the experiment's folder that saves a CSV
+to `2_pipeline/<id>/inputs/`, with one row per `survey_unit_id`,
+and name the file in the config:
+
+```r
+config <- experiment_config(
+  ...,
+  stage_models = list(
+    climate = extend_models("climate_plant_v2_full", "sg_clay_0_5cm")
+  ),
+  covariate_files = "2_pipeline/exp_NNN/inputs/my_covariates.csv"
+)
+```
+
+Never add columns to `0_data/` or change `_setup/` for an
+experiment: those hold the v2 data every experiment is compared
+against. `exp_002_soilgrids` is a worked example.
+
 ### 2. A different engine or rule: `specs`
 
 Build the standard specs, change a stage, and pass them in. For
@@ -174,8 +193,10 @@ that, it is a name in a spec, as in lever 2.
 
 ### Reading the comparison
 
-The template's `run.R` ends with `compare_to_baseline`, which
-writes three tables:
+Every experiment is compared with exp_000 automatically:
+`run_experiment()` writes three tables to `tables/`, and prints
+the headline (set `baseline = NULL` in `experiment_config()` to
+skip it):
 
 | File | Holds |
 | --- | --- |

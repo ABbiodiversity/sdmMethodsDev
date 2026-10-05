@@ -22,6 +22,10 @@
 #   - The usual levers, from least to most invasive:
 #     - `stage_models`: different candidate formulas for a stage
 #       (new covariates, a different model set).
+#     - `covariate_files`: covariates the dataset does not hold,
+#       from a CSV this experiment's own script writes to
+#       2_pipeline/<id>/inputs/. Never add them to 0_data/ or
+#       _setup/, which stay the v2 data.
 #     - `specs`: a spec with a stage changed - a different engine
 #       or selection rule. Build it from standard_specs() and
 #       change the field; see docs/getting_started.md.
@@ -62,12 +66,13 @@ config <- experiment_config(
 )
 
 # 2. Run ----
-# Fit, summarize, and compare with the v2 baseline (exp_000).
-# The comparison is written to tables/comparison_*.csv.
+# Fit, summarize, and compare with the v2 baseline (exp_000);
+# every experiment is compared with it. The comparison is
+# written to tables/comparison_*.csv. Add `steps` for anything
+# this experiment needs beyond that.
 results <- run_experiment(
   config,
-  translate = list(bird = bird_habitat_translation),
-  steps = list(compare = compare_to_baseline)
+  translate = list(bird = bird_habitat_translation)
 )
 
 # End of script ----

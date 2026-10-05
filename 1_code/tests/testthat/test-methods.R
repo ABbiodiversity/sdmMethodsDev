@@ -14,9 +14,9 @@ test_that("every registered engine passes check_engine()", {
 })
 
 test_that("the v2 methods are all registered", {
-  expect_setequal(
-    registered_names("engine"), c("glm", "bayesglm")
-  )
+  expect_true(all(
+    c("glm", "bayesglm", "gbm") %in% registered_names("engine")
+  ))
   expect_true(all(c(
     "single", "aic_best", "aic_average", "staged_bic", "ivw_grid",
     "aic_best_grid", "aic_best_onehot"
@@ -26,7 +26,7 @@ test_that("the v2 methods are all registered", {
 })
 
 test_that("an unknown method fails with the registered names", {
-  expect_error(get_engine("gbm"), "Registered: .*glm")
+  expect_error(get_engine("no_such_engine"), "Registered: .*glm")
   expect_error(get_method("selection", "best"), "aic_best")
 })
 
