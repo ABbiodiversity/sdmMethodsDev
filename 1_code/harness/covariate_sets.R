@@ -3,7 +3,7 @@
 # author: Brendan Casey
 # created: 2026-09-09
 # inputs:
-#   in 0_data/test_dataset/lookup/:
+#   in the test dataset's lookup/ (see data_source.R):
 #     - covariate_columns.csv
 # outputs: none; returns objects in memory
 # notes:
@@ -276,7 +276,7 @@ apply_derivations <- function(
 
 #' Read the Covariate Column Catalogue
 #'
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @param taxon Character. Keep only this taxon's rows, or NULL
 #'   for all of them.
 #' @return A data frame of taxon, block, source_column and
@@ -328,7 +328,7 @@ covariate_catalogue <- function(data_dir, taxon = NULL) {
 
 #' List the Covariates One Taxon and Region Have
 #'
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @param taxon Character. Taxon slug.
 #' @param region Character. Region name, or NULL.
 #' @param block Character. Restrict to one block, or NULL.
@@ -389,7 +389,7 @@ available_covariates <- function(
 #' different model, which is the one thing a comparison must not
 #' do.
 #'
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @param taxa Character vector of taxon slugs.
 #' @param block Character. Restrict to one block, or NULL.
 #' @return A character vector of master column names present for
@@ -447,7 +447,7 @@ common_covariates <- function(data_dir, taxa, block = NULL) {
 #' as NA, so the map is what keeps a habitat model from silently
 #' losing its footprint terms.
 #'
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @param taxon Character. Taxon slug.
 #' @param region Character. Region name, or NULL.
 #' @param block Character. Restrict to one block, or NULL for
@@ -532,7 +532,7 @@ apply_term_map <- function(x, map) {
 #'
 #' @param requested Character vector of set names, `block:<name>`
 #'   references, or master column names.
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @param taxon Character. Taxon slug.
 #' @param region Character. Region name, or NULL.
 #' @param sets Named list of covariate sets.

@@ -3,8 +3,9 @@
 # author: Brendan Casey
 # created: 2026-09-09
 # inputs:
-#   in 0_data/test_dataset/, where lookup/dataset_manifest.csv
-#   says (`bootstrap_ids`, `bootstrap_layout`):
+#   in the test dataset (see harness/data_source.R), where
+#   lookup/dataset_manifest.csv says (`bootstrap_ids`,
+#   `bootstrap_layout`):
 #     - per_taxon_csv: one table, one column per draw (birds)
 #     - per_species_rds: one file per species (plant groups)
 # outputs: registers the `precomputed` scheme
@@ -29,7 +30,7 @@ library(data.table) # lookup table reading (version: 1.16.4)
 
 #' Read Bootstrap Ids the Source Pipeline Generated
 #'
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @param taxon Character. Taxon slug.
 #' @param iterations Integer vector of bootstrap iterations.
 #' @param id_column Character. The column in the covariate frame

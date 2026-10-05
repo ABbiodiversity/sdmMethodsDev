@@ -3,6 +3,10 @@
 # author: Brendan Casey
 # created: 2026-09-29
 # inputs:
+#   Read from the input mirror on ABMI-DATA2 (utils/
+#   input_paths.R; 00_mirror_setup_inputs.R made it). The
+#   locations below are the originals, which the SDM_* variables
+#   can point back to.
 #   in the v2 plant project (SDM_V2_PROJECT):
 #     - 0_data/bootstrap/lichen-bootstrap-ids.Rdata
 #     - 0_data/bootstrap/mite-bootstrap-ids.Rdata
@@ -44,9 +48,12 @@ library(data.table) # reading sites.csv (version: 1.16.4)
 ## 1.2 Resolve paths ----
 project_root <- normalizePath(getwd(), winslash = "/")
 
+# The _setup inputs mirrored on ABMI-DATA2 (setup_input())
+source(file.path(project_root, "1_code/_setup/utils/input_paths.R"))
+
 v2_project <- Sys.getenv(
   "SDM_V2_PROJECT",
-  unset = "//ABMI-DATA2/science/sc/ToEmily/VegetationModels"
+  unset = setup_input("vegetation_models")
 )
 
 sources <- c(

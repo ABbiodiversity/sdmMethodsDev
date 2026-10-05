@@ -3,7 +3,7 @@
 # author: Brendan Casey; translation logic by Elly Knight (v2)
 # created: 2026-09-29
 # inputs:
-#   in 0_data/test_dataset/:
+#   in the test dataset (see harness/data_source.R):
 #     - covariates.csv, the bird rows
 #     - lookup/bird_veg_age_matrix.csv, from
 #       1_code/_setup/06_harmonize_bird_translation_lookup.R
@@ -79,7 +79,7 @@ bird_sort_interaction <- function(x) {
 #' block - `road` became `road_veg` and `road_soil` - so model
 #' terms carry the suffix and v2's lookups do not.
 #'
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @param block Character. "veg" for north, "soil" for south.
 #' @return A data frame of source and master names, one row per
 #'   source column, preferring the given block.
@@ -184,7 +184,7 @@ bird_model_terms <- function(set) {
 #' the covariates under v2's names, the design matrix, and the
 #' row sets the linear-feature adjustment averages over.
 #'
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @param region Character. "north" or "south".
 #' @return A list.
 #'
@@ -436,7 +436,7 @@ standardize_bird_draw <- function(raw, context, species) {
 #'
 #' @param coefficients A data frame of species, region, boot,
 #'   term and estimate: the landcover stage, one region.
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @param region Character. "north" or "south".
 #' @return A data frame of the same columns, on the standardized
 #'   template, with stage "habitat" and se NA.
@@ -496,7 +496,7 @@ standardize_bird_coefficients <- function(
 #' "habitat". The raw "landcover" rows stay as they are.
 #'
 #' @param coefficients A store's coefficients.
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @param region Character. "north" or "south".
 #' @return A data frame of coefficient rows, or NULL.
 #'

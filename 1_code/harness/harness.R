@@ -51,6 +51,7 @@ load_harness <- function(
   files <- c(
     "registry.R",
     "cache.R",
+    "data_source.R",
     "spec.R",
     "data_load.R",
     "covariate_sets.R",

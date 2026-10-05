@@ -3,7 +3,7 @@
 # author: Brendan Casey
 # created: 2026-10-04
 # inputs:
-#   - 0_data/test_dataset/, the frozen v2 data, unchanged
+#   - the published test dataset, the frozen v2 data, unchanged
 #   - 2_pipeline/exp_002_soilgrids/inputs/soilgrids_0_5cm.csv, the
 #     soil covariates, written by 01_extract_soilgrids_covariates.R
 #     in this folder (run here when the file is missing)

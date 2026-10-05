@@ -3,7 +3,7 @@
 # author: Brendan Casey
 # created: 2026-10-03
 # inputs:
-#   0_data/test_dataset/
+#   the published test dataset (see data_source.R)
 # outputs:
 #   in 2_pipeline/<id>/: the result stores and run_log.csv
 #   in 3_output/<id>/: tables/, run_record.md, and whatever the
@@ -69,7 +69,7 @@ library(data.table) # run log writing (version: 1.16.4)
 #'   reach to be gated.
 #' @param project_root Character. The repository root.
 #' @param data_dir,pipeline_dir,out_dir Character, or NULL for
-#'   0_data/test_dataset, 2_pipeline/<id> and 3_output/<id>.
+#'   test_dataset_dir(), 2_pipeline/<id> and 3_output/<id>.
 #' @return A list of class `experiment_config`.
 #'
 #' @example # Example usage of the function
@@ -121,9 +121,7 @@ experiment_config <- function(
   }
 
   n_bootstraps <- as.integer(n_bootstraps)
-  data_dir <- data_dir %||% file.path(
-    project_root, "0_data", "test_dataset"
-  )
+  data_dir <- test_dataset_dir(data_dir)
 
   # Stored draws have a hard ceiling; drawn ones do not
   for (key in names(specs)) {
@@ -412,7 +410,7 @@ record_config <- function(config, run_log = NULL) {
     engines = stage_values("engine"),
     selection = stage_values("selection"),
     compared_with = config$baseline %||% "none (baseline)",
-    data_dir = basename(config$data_dir)
+    data_dir = published_label(config$data_dir)
   )
 
   # Failures belong in the record. Without them, a run that lost

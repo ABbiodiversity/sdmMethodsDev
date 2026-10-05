@@ -3,6 +3,10 @@
 # author: Brendan Casey
 # created: 2026-09-05
 # inputs:
+#   Read from the input mirror on ABMI-DATA2 (utils/
+#   input_paths.R; 00_mirror_setup_inputs.R made it). The
+#   locations below are the originals, which the SDM_* variables
+#   can point back to.
 #   from 0_data/data_snapshots/model_ready_v2/ on ABMI-DATA2:
 #     - vascular-plant-model-data.Rdata
 #     - bryophyte-model-data.Rdata
@@ -154,13 +158,13 @@ library(data.table)
 ## 1.2 Configure paths ----
 project_root <- normalizePath(getwd(), winslash = "/")
 
+# The _setup inputs mirrored on ABMI-DATA2 (setup_input())
+source(file.path(project_root, "1_code/_setup/utils/input_paths.R"))
+
 # Directory containing the v2 model ready snapshot files on ABMI-DATA2
 snapshot_dir <- Sys.getenv(
   "SDM_SNAPSHOT_V2",
-  unset = paste0(
-    "//ABMI-DATA2/science/sc/sdmMethodsDev/0_data/",
-    "data_snapshots/model_ready_v2"
-  )
+  unset = setup_input("model_ready_v2")
 )
 
 # Output is the frozen test dataset itself, so it lands in
@@ -370,9 +374,8 @@ mammal_climate_cols <- c(
 # four of the nine v2 climate models need.
 mammal_camera_climate_file <- Sys.getenv(
   "SDM_MAMMAL_CAMERA_CLIMATE",
-  unset = paste0(
-    "//ABMI-DATA2/science/sc/AB_data_v2023/sites/processed/",
-    "climate/abmi-camera-climate_2023.Rdata"
+  unset = setup_input(
+    "ab_data_v2023", "abmi-camera-climate_2023.Rdata"
   )
 )
 
@@ -398,9 +401,9 @@ mammal_camera_climate_cols <- c(
 # pipeline, so it is copied in rather than derived here.
 mammal_climate_pred_file <- Sys.getenv(
   "SDM_MAMMAL_CLIMATE_PRED",
-  unset = paste0(
-    "G:/Shared drives/ABMI Mammals/Results/Habitat Modeling/",
-    "2024/Climate/Predictions/",
+  unset = setup_input(
+    "abmi_mammals",
+    "Results/Habitat Modeling/2024/Climate/Predictions",
     "All Species Climate Predictions.csv"
   )
 )
@@ -422,9 +425,8 @@ mammal_climate_pred_file <- Sys.getenv(
 # models.
 v2_lookup_dir <- Sys.getenv(
   "SDM_V2_LOOKUP",
-  unset = paste0(
-    "//ABMI-DATA2/science/sc/ToEmily/VegetationModels/",
-    "0_data/lookup/prediction-matrix"
+  unset = setup_input(
+    "vegetation_models", "0_data/lookup/prediction-matrix"
   )
 )
 
@@ -437,8 +439,8 @@ v2_lookup_files <- c(
 # The naming authority for mammal species.
 wt_species_file <- Sys.getenv(
   "SDM_WT_SPECIES",
-  unset = paste0(
-    "G:/Shared drives/ABMI Mammals/Data/Lookup Tables/",
+  unset = setup_input(
+    "abmi_mammals", "Data/Lookup Tables",
     "WildTrax Species Strings.RData"
   )
 )
@@ -461,10 +463,7 @@ wt_species_file <- Sys.getenv(
 # below writes to it.
 bird_data_file <- Sys.getenv(
   "SDM_BIRD_DATA",
-  unset = paste0(
-    "G:/Shared drives/work_abmi/1_projects/active/",
-    "sdmMethodsDev/remote/birds_data_v2/Stratified.Rdata"
-  )
+  unset = setup_input("birds_data_v2", "Stratified.Rdata")
 )
 
 ## 1.11 Name the bird covariate blocks ----

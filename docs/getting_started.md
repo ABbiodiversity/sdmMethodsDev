@@ -52,7 +52,11 @@ and is compared against it.
 ## Run the baseline
 
 Open the project in RStudio or Positron. The working directory is
-then the repository root. Then:
+then the repository root. You need read access to
+`//ABMI-DATA2/science/sdmMethodsDev/` (on the ABMI network or VPN):
+the test dataset and the v2 results are read from there, so you do
+not run `_setup/`. Off the network, copy the published folders and
+set `SDM_TEST_DATASET` and `SDM_V2_RESULTS` to them. Then:
 
 ```r
 source("1_code/experiments/exp_000_parity_v2/run.R")
@@ -267,5 +271,5 @@ meant to alter results should alter only what it says it does.
 | `1_code/experiments/exp_NNN_*/` | One folder per question | Ask a question |
 | `1_code/experiments/_shared/` | Named focal-species sets | Add a reusable species set |
 | `1_code/_setup/` | One-off scripts that build `0_data/` | Rebuild or extend the dataset |
-| `0_data/test_dataset/` | The frozen dataset. `lookup/dataset_manifest.csv` says which file is whose | Nothing; it is rebuilt by `_setup/` |
+| `0_data/test_dataset/` | The frozen dataset as `_setup/` builds it. Runs read the copy published on ABMI-DATA2, pinned in `1_code/harness/data_source.R`. `lookup/dataset_manifest.csv` says which file is whose | Nothing; it is rebuilt by `_setup/` and republished by `_setup/10` |
 | `docs/` | Design, taxon quirks, this guide | |

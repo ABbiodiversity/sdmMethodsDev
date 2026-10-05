@@ -6,7 +6,8 @@
 #   - SoilGrids 2.0, ABMI 1 km variant, from the sciSpatialR
 #     catalogue (geoscientificInformation/soilgrids_250_v2_ab/
 #     abmi1km), on //ABMI-DATA2; SDM_SOILGRIDS overrides the path
-#   - 0_data/test_dataset/sites.csv, read only
+#   - sites.csv from the published test dataset (see
+#     1_code/harness/data_source.R), read only
 # outputs:
 #   in 2_pipeline/exp_002_soilgrids/inputs/:
 #     - soilgrids_0_5cm.csv: survey_unit_id plus ten
@@ -14,7 +15,7 @@
 #     - soilgrids_0_5cm_source.csv: where the columns came from
 # notes:
 #   - The experiment's own covariates. They are written here, not
-#     into 0_data/test_dataset/, which stays the frozen v2 data;
+#     into the test dataset, which stays the frozen v2 data;
 #     run.R names the file in experiment_config(covariate_files =)
 #     and the harness joins it on survey_unit_id when loading.
 #   - The shallowest depth, 0-5 cm, of the ten SoilGrids
@@ -48,19 +49,20 @@ library(sf)          # survey unit points (version: 1.1.2)
 
 ## 1.2 Resolve paths ----
 project_root <- normalizePath(getwd(), winslash = "/")
-sites_path <- file.path(
-  project_root, "0_data", "test_dataset", "sites.csv"
-)
+resolver <- file.path(project_root, "1_code/harness/data_source.R")
+
+if (!file.exists(resolver)) {
+  stop("Run this from the repository root.", call. = FALSE)
+}
+
+source(resolver)
+sites_path <- file.path(test_dataset_dir(), "sites.csv")
 out_dir <- file.path(
   project_root, "2_pipeline", "exp_002_soilgrids", "inputs"
 )
 
 layer_id <- "geoscientificInformation/soilgrids_250_v2_ab/abmi1km"
 layer_path <- Sys.getenv("SDM_SOILGRIDS", unset = "")
-
-if (!file.exists(sites_path)) {
-  stop("Run this from the repository root.", call. = FALSE)
-}
 
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 

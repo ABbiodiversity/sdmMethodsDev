@@ -3,7 +3,7 @@
 # author: Brendan Casey
 # created: 2026-09-09
 # inputs:
-#   in 0_data/test_dataset/lookup/:
+#   in the test dataset's lookup/ (see data_source.R):
 #     - species_queue.csv, from _setup/09_harmonize_lookups.R
 # outputs: none; returns objects in memory
 # notes:
@@ -34,7 +34,7 @@ library(data.table) # lookup table reading (version: 1.16.4)
 
 #' Read the Species Queue
 #'
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @param taxon Character. Keep one taxon, or NULL for all.
 #' @return A data frame of taxon, region, season, tier, species,
 #'   order and source_name.
@@ -82,7 +82,7 @@ species_catalogue <- function(data_dir, taxon = NULL) {
 #'
 #' What an experiment reads to decide which focal species to run.
 #'
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @param taxon Character. Taxon slug.
 #' @param region Character. Restrict to one region, or NULL.
 #' @param tier Character. Restrict to one model tier, or NULL.
@@ -131,7 +131,7 @@ list_species <- function(
 #' dataset's column: mammals are "Black BearSummer" there and
 #' "BlackBear_Summer" here.
 #'
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @param taxon,species Character.
 #' @return Character, the source name.
 #'
@@ -161,7 +161,7 @@ species_source_name <- function(data_dir, taxon, species) {
 #' hours later.
 #'
 #' @param species Character vector of species, or NULL for all.
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @param taxon Character. Taxon slug.
 #' @param region Character. Restrict to one region, or NULL.
 #' @param tier Character. Restrict to one model tier, or NULL.

@@ -3,7 +3,7 @@
 # author: Brendan Casey
 # created: 2026-10-03
 # inputs:
-#   - 0_data/test_dataset/
+#   - the published test dataset (harness/data_source.R)
 #   - 3_output/exp_000_parity_v2/tables/, the v2 baseline
 # outputs:
 #   in 2_pipeline/exp_001_xgboost/:

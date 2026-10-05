@@ -3,8 +3,9 @@
 # author: Brendan Casey
 # created: 2026-09-09
 # inputs:
-#   - 0_data/test_dataset/
-#   - 0_data/v2_results/, the v2 reference (section 1.3)
+#   - the published test dataset (harness/data_source.R)
+#   - the published v2 results, the v2 reference (section 1.3;
+#     see harness/data_source.R)
 #   - the framework: 1_code/harness/, methods/, modules/
 # outputs:
 #   in 2_pipeline/exp_000_parity_v2/:
@@ -102,9 +103,7 @@ config <- experiment_config(
 config$v2_reference <- "abmiexplorer"
 
 config$v2_reference_dir <- file.path(
-  config$project_root,
-  "0_data",
-  "v2_results",
+  v2_results_dir(),
   switch(
     config$v2_reference,
     abmiexplorer = "abmiexplorer",

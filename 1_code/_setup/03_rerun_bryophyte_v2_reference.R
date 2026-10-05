@@ -3,6 +3,10 @@
 # author: Brendan Casey
 # created: 2026-09-10
 # inputs:
+#   Read from the input mirror on ABMI-DATA2 (utils/
+#   input_paths.R; 00_mirror_setup_inputs.R made it). The
+#   locations below are the originals, which the SDM_* variables
+#   can point back to.
 #   in the v2 project (SDM_V2_PROJECT):
 #     - 0_data/species/processed/bryophyte-model-data.Rdata
 #     - 0_data/bootstrap/bryophyte-bootstrap-ids.Rdata
@@ -49,9 +53,12 @@ library(parallel) # bootstrap-level parallelism (version: 4.5.0)
 ## 1.2 Configure ----
 project_root <- normalizePath(getwd(), winslash = "/")
 
+# The _setup inputs mirrored on ABMI-DATA2 (setup_input())
+source(file.path(project_root, "1_code/_setup/utils/input_paths.R"))
+
 v2_project <- Sys.getenv(
   "SDM_V2_PROJECT",
-  unset = "//ABMI-DATA2/science/sc/ToEmily/VegetationModels"
+  unset = setup_input("vegetation_models")
 )
 
 out_dir <- file.path(project_root, "2_pipeline/v2_reference")

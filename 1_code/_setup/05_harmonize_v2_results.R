@@ -21,6 +21,10 @@
 #   - 0_data/v2_results/v2_results.csv
 #   - 0_data/v2_results/v2_results_coverage.csv
 # notes:
+#   - Legacy: not re-run. Parity is scored against the
+#     ABMIexploreR reference (08). Its output is published frozen
+#     with 0_data/v2_results/ by 10_publish_datasets.R, and its
+#     inputs are not mirrored to ABMI-DATA2.
 #   - One long table of the published v2 results, so that a run
 #     in 3_output/exp_000_parity_v2/ can be scored against a
 #     single file rather than against three storage formats on

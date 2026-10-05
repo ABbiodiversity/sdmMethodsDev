@@ -143,6 +143,13 @@ factor levels are one table each for every taxon. The harness reads
 file locations from the manifest and nowhere else, so a new taxon is
 manifest rows plus its files.
 
+The dataset folder itself is resolved once, by `test_dataset_dir()` in
+`harness/data_source.R`: the version published to
+`//ABMI-DATA2/science/sdmMethodsDev/0_data/test_dataset/` that the file
+pins, unless `SDM_TEST_DATASET` names another copy. A published version
+is never overwritten and carries a `checksums.csv`, so every run reads
+the same bytes, and the run record says which version it read.
+
 ### Runs are parallel and reproducible
 
 Each species of each spec is one job. Jobs run on a cluster of R

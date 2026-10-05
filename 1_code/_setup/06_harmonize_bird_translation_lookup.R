@@ -3,6 +3,10 @@
 # author: Brendan Casey
 # created: 2026-09-29
 # inputs:
+#   Read from the input mirror on ABMI-DATA2 (utils/
+#   input_paths.R; 00_mirror_setup_inputs.R made it). The
+#   locations below are the originals, which the SDM_* variables
+#   can point back to.
 #   in the BirdModels project (SDM_V2_BIRD_ROOT):
 #     - Data/lookups/Xn-veg-v2024.Rdata
 # outputs:
@@ -40,12 +44,12 @@ library(data.table) # CSV writing (version: 1.16.4)
 ## 1.2 Resolve paths ----
 project_root <- normalizePath(getwd(), winslash = "/")
 
+# The _setup inputs mirrored on ABMI-DATA2 (setup_input())
+source(file.path(project_root, "1_code/_setup/utils/input_paths.R"))
+
 v2_bird_root <- Sys.getenv(
   "SDM_V2_BIRD_ROOT",
-  unset = paste0(
-    "G:/.shortcut-targets-by-id/",
-    "17Ymt13eHfKvIiuoMl6x-Kn74Z2uVbbzS/BirdModels"
-  )
+  unset = setup_input("bird_models")
 )
 
 source_path <- file.path(

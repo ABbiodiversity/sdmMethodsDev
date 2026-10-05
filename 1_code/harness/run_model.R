@@ -54,7 +54,7 @@
 #'
 #' @param specs A named list of taxon specs. The names name the
 #'   runs, and so the folders under `pipeline_dir`.
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @param pipeline_dir Character. Each spec writes to
 #'   `pipeline_dir/<name>/<region>/`.
 #' @param species Character vector of focal species, named by
@@ -150,7 +150,7 @@ run_specs <- function(
 #' run_specs() for a single spec, writing to `run_dir/<region>/`.
 #'
 #' @param spec A taxon spec.
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @param run_dir Character. Where the region stores go.
 #' @param ... Passed to run_specs(): species, regions,
 #'   iterations, stage_models, metrics, boot_seed, workers,

@@ -3,7 +3,7 @@
 # author: Brendan Casey
 # created: 2026-09-09
 # inputs:
-#   in 0_data/test_dataset/:
+#   in the test dataset (see harness/data_source.R):
 #     - sites.csv
 #     - covariates.csv
 #     - each taxon's response and offset files, as named in
@@ -59,7 +59,7 @@ library(data.table) # column-selective CSV reading (version: 1.16.4)
 #' file, the covariate key, the habitat prediction grid, and any
 #' stored bootstrap draws.
 #'
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @return A data frame.
 #'
 #' @example # Example usage of the function
@@ -86,7 +86,7 @@ Run 1_code/_setup/09_harmonize_lookups.R first.",
 
 #' One Taxon's Manifest Row
 #'
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @param taxon Character. Taxon slug.
 #' @param region Character, or NULL for the taxon's first region,
 #'   which is enough for anything that does not vary by region.
@@ -127,7 +127,7 @@ manifest_entry <- function(data_dir, taxon, region = NULL) {
 #' @param taxon Character. Taxon slug.
 #' @param region Character, or NULL when the taxon's covariates
 #'   are not stored per region.
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @return Character. The value to match in the `taxon` column of
 #'   covariates.csv.
 #'
@@ -150,7 +150,7 @@ covariate_key <- function(taxon, region = NULL, data_dir) {
 #' identity, design and location fields the covariate tables
 #' factor out, and an `in_<taxon>` flag per taxon.
 #'
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @param taxon Character. Keep only units that taxon covers, or
 #'   NULL for every unit.
 #' @param columns Character vector of columns to read, or NULL
@@ -158,7 +158,7 @@ covariate_key <- function(taxon, region = NULL, data_dir) {
 #' @return A data frame, one row per survey unit.
 #'
 #' @example # Example usage of the function
-#' # sites <- load_sites("0_data/test_dataset", taxon = "bird")
+#' # sites <- load_sites(test_dataset_dir(), taxon = "bird")
 #' # nrow(sites)
 load_sites <- function(data_dir, taxon = NULL, columns = NULL) {
   path <- file.path(data_dir, "sites.csv")
@@ -208,7 +208,7 @@ load_sites <- function(data_dir, taxon = NULL, columns = NULL) {
 #' model_frame().
 #'
 #' @param taxon Character. Taxon slug.
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @param species Character vector of species columns to read, or
 #'   NULL for all of them.
 #' @return A data frame of survey_unit_id and species columns.
@@ -255,7 +255,7 @@ load_response <- function(taxon, data_dir, species = NULL) {
 #' is a modelling choice, and this is a data reader.
 #'
 #' @param taxon Character. Taxon slug.
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @param species Character vector of species columns to read, or
 #'   NULL for all of them.
 #' @return A data frame of survey_unit_id and species columns, or
@@ -297,7 +297,7 @@ load_offsets <- function(taxon, data_dir, species = NULL) {
 #' rows belonging to one covariate key.
 #'
 #' @param taxon Character. Taxon slug.
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @param columns Character vector of master column names.
 #' @param region Character. Region name, or NULL when the taxon's
 #'   covariates are not stored per region.
@@ -424,7 +424,7 @@ load_covariates <- function(
 #' already has, so no column has two possible sources.
 #'
 #' @param files Character vector of CSV paths.
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @return `files`, invisibly; stops on the first problem.
 #'
 #' @example # Example usage of the function
@@ -551,7 +551,7 @@ add_covariate_files <- function(x, files, columns) {
 #' quietly admitting it would change the contrasts.
 #'
 #' @param frame A data frame.
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @param taxon Character. Taxon slug.
 #' @return The frame, with the recorded columns as factors.
 #'
@@ -667,7 +667,7 @@ reference level and every contrast.",
 #' the fitting.
 #'
 #' @param taxon Character. Taxon slug.
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @param species Character vector of species to model.
 #' @param covariates Character vector of master column names.
 #' @param region Character. Region name, or NULL.

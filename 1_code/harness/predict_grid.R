@@ -3,7 +3,7 @@
 # author: Brendan Casey
 # created: 2026-09-09
 # inputs:
-#   in 0_data/test_dataset/lookup/:
+#   in the test dataset's lookup/ (see data_source.R):
 #     - <name>_prediction_matrix.csv
 # outputs: none; returns objects in memory
 # notes:
@@ -40,7 +40,7 @@ library(data.table) # lookup table reading (version: 1.16.4)
 
 #' Read a Prediction Grid
 #'
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @param name Character. Grid name, without the
 #'   `_prediction_matrix.csv` suffix, or NULL for no grid.
 #' @return A data frame with habitat types as rownames, or NULL.

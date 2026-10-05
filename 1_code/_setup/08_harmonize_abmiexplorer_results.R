@@ -4,6 +4,10 @@
 # author: Brendan Casey
 # created: 2026-10-02
 # inputs:
+#   Read from the input mirror on ABMI-DATA2 (utils/
+#   input_paths.R; 00_mirror_setup_inputs.R made it). The
+#   locations below are the originals, which the SDM_* variables
+#   can point back to.
 #   - data/species-coefs.RData from the ABbiodiversity/ABMIexploreR
 #     GitHub repository, at the commit pinned in section 1.2
 #   - Data/lookups/birdlist.csv on the BirdModels drive, for the
@@ -95,14 +99,15 @@ explorer_file <- "data/species-coefs.RData"
 ## 1.3 Resolve the other locations ----
 project_root <- normalizePath(getwd(), winslash = "/")
 
+# The _setup inputs mirrored on ABMI-DATA2 (setup_input())
+source(file.path(project_root, "1_code/_setup/utils/input_paths.R"))
+
 # The same lookup v2's 08.PackageCoefficients.R uses to turn
 # bird codes into the names the package carries.
 bird_lookup_path <- Sys.getenv(
   "SDM_V2_BIRD_LOOKUP",
-  unset = paste0(
-    "G:/.shortcut-targets-by-id/",
-    "17Ymt13eHfKvIiuoMl6x-Kn74Z2uVbbzS/BirdModels/",
-    "Data/lookups/birdlist.csv"
+  unset = setup_input(
+    "bird_models", "Data/lookups/birdlist.csv"
   )
 )
 

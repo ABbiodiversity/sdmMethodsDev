@@ -423,6 +423,10 @@ handful of draws does not mean much. On a 24-core machine, the 14
 
 The dataset is built once per source snapshot by the scripts in
 `1_code/_setup/`, run by hand and in order. No experiment runs them.
+The built dataset and v2 results are then published to ABMI-DATA2
+(`10`), and experiments read those copies, so only whoever rebuilds the
+data runs `_setup/`. The scripts read their inputs from a mirror on the
+same share (`00`), so anyone with access to it can rebuild.
 
 ```mermaid
 %% ----------------------------
@@ -495,15 +499,25 @@ flowchart TD
 
 | Script | Reads | Writes |
 | --- | --- | --- |
+| `00_mirror_setup_inputs.R` | Every external input below, at its original location | `setup_inputs/` on ABMI-DATA2, with `inputs_manifest.csv`; run once |
 | `01_harmonize_model_ready_v2.R` | The `model_ready_v2` snapshot, the mammal camera climate, the WildTrax species lookup, the v2 prediction matrices, the bird `Stratified.Rdata` | `0_data/test_dataset/` |
 | `02_validate_test_dataset.R` | The test dataset and the same sources | Nothing; prints a pass / fail tally |
 | `03_rerun_bryophyte_v2_reference.R` | The v2 plant project's bryophyte data, and the frozen v2 functions | `2_pipeline/v2_reference/bryophyte-species-models.Rdata` |
-| `04_package_bird_coefficients.R` | The per-draw v2 bird coefficient CSVs | `2_pipeline/v2_reference/Birds2024.RData` |
-| `05_harmonize_v2_results.R` | v2 plant `COEFS.RData`, the mammal coefficient tables, `Birds2024.RData` | `0_data/v2_results/` |
+| `04_package_bird_coefficients.R` (legacy) | The per-draw v2 bird coefficient CSVs | `2_pipeline/v2_reference/Birds2024.RData` |
+| `05_harmonize_v2_results.R` (legacy) | v2 plant `COEFS.RData`, the mammal coefficient tables, `Birds2024.RData` | `0_data/v2_results/` |
 | `06_harmonize_bird_translation_lookup.R` | v2's bird `Xn-veg-v2024.Rdata` | `lookup/bird_veg_age_matrix.csv` |
 | `07_harmonize_v2_plant_bootstrap_ids.R` | v2's stored plant bootstrap draws | `lookup/v2_bootstrap_ids/` |
 | `08_harmonize_abmiexplorer_results.R` | ABMIexploreR's packaged coefficients | `0_data/v2_results/abmiexplorer/` |
 | `09_harmonize_lookups.R` | `0_data/test_dataset/lookup/` only (offline) | `species_queue.csv`, `factor_levels.csv`, `dataset_manifest.csv`, the bird prediction grids |
+| `10_publish_datasets.R` | `0_data/test_dataset/`, `0_data/v2_results/` | A new `<version>/` of each on ABMI-DATA2, with `checksums.csv` |
+
+- **`00`** copies every external file `_setup/` reads to
+  `//ABMI-DATA2/science/sdmMethodsDev/0_data/setup_inputs/`, unchanged and
+  under each source's own relative paths, and records each copy's origin
+  and md5 in `inputs_manifest.csv`. The originals are left in place. The
+  scripts read the mirror by default (`_setup/utils/input_paths.R`); their
+  `SDM_*` variables still point them back at the originals. It never
+  overwrites the mirror: a source that has changed since is reported.
 
 - **`01`** writes every response, covariate and lookup table, so experiments
   run from `0_data/test_dataset/` alone. Mammal species names are resolved
@@ -517,7 +531,12 @@ flowchart TD
   every draw is an error object. It re-runs the frozen v2 functions
   unmodified, climate stage only.
 - **`04`** rebuilds the packaged bird output, absent from the bird drive. It
-  is v2's `08.PackageCoefficients.R` with only the paths changed.
+  is v2's `08.PackageCoefficients.R` with only the paths changed. **`04`
+  and `05` are legacy:** parity is scored against `08`'s ABMIexploreR
+  build, which agrees with theirs to about 1e-15 on shared species. Their
+  output is kept and published frozen in `v2_results/`, and their inputs
+  (hours of Google Drive reads, and ~38 GB of bird model objects) are not
+  mirrored.
 - **`05`** flattens the three v2 storage formats into one table. Mammal
   results average the two seasons, as v2's `.all` tables do.
   `Birds2024.RData` labels draws 2 to 100 in file-listing order (`b2` is draw
@@ -535,13 +554,18 @@ flowchart TD
   the bird habitat grids, and `dataset_manifest.csv`, which names each
   taxon's files. The harness reads file locations from the manifest and
   nowhere else. It runs offline in seconds; re-run it after `01` or `06`.
+- **`10`** publishes `0_data/test_dataset/` and `0_data/v2_results/` as a
+  new version folder each (default: today's date), copied to a `.partial`
+  folder, checked by md5 and only then renamed into place. A published
+  version is never overwritten. Point experiments at it by changing the
+  pin in `1_code/harness/data_source.R`.
 
 ## Directory structure
 
 ```
 sdmMethodsDev/
 ├── README.md
-├── 0_data/                        # read-only inputs; written only by 1_code/_setup/
+├── 0_data/                        # _setup/ output; experiments read the published copy
 │   ├── test_dataset/              # the frozen dataset; see "Data" below
 │   ├── v2_results/                # the published v2 results, one table
 │   ├── v2_scripts/                # the v2 scripts as received; reference only
@@ -574,7 +598,8 @@ sdmMethodsDev/
 │   │   ├── exp_001_xgboost/       # test: habitat stage fitted with xgboost
 │   │   └── exp_002_soilgrids/     # test: SoilGrids terms in the climate stage;
 │   │                              # 01_extract_soilgrids_covariates.R, run.R
-│   ├── _setup/                    # 01–09: build the v2 data in 0_data/; fixed
+│   ├── _setup/                    # 00–10: mirror inputs, build the v2 data in
+│   │                              # 0_data/, publish it to ABMI-DATA2; fixed
 │   ├── tests/                     # run_tests.R; compare_stores.R
 │   └── _scratch.R                 # dated workspace for exploration
 │
@@ -603,7 +628,25 @@ sdmMethodsDev/
 
 ## Data: `0_data/`
 
-Read-only during experiments, and gitignored except `v2_scripts/`.
+Gitignored except `v2_scripts/`. `test_dataset/` and `v2_results/` are
+built here by `_setup/`, then published to ABMI-DATA2 as versioned,
+checksummed copies:
+
+```
+//ABMI-DATA2/science/sdmMethodsDev/0_data/
+├── test_dataset/<version>/   # + checksums.csv, publish_record.md
+├── v2_results/<version>/
+└── setup_inputs/             # _setup/'s inputs; see "Building the dataset"
+```
+
+**Experiments, tests and downstream scripts read the published copies,**
+through `test_dataset_dir()` and `v2_results_dir()` in
+[`1_code/harness/data_source.R`](1_code/harness/data_source.R). That file
+pins the version every run reads, and each run record names it. Every call
+checks the published files are present at their published sizes;
+`verify_published()` checks them by md5. To read another copy (a local one
+for working off the network, or `0_data/` straight after a rebuild), set
+`SDM_TEST_DATASET` or `SDM_V2_RESULTS` to its folder.
 
 ### `test_dataset/`
 
@@ -971,8 +1014,13 @@ install.packages(c(
 ))
 ```
 
-Fitting an experiment needs only `0_data/`. Building the dataset needs the
-network sources, once per snapshot, from the repository root:
+Fitting an experiment needs only read access to
+`//ABMI-DATA2/science/sdmMethodsDev/` (on the ABMI network or VPN); nothing
+in `_setup/` has to be run. Off the network, copy the published folders
+locally and set `SDM_TEST_DATASET` and `SDM_V2_RESULTS` to them.
+
+Rebuilding the dataset needs the same share, once per snapshot, from the
+repository root:
 
 ```r
 source("1_code/_setup/01_harmonize_model_ready_v2.R")
@@ -980,25 +1028,36 @@ source("1_code/_setup/06_harmonize_bird_translation_lookup.R")
 source("1_code/_setup/09_harmonize_lookups.R")      # offline; seconds
 source("1_code/_setup/02_validate_test_dataset.R")
 
-# The v2 reference. 03 and 04 take hours; re-run only if their sources change
+# The v2 reference. 03 takes hours; re-run only if its sources change
 source("1_code/_setup/03_rerun_bryophyte_v2_reference.R")
-source("1_code/_setup/04_package_bird_coefficients.R")
-source("1_code/_setup/05_harmonize_v2_results.R")
+source("1_code/_setup/07_harmonize_v2_plant_bootstrap_ids.R")
 source("1_code/_setup/08_harmonize_abmiexplorer_results.R")
+
+# Publish, then move the pin in 1_code/harness/data_source.R
+source("1_code/_setup/10_publish_datasets.R")
 ```
 
-Set these when a source is not in its default location:
+`00_mirror_setup_inputs.R` is run once, by someone who can reach the
+original drives, and again only if a source changes. `04` and `05` are
+legacy and need the original drives.
+
+Set these to read or write somewhere other than the default:
 
 | Variable | Read by | Points at |
 | --- | --- | --- |
+| `SDM_TEST_DATASET` | the harness, tests | A test dataset folder to read instead of the pinned published version |
+| `SDM_V2_RESULTS` | exp_000 | A v2 results folder to read instead of the pinned published version |
+| `SDM_SETUP_INPUT_ROOT` | `00`–`08` | The input mirror; defaults to `//ABMI-DATA2/science/sdmMethodsDev/0_data/setup_inputs` |
+| `SDM_SHARE_ROOT`, `SDM_DATASET_VERSION`, `SDM_PUBLISH` | `10` | Where to publish, the version folder (`YYYY-MM-DD`), and which datasets |
 | `SDM_SNAPSHOT_V2` | `01`, `02` | The `model_ready_v2` snapshot folder |
 | `SDM_MAMMAL_CAMERA_CLIMATE` | `01` | `abmi-camera-climate_2023.Rdata` |
 | `SDM_MAMMAL_CLIMATE_PRED` | `01`, `02` | `All Species Climate Predictions.csv` |
 | `SDM_V2_LOOKUP` | `01` | The v2 folder holding the two plant prediction-matrix CSVs |
 | `SDM_WT_SPECIES` | `01` | `WildTrax Species Strings.RData` |
-| `SDM_BIRD_DATA` | `01`, `02`, `04` | The bird `Stratified.Rdata` v2 was fitted on; defaults to `work_abmi/1_projects/active/sdmMethodsDev/remote/birds_data_v2/` |
-| `SDM_V2_PROJECT` | `03`, `05` | The v2 plant project (`VegetationModels`) |
-| `SDM_V2_BIRD_ROOT` | `04`, `05` | The v2 bird project (`BirdModels`) |
+| `SDM_BIRD_DATA` | `01`, `02`, `04` | The bird `Stratified.Rdata` v2 was fitted on; mirrored from `work_abmi/1_projects/active/sdmMethodsDev/remote/birds_data_v2/` |
+| `SDM_V2_PROJECT` | `03`, `05`, `07` | The v2 plant project (`VegetationModels`) |
+| `SDM_V2_BIRD_ROOT` | `04`, `05`, `06` | The v2 bird project (`BirdModels`) |
+| `SDM_V2_BIRD_LOOKUP` | `08` | The v2 bird `birdlist.csv` |
 | `SDM_V2_MAMMAL_ROOT` | `05` | The v2 mammal habitat-modelling results for 2024 |
 
 ## Related resources

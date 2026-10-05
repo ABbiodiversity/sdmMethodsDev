@@ -18,6 +18,10 @@
 #   in 2_pipeline/v2_reference/:
 #     - Birds2024.RData
 # notes:
+#   - Legacy: not re-run. Parity is scored against the
+#     ABMIexploreR reference (08). Its output is published frozen
+#     with 0_data/v2_results/ by 10_publish_datasets.R, and its
+#     inputs are not mirrored to ABMI-DATA2.
 #   - A clone of 0_data/v2_scripts/birds/08.PackageCoefficients.R,
 #     the v2 step that turns per-draw coefficient csvs into the
 #     packaged `birds` object. Only the plumbing is changed:

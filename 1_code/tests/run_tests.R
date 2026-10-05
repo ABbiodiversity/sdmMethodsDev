@@ -4,7 +4,8 @@
 # created: 2026-10-03
 # inputs:
 #   - 1_code/tests/testthat/test-*.R
-#   - 0_data/test_dataset/, for the dataset checks
+#   - the published test dataset (see harness/data_source.R),
+#     for the dataset checks; skipped when it cannot be reached
 # outputs: none; prints a pass / fail summary
 # notes:
 #   - Fast checks of the contracts the framework relies on: every
@@ -29,8 +30,9 @@ library(testthat) # test runner (version: 3.3.2)
 source("1_code/harness/harness.R")
 load_framework()
 
-data_dir <- file.path(getOption("sdm.project_root"), "0_data",
-                      "test_dataset")
+# Unchecked, so an unreachable share skips the dataset checks
+# rather than stopping the rest
+data_dir <- test_dataset_dir(check = FALSE)
 
 # 2. Run ----
 results <- testthat::test_dir(

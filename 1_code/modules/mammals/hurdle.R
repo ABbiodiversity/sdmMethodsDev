@@ -4,7 +4,7 @@
 #   Huggard (v2)
 # created: 2026-09-29
 # inputs:
-#   in 0_data/test_dataset/lookup/:
+#   in the test dataset's lookup/ (see data_source.R):
 #     - mammal_climate_predictions.csv
 #     - species_queue.csv (each species' v2 name)
 # outputs: none; returns objects in memory

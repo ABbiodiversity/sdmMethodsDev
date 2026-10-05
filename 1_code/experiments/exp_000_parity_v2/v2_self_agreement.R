@@ -5,8 +5,9 @@
 # inputs:
 #   - 2_pipeline/v2_reference/bryophyte-species-models.Rdata,
 #     from 1_code/_setup/03_rerun_bryophyte_v2_reference.R
-#   - 0_data/v2_results/v2_results.csv, the bryophyte climate
-#     rows, which come from v2's COEFS.RData
+#   - v2_results.csv from the published v2 results (see
+#     1_code/harness/data_source.R), the bryophyte climate rows,
+#     which come from v2's COEFS.RData
 # outputs:
 #   in 3_output/exp_000_parity_v2/tables/:
 #     - v2_self_agreement.csv, per species and term
@@ -59,9 +60,8 @@ rerun_path <- file.path(
   project_root, "2_pipeline", "v2_reference",
   "bryophyte-species-models.Rdata"
 )
-results_path <- file.path(
-  project_root, "0_data", "v2_results", "v2_results.csv"
-)
+source(file.path(project_root, "1_code/harness/data_source.R"))
+results_path <- file.path(v2_results_dir(), "v2_results.csv")
 tables_dir <- file.path(
   project_root, "3_output", "exp_000_parity_v2", "tables"
 )

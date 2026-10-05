@@ -3,6 +3,10 @@
 # author: Brendan Casey
 # created: 2026-09-08
 # inputs:
+#   Read from the input mirror on ABMI-DATA2 (utils/
+#   input_paths.R; 00_mirror_setup_inputs.R made it). The
+#   locations below are the originals, which the SDM_* variables
+#   can point back to.
 #   in 0_data/test_dataset/, written by
 #   _setup/01_harmonize_model_ready_v2.R:
 #     - sites.csv
@@ -62,6 +66,9 @@
 library(data.table)
 
 ## 1.2 Configure paths ----
+# The _setup inputs mirrored on ABMI-DATA2 (setup_input())
+source(file.path(getwd(), "1_code/_setup/utils/input_paths.R"))
+
 # data_dir holds the harmonized CSVs; snapshot_dir holds the
 # read-only sources they were built from.
 data_dir <- file.path(
@@ -71,10 +78,7 @@ data_dir <- file.path(
 
 snapshot_dir <- Sys.getenv(
   "SDM_SNAPSHOT_V2",
-  unset = paste0(
-    "//ABMI-DATA2/science/sc/sdmMethodsDev/0_data/",
-    "data_snapshots/model_ready_v2"
-  )
+  unset = setup_input("model_ready_v2")
 )
 
 taxa <- c(
@@ -90,10 +94,7 @@ taxa <- c(
 # were fitted on, not the BirdModels drive's rebuilt one.
 bird_data_file <- Sys.getenv(
   "SDM_BIRD_DATA",
-  unset = paste0(
-    "G:/Shared drives/work_abmi/1_projects/active/",
-    "sdmMethodsDev/remote/birds_data_v2/Stratified.Rdata"
-  )
+  unset = setup_input("birds_data_v2", "Stratified.Rdata")
 )
 
 ## 1.3 Read the harmonized CSVs ----
@@ -338,9 +339,9 @@ plant_files <- c(
 # The mammal climate offset, produced outside this repository.
 mammal_climate_pred_file <- Sys.getenv(
   "SDM_MAMMAL_CLIMATE_PRED",
-  unset = paste0(
-    "G:/Shared drives/ABMI Mammals/Results/Habitat Modeling/",
-    "2024/Climate/Predictions/",
+  unset = setup_input(
+    "abmi_mammals",
+    "Results/Habitat Modeling/2024/Climate/Predictions",
     "All Species Climate Predictions.csv"
   )
 )
