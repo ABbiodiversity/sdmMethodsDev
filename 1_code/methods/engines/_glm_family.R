@@ -62,6 +62,19 @@ fit_glm_family <- function(
     args$offset <- offset
   }
 
+  # A Gamma fit starts at the mean response unless told otherwise.
+  # The default start, y itself, spans orders of magnitude for a
+  # right-skewed density and sends the fitting off; v2's mammal
+  # abundance models start at the mean for that reason.
+  family_name <- if (is.character(family)) family else family$family
+  starts <- c("mustart", "start", "etastart")
+
+  if (identical(family_name, "Gamma") &&
+        !any(starts %in% names(control))) {
+    y <- data[[all.vars(formula[[2]])[1]]]
+    args$mustart <- rep(mean(y, na.rm = TRUE), nrow(data))
+  }
+
   # A convergence warning still leaves a usable fit, so it is
   # recorded rather than treated as a failure. It is caught with
   # withCallingHandlers() and muffled, so the model is fitted

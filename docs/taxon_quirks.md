@@ -154,7 +154,7 @@ AUC would have been silently invalid. Fixed with `as.numeric()`.
 
 | Quirk | What v2 does | Status |
 | --- | --- | --- |
-| Hurdle structure | Binomial presence times Gamma abundance given presence, on a log link. Their product is total abundance | OK `mammal_spec(part = "hurdle")`, both halves together (hurdle.R) |
+| Hurdle structure | Binomial presence times Gamma abundance given presence, on a log link. Their product is total abundance | OK, the generic `hurdle` rule fits both halves through the stage's engine; v2's table-building is the `mammal_v2_habitat_tables()` post-process step (hurdle.R) |
 | Lure correction | Estimated **only** from numbered ABMI grid sites, which are the ones with matched lured and unlured deployments. Applied as `sign(Count) / lure_ratio`, then rescaled to a maximum of 1 | OK |
 | Abundance winsorizing | Capped at the 99th percentile of abundance given presence, before fitting | OK |
 | Season | Separate summer and winter models, with `wt_summer` and `wt_winter` passed as `glm` weights | OK |

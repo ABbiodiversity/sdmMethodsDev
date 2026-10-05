@@ -5,6 +5,10 @@ bryophyte,bryophyte,north,,,2,5,climate,TRUE,TRUE
 bryophyte,bryophyte,south,,,2,5,climate,TRUE,TRUE
 lichen,lichen,north,,,2,5,climate,TRUE,TRUE
 lichen,lichen,south,,,2,5,climate,TRUE,TRUE
+mammal,mammal_summer,north,summer,hurdle,2,5,"habitat_presence, habitat_abundance, habitat_total",TRUE,TRUE
+mammal,mammal_summer,south,summer,hurdle,2,5,"habitat_presence, habitat_abundance, habitat_total",TRUE,TRUE
+mammal,mammal_winter,north,winter,hurdle,2,5,"habitat_presence, habitat_abundance, habitat_total",TRUE,TRUE
+mammal,mammal_winter,south,winter,hurdle,2,5,"habitat_presence, habitat_abundance, habitat_total",TRUE,TRUE
 mite,mite,north,,,2,5,climate,TRUE,TRUE
 mite,mite,south,,,2,5,climate,TRUE,TRUE
 vascular_plant,vascular_plant,north,,,2,5,climate,TRUE,TRUE

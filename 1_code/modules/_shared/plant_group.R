@@ -107,6 +107,8 @@ plant_group_spec <- function(
   list(
     taxon = taxon,
     response_name = "response",
+    # The stage a methods experiment replaces by default
+    habitat_stage = "habitat",
 
     # Plant-group responses are cover or abundance values; v2
     # models presence, so anything above zero is a detection.

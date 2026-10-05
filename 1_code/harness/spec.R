@@ -47,10 +47,12 @@ spec_fields <- function() {
   list(
     spec = c(
       "taxon", "response_name", "response_transform", "family",
-      "weight_column", "tier", "season", "part", "aliases",
+      "weight_column", "tier", "season", "aliases",
       "regions", "stages", "resample", "v2_coverage", "validate",
       "final_prediction", "species_frame", "supplied_columns",
       "notes", "models_overridden", "covariate_files",
+      # The stage a methods experiment replaces by default
+      "habitat_stage",
       # Recorded facts a module keeps for its own reports
       "use_protocol", "protocol_is_v2", "climate_source"
     ),
@@ -182,6 +184,32 @@ validate_spec <- function(spec, stop_on_error = TRUE) {
           "` needs ", paste(missing_capabilities, collapse = ", "),
           ", which engine `", engine$name, "` does not provide. ",
           "Choose a rule that does not, such as `single`."
+        )
+      }
+    }
+
+    # A composite rule (the hurdle) runs an inner rule per part;
+    # that rule's requirements are checked against the engine too
+    if (!is.null(engine) && !is.null(rule) &&
+          "part_selection" %in% names(formals(rule))) {
+      inner <- stage$part_selection %||% formals(rule)$part_selection
+      entry <- tryCatch(
+        get_method("selection", inner, entry = TRUE),
+        error = function(e) {
+          problem(where, ": `part_selection`: ", conditionMessage(e))
+          NULL
+        }
+      )
+      missing_capabilities <- setdiff(
+        entry$requires, engine$capabilities
+      )
+
+      if (!is.null(entry) && length(missing_capabilities) > 0) {
+        problem(
+          where, ": inner rule `", inner, "` needs ",
+          paste(missing_capabilities, collapse = ", "),
+          ", which engine `", engine$name, "` does not provide. ",
+          "Use `single` as the part_selection."
         )
       }
     }
@@ -429,11 +457,22 @@ apply_stage_models <- function(spec, stage_models) {
 #' models_union()), per region where the region supplies the
 #' models.
 #'
+#' The stage defaults to the spec's `habitat_stage`, so one call
+#' serves every taxon:
+#' `lapply(standard_specs(), replace_stage_method, engine = "x")`.
+#'
+#' A stage whose rule is composite - it declares
+#' `part_selection`, as the mammal `hurdle` does - keeps its rule,
+#' and the new rule becomes the one each part runs. The hurdle's
+#' structure (presence, then abundance given presence) is a
+#' property of the data, not of the method, so it stays.
+#'
 #' Removed, because they read v2 coefficient tables a different
 #' engine may not produce:
 #'
 #' - the stage's `post_process` steps (the plant stand-age
-#'   splines, cutblock convergence, pAspen and footprint pooling);
+#'   splines, cutblock convergence, pAspen and footprint pooling;
+#'   the mammal v2 habitat tables);
 #' - stage fields only the old rule took (`head_terms`, say);
 #' - when the stage is the last, the spec's `final_prediction` and
 #'   `validate` (v2's plant prediction and validation AUCs), so the
@@ -443,7 +482,8 @@ apply_stage_models <- function(spec, stage_models) {
 #' record the change.
 #'
 #' @param spec A taxon spec.
-#' @param stage Character. The stage's name.
+#' @param stage Character. The stage's name; the spec's
+#'   `habitat_stage` by default.
 #' @param engine Character. A registered engine.
 #' @param selection Character. A registered rule; "single" for an
 #'   engine with no information criterion.
@@ -454,12 +494,21 @@ apply_stage_models <- function(spec, stage_models) {
 #' @return The spec.
 #'
 #' @example # Example usage of the function
-#' # spec <- replace_stage_method(lichen_spec(), "habitat", "gbm")
+#' # spec <- replace_stage_method(lichen_spec(), engine = "xgboost")
 replace_stage_method <- function(
-  spec, stage, engine, selection = "single", control = list(),
-  union = TRUE
+  spec, stage = spec$habitat_stage, engine, selection = "single",
+  control = list(), union = TRUE
 ) {
   names_in <- vapply(spec$stages, `[[`, character(1), "name")
+
+  if (is.null(stage)) {
+    stop(
+      "Spec `", spec$taxon, "` names no `habitat_stage`; pass ",
+      "`stage`. Stages: ", paste(names_in, collapse = ", "),
+      call. = FALSE
+    )
+  }
+
   index <- match(stage, names_in)
 
   if (is.na(index)) {
@@ -470,9 +519,22 @@ replace_stage_method <- function(
     )
   }
 
-  rule <- get_method("selection", selection)
+  get_method("selection", selection)
   get_engine(engine)
   old <- spec$stages[[index]]
+
+  # A composite rule keeps its place and takes the new rule inside
+  old_rule <- if (is.function(old$selection)) {
+    old$selection
+  } else {
+    get_method("selection", old$selection)
+  }
+  composite <- "part_selection" %in% names(formals(old_rule))
+  rule <- if (composite) {
+    old_rule
+  } else {
+    get_method("selection", selection)
+  }
 
   # Step 1: The candidate formulas, per region where the region
   # supplies them
@@ -494,10 +556,16 @@ replace_stage_method <- function(
   known <- c(spec_fields()$stage, names(formals(rule)))
   new <- old[intersect(names(old), known)]
   new$engine <- engine
-  new$selection <- selection
   new$control <- control
   new$ic <- NULL
   new$post_process <- NULL
+
+  if (composite) {
+    new$part_selection <- selection
+  } else {
+    new$selection <- selection
+  }
+
   spec$stages[[index]] <- new
 
   # Step 3: Hooks that read v2 coefficient tables
@@ -509,6 +577,7 @@ replace_stage_method <- function(
   # Step 4: Say so
   label <- paste0(
     engine, " with `", selection, "`",
+    if (composite) paste0(" inside `", old$selection, "`") else "",
     if (union) ", on every covariate the v2 candidates use" else ""
   )
   spec$v2_coverage[[stage]] <- v2_status(

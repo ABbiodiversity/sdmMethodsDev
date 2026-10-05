@@ -29,14 +29,13 @@ skeleton for an engine and a selection rule; it is not loaded.
 | --- | --- | --- | --- |
 | engine | `glm` | `stats::glm` (v2 mammals, birds) | |
 | engine | `bayesglm` | `arm::bayesglm`, weakly informative priors (v2 plants) | |
-| engine | `gbm` | Boosted regression trees, `gbm::gbm.fit`; no coefficients, information criterion or standard errors, so use the `single` rule | |
+| engine | `xgboost` | Boosted regression trees, `xgboost::xgb.train`; binomial (proportions too), Poisson, log-link Gamma, Gaussian; no coefficients, information criterion or standard errors, so use the `single` rule | |
 | selection | `single` | Fit the first candidate; no ranking | |
 | selection | `aic_best` | Keep the lowest-scoring candidate | ic |
 | selection | `aic_average` | Average coefficients by Akaike weight (v2 climate) | ic, coefficients |
 | selection | `staged_bic` | Forward selection through groups (v2 bird landcover) | ic, coefficients |
 | selection | `ivw_grid` | Inverse-variance average onto the habitat grid (v2 plant habitat) | coefficients, se |
-| selection | `aic_best_grid` | Best candidate, predicted onto the grid (v2 mammal abundance) | ic, se |
-| selection | `aic_best_onehot` | Best candidate, one habitat type at a time (v2 mammal presence) | ic, coefficients, se |
+| selection | `hurdle` | Presence, then abundance given presence, each through an inner rule (`part_selection`); reports both and their product on the grid (v2 mammals) | those of `part_selection` |
 | resampler | `precomputed` | Replay draws stored with the dataset (v2 birds; plant `v2_ids`) | |
 | resampler | `spatial_block` | Bootstrap within coarse spatial blocks (v2 plants, mammals) | |
 | resampler | `spatial_cv` | Spatial block cross-validation; each draw holds out one fold | |
@@ -67,7 +66,7 @@ argument: an offset argument is not carried onto new data by
 
 `family` arrives as a name (`"binomial"`, `"poisson"`) or a family
 object (`Gamma(link = "log")`). An engine with its own vocabulary,
-such as `gbm`'s `distribution = "bernoulli"`, translates it.
+such as `xgboost`'s `objective = "binary:logistic"`, translates it.
 
 ### Testing an engine
 
@@ -90,6 +89,26 @@ replace that stage's engine, selection and models together. The
 v2 post-processing steps that read coefficients (the plant
 stand-age splines, say) then do not apply, and the stage should
 drop them; see `docs/getting_started.md`.
+
+`replace_stage_method()` does all of this in one call. Its stage
+defaults to the spec's `habitat_stage`, so the same call serves
+every taxon:
+
+```r
+specs <- lapply(standard_specs(), replace_stage_method,
+                engine = "xgboost")
+```
+
+A **composite** rule - one that declares `part_selection`, as
+`hurdle` does - keeps its place, and the new rule becomes the one
+each part runs. The mammal hurdle's structure (presence on every
+unit, abundance where the species was found) is a property of the
+data, so it stays; the new engine fits both halves, and v2's
+table-building (`post_process`) is removed.
+
+A `post_process` step is a function of the selection result and
+the stage's data. A step that also declares `grid`, `species` or
+`stage` is given them.
 
 A stage carried into the next one (`carry_as`) is carried from the
 stage's final model: its averaged coefficients where it has them,

@@ -89,9 +89,9 @@ requires a separate pipeline.
 │   ├── compare.R            # compare_experiments()
 │   └── experiment.R         # experiment_config(), run_experiment()
 ├── methods/                 # one file per method, each self-registering
-│   ├── engines/             # glm, bayesglm
+│   ├── engines/             # glm, bayesglm, xgboost
 │   ├── selection/           # single, aic_best, aic_average, staged_bic,
-│   │                        #   ivw_grid, aic_best_grid, aic_best_onehot
+│   │                        #   ivw_grid, hurdle
 │   ├── resampling/          # precomputed, spatial_block, spatial_cv
 │   └── metrics/             # auc, deviance_explained, rmse, …
 ├── modules/
@@ -201,7 +201,7 @@ run_experiment(
   species   = c("Aulacomnium.palustre", "Sphagnum.fuscum"),
   overrides = list(
     stages = list(climate = list(models = "climate_plus_topography")),
-    engine = "gbm"))
+    engine = "xgboost"))
 ```
 
 ## Contract 2: the result object
@@ -463,7 +463,10 @@ It sits on a regularization axis. A Bayesian framework comparison needs
    against the published v2 output, on every stage, for all three
    taxa. Five selection rules cover the three pipelines' different
    ideas of what a coefficient is: `aic_average`, `ivw_grid`,
-   `staged_bic`, `aic_best_grid` and `aic_best_onehot`.
+   `staged_bic`, and the mammal `hurdle` (2026-10-05: an
+   engine-agnostic rule, replacing `aic_best_grid`,
+   `aic_best_onehot` and the custom hurdle function; v2's
+   table-building is now a mammal `post_process` step).
 5a. **Built (2026-10-03).** The plug-in method layer
    (`1_code/methods/`, the registry, `validate_spec()`,
    `check_engine()`); the dataset manifest and harmonized lookups
@@ -473,10 +476,13 @@ It sits on a regularization axis. A Bayesian framework comparison needs
    experiment template and `compare_experiments()`; contract tests.
    Checked against the previous code at 5 draws for the 14 parity
    species: every stage's coefficients identical.
-6. **Started (2026-10-03).** The `gbm` engine and
-   `replace_stage_method()`; `exp_001_gbm`, a test
+6. **Started (2026-10-03).** A boosted-tree engine and
+   `replace_stage_method()`; `exp_001_xgboost`, a test
    experiment fitting the habitat stage with boosted regression
-   trees. `covariate_files` lets an experiment add covariates the
+   trees, every taxon including mammals. (The first engine, `gbm`,
+   was replaced by `xgboost` on 2026-10-05: gbm cannot fit the
+   mammal hurdle's 0-1 presence response or its Gamma
+   abundance.) `covariate_files` lets an experiment add covariates the
    frozen dataset does not hold, from its own files;
    `exp_002_soilgrids` adds SoilGrids at 0–5 cm from the
    sciSpatialR catalogue to the climate stage. Still to come:

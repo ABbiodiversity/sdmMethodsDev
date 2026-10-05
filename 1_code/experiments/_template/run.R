@@ -27,8 +27,11 @@
 #       2_pipeline/<id>/inputs/. Never add them to 0_data/ or
 #       _setup/, which stay the v2 data.
 #     - `specs`: a spec with a stage changed - a different engine
-#       or selection rule. Build it from standard_specs() and
-#       change the field; see docs/getting_started.md.
+#       or selection rule. For a new habitat method in every
+#       taxon, mammals included, one call:
+#         specs <- lapply(standard_specs(), replace_stage_method,
+#                         engine = "xgboost")
+#       See exp_001_xgboost and docs/getting_started.md.
 #     - A new method in 1_code/methods/, then named in a spec;
 #       see 1_code/methods/README.md.
 # ---

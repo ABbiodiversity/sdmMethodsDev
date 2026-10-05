@@ -230,16 +230,19 @@ name. Adding a method is adding a file; no harness code changes.
 
 | Kind | Folder | Registered |
 | --- | --- | --- |
-| Engines: how a model is fitted | `methods/engines/` | `glm`, `bayesglm`, `gbm` (boosted regression trees) |
-| Selection rules: how candidates become one result | `methods/selection/` | `single`, `aic_best`, `aic_average`, `staged_bic`, `ivw_grid`, `aic_best_grid`, `aic_best_onehot` |
+| Engines: how a model is fitted | `methods/engines/` | `glm`, `bayesglm`, `xgboost` (boosted regression trees) |
+| Selection rules: how candidates become one result | `methods/selection/` | `single`, `aic_best`, `aic_average`, `staged_bic`, `ivw_grid`, `hurdle` (presence, then abundance given presence; v2 mammals) |
 | Resampling: which units each draw fits | `methods/resampling/` | `precomputed`, `spatial_block`, `spatial_cv` |
 | Metrics: how a prediction is scored | `methods/metrics/` | `auc`, `deviance_explained`, `rmse`, `spearman`, `calibration_slope`, `prevalence`, `n` |
 
 A selection rule states the engine capabilities it needs (coefficients, an
 information criterion, standard errors), and `validate_spec()` checks them.
 `replace_stage_method()` swaps one stage of a v2 spec to another engine and
-rule, leaving the rest v2's; `exp_001_gbm` uses it to fit the habitat
-stage with boosted regression trees. `extend_models()` adds terms to every
+rule, leaving the rest v2's. Each spec names its `habitat_stage`, so one
+call serves every taxon, mammals included: the mammal hurdle keeps its
+presence-then-abundance structure and the new engine fits both halves.
+`exp_001_xgboost` uses it to fit the habitat stage with boosted regression
+trees. `extend_models()` adds terms to every
 candidate in a model set, and `covariate_files` supplies terms the dataset
 does not hold; `exp_002_soilgrids` uses both to add SoilGrids soil
 properties to the climate stage.
@@ -561,14 +564,14 @@ sdmMethodsDev/
 │   ├── modules/                   # one v2 spec per taxon
 │   │   ├── _shared/               # plant_group.R (four plant taxa); standard_specs.R
 │   │   ├── bryophytes/  lichens/  soil_mites/  vascular_plants/
-│   │   ├── mammals/               # spec.R, hurdle.R (v2's hurdle model)
+│   │   ├── mammals/               # spec.R, hurdle.R (v2's hurdle tables)
 │   │   └── birds/                 # spec.R, standardize.R (v2's term translation)
 │   ├── experiments/
 │   │   ├── _shared/               # named focal-species sets
 │   │   ├── _template/             # copy to start an experiment
 │   │   ├── exp_000_parity_v2/     # run.R, 01_compare_to_v2.R, 02_plot_parity.R,
 │   │   │                          # 03_build_report.R, utils/parity_targets.R
-│   │   ├── exp_001_gbm/           # test: habitat stage fitted with gbm
+│   │   ├── exp_001_xgboost/       # test: habitat stage fitted with xgboost
 │   │   └── exp_002_soilgrids/     # test: SoilGrids terms in the climate stage;
 │   │                              # 01_extract_soilgrids_covariates.R, run.R
 │   ├── _setup/                    # 01–09: build the v2 data in 0_data/; fixed

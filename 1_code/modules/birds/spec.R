@@ -45,6 +45,8 @@
 bird_spec <- function() {
   list(
     taxon = "bird",
+    # The stage a methods experiment replaces by default
+    habitat_stage = "landcover",
     response_name = "response",
 
     # Counts are modelled as given; the offset carries effort.

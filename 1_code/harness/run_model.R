@@ -923,9 +923,13 @@ fit_one_stage <- function(stage, fitting, spec, grid = NULL,
   # A stage may reshape its result after selection with steps its
   # spec supplies, applied in order: the plant stand-age splines,
   # cutblock convergence and footprint pooling. Each takes and
-  # returns the selection result, and sees the stage's data.
+  # returns the selection result, and sees the stage's data. A
+  # step that declares `grid`, `species` or `stage` is given them,
+  # as a rule is: the mammal v2 tables read all three.
   for (step in stage$post_process) {
-    selected <- step(selected, stage_data)
+    context <- list(grid = grid, species = species, stage = stage)
+    context <- context[names(context) %in% names(formals(step))]
+    selected <- do.call(step, c(list(selected, stage_data), context))
   }
 
   list(status = "ok", note = NA_character_, selected = selected)
@@ -1228,11 +1232,17 @@ run_meta <- function(p, region) {
   list(
     taxon = spec$taxon,
     region = region$name,
-    # Mammal specs are fitted per season and per hurdle part, and
-    # the comparison needs both to find the right reference. NA
-    # for every other taxon.
+    # Mammal specs are fitted per season, as a hurdle, and the
+    # comparison needs both to find the right reference. NA for
+    # every other taxon.
     season = spec$season %||% NA_character_,
-    part = spec$part %||% NA_character_,
+    part = if (any(vapply(
+      stages, function(s) identical(s$selection, "hurdle"), logical(1)
+    ))) {
+      "hurdle"
+    } else {
+      NA_character_
+    },
     species_n = length(region$species),
     iterations = length(p$iterations),
     stages = vapply(stages, `[[`, character(1), "name"),

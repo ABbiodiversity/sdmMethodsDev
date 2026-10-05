@@ -15,11 +15,11 @@ test_that("every registered engine passes check_engine()", {
 
 test_that("the v2 methods are all registered", {
   expect_true(all(
-    c("glm", "bayesglm", "gbm") %in% registered_names("engine")
+    c("glm", "bayesglm", "xgboost") %in% registered_names("engine")
   ))
   expect_true(all(c(
     "single", "aic_best", "aic_average", "staged_bic", "ivw_grid",
-    "aic_best_grid", "aic_best_onehot"
+    "hurdle"
   ) %in% registered_names("selection")))
   expect_true(all(c("precomputed", "spatial_block", "spatial_cv")
                   %in% registered_names("resampler")))

@@ -1,5 +1,5 @@
 # ---
-# title: The v2 Mammal Hurdle Model
+# title: The v2 Mammal Hurdle Tables
 # author: Brendan Casey; model logic by Marcus Becker and David J.
 #   Huggard (v2)
 # created: 2026-09-29
@@ -9,18 +9,18 @@
 #     - species_queue.csv (each species' v2 name)
 # outputs: none; returns objects in memory
 # notes:
-#   - A port of the per-species, per-season body of v2's
-#     03_basic-models.R, north (sections 6.1 to 6.6 and 6.11) and
-#     south (6.1 to 6.6), for one species, season and region. It
-#     is registered as the habitat stage's selection rule, so the
-#     harness runs it once per draw.
-#   - v2 couples the two halves of the hurdle, so they are fitted
-#     together here: presence (binomial, best of the candidates by
-#     AICc), abundance given presence (Gamma on the log scale, over
-#     the presence candidates that leave some cover unaccounted
-#     for, plus an effort-only null), their product as total
-#     abundance, calibrated to the observed mean, and in the north
-#     stand-age splines and cutblock convergence.
+#   - The hurdle itself - presence, then abundance given presence -
+#     is fitted by the generic `hurdle` rule
+#     (methods/selection/hurdle.R), through whatever engine the
+#     stage names. This file holds what is v2's own: how v2 turns
+#     the two fitted GLMs into its published tables. It is a port
+#     of the per-species, per-season body of v2's 03_basic-models.R
+#     after the fits, north (sections 6.3 to 6.6 and 6.11) and
+#     south (6.3 to 6.6).
+#   - mammal_v2_habitat_tables() runs as the habitat stage's
+#     post_process step, so replace_stage_method() removes it with
+#     the GLMs: an engine experiment reports the hurdle rule's own
+#     grid tables instead. It stops if either half is not a GLM.
 #   - Effects are reported on v2's full habitat set, not the
 #     winning model's categories: each category is spread over
 #     the fine types the prediction matrix assigns to it.
@@ -95,7 +95,7 @@ mammal_precomputed_climate <- function(frame, species, data_dir,
   frame
 }
 
-# 3. The hurdle model ----
+# 3. Helpers ----
 
 ## 3.1 mammal_aicc() ----
 
@@ -132,41 +132,70 @@ mammal_lure_ratio <- function(values, lured, location) {
   unname(q["Yes"] / q["No"])
 }
 
-## 3.3 select_mammal_v2_hurdle() ----
+## 3.3 mammal_held_constants() ----
 
-#' Fit v2's Mammal Hurdle Model for One Species and Season
+#' The Values v2 Holds Fixed for Its One-Hot Predictions
 #'
-#' Registered as the mammal habitat stage's selection rule. See
-#' the header for the steps.
-#'
-#' @param models List of presence candidate formulas.
-#' @param base,engine,family,weights,offset,ic,control As passed
-#'   to every selection rule; `weights` is the season weight.
-#' @param data The draw's rows: `response_raw` is the count, and
-#'   `lured`, `location`, `seas_days`, `Climate`, the habitat
-#'   columns and, in the north, the aged stand-cover columns.
-#' @param grid The prediction matrix, with v2's rows dropped.
-#' @param intercept_cats Character vector: each candidate's
-#'   reference category.
-#' @param species Character. The harness species name.
-#' @param stage The stage definition. Unused; the stand-age steps
-#'   run where the aged cover columns are present (the north).
-#' @return A selection result: `fit` is the presence model,
-#'   `coefficients` the presence table, and `outputs` the
-#'   presence, abundance and total tables.
+#' @param has_aspen Logical. Whether the region fits pAspen (the
+#'   south).
+#' @return A named list.
 #'
 #' @example # Example usage of the function
-#' # select_mammal_v2_hurdle(models, response ~ 1, d, engine,
-#' #                         "binomial", grid = pm, ...)
-select_mammal_v2_hurdle <- function(
-  models, base, data, engine, family,
-  weights = NULL, offset = NULL, ic = "AICc", control = list(),
-  grid = NULL, intercept_cats = NULL, species = NA_character_,
-  stage = list()
-) {
+#' # mammal_held_constants(TRUE)
+mammal_held_constants <- function(has_aspen) {
+  constants <- list(seas_days = 100, Climate = 0)
+  if (has_aspen) constants$pAspen <- 0
+  constants
+}
+
+# 4. The v2 tables ----
+
+## 4.1 mammal_v2_habitat_tables() ----
+
+#' Turn the Fitted Hurdle into v2's Three Habitat Tables
+#'
+#' The habitat stage's post_process step. Reads the two GLMs the
+#' `hurdle` rule chose and replaces its outputs with v2's
+#' presence, abundance and total tables.
+#'
+#' @param selected The `hurdle` rule's selection result.
+#' @param data The stage's data: `response` is the lure-scaled
+#'   presence, `response_raw` the count, `weight` the season
+#'   weight, and `lured`, `location`, `seas_days`, `Climate`, the
+#'   habitat columns and, in the north, the aged stand-cover
+#'   columns.
+#' @param grid The prediction matrix, with v2's rows dropped.
+#' @param species Character. The harness species name.
+#' @return The selection result, with `coefficients` the presence
+#'   table and `outputs` v2's three tables.
+#'
+#' @example # Example usage of the function
+#' # selected <- mammal_v2_habitat_tables(selected, d, pm,
+#' #                                      "MuleDeer_Summer")
+mammal_v2_habitat_tables <- function(selected, data, grid,
+                                     species = NA_character_) {
   if (!requireNamespace("MuMIn", quietly = TRUE) ||
         !requireNamespace("mgcv", quietly = TRUE)) {
-    stop("The mammal hurdle model needs MuMIn and mgcv.",
+    stop("The mammal v2 tables need MuMIn and mgcv.", call. = FALSE)
+  }
+
+  pa <- selected$parts$presence$fit$fit
+  agp <- selected$parts$abundance$fit$fit
+
+  # v2's tables are read from GLM coefficients. A stage fitted
+  # with another engine should have had this step removed by
+  # replace_stage_method(); say so rather than mix the two.
+  if (!inherits(pa, "glm") || !inherits(agp, "glm")) {
+    stop(
+      "The mammal v2 tables read GLM fits, but this hurdle was ",
+      "fitted with another engine. Replace the stage's method ",
+      "with replace_stage_method(), which removes this step.",
+      call. = FALSE
+    )
+  }
+
+  if (is.null(grid)) {
+    stop("The mammal v2 tables need the prediction matrix.",
          call. = FALSE)
   }
 
@@ -175,94 +204,105 @@ select_mammal_v2_hurdle <- function(
   ages <- "SpruceR" %in% names(data)
   has_aspen <- "pAspen" %in% names(data)
   count <- data$response_raw
-  seas_wt <- weights
-  fail <- function(message) {
-    stop("mammal hurdle: ", message, call. = FALSE)
-  }
-
-  # Step 1: Presence (6.1)
   lure_pa <- mammal_lure_ratio(sign(count), data$lured, data$location)
-  data$p_count_pa <- sign(count) / ifelse(data$lured == "Yes", lure_pa, 1)
-  data$p_count_pa <- data$p_count_pa / max(data$p_count_pa)
-
-  formulas <- lapply(models, function(m) {
-    stats::update(p_count_pa ~ 1, m)
-  })
-
-  m_pa <- lapply(formulas, function(f) {
-    try(stats::glm(f, family = "binomial", data = data,
-                   weights = seas_wt), silent = TRUE)
-  })
-  aic_pa <- vapply(m_pa, mammal_aicc, numeric(1))
-
-  if (!any(is.finite(aic_pa))) {
-    fail("every presence model failed")
-  }
-
-  best_pa <- which.min(aic_pa)
-  pa <- m_pa[[best_pa]]
-
-  # Step 2: Abundance given presence (6.2)
-  d_p <- data[count > 0, , drop = FALSE]
-  count_p <- count[count > 0]
-  lure_agp <- mammal_lure_ratio(count_p, d_p$lured, d_p$location)
-  d_p$p_count_agp <- count_p /
-    ifelse(d_p$lured == "Yes", lure_agp, 1)
-  d_p$p_count_agp <- pmin(
-    d_p$p_count_agp, stats::quantile(d_p$p_count_agp, 0.99)
+  lure_agp <- mammal_lure_ratio(
+    count[count > 0], data$lured[count > 0], data$location[count > 0]
   )
-  agp_start <- rep(mean(d_p$p_count_agp), nrow(d_p))
 
-  m_agp <- list()
+  # Step 1: Presence effects, one category at a time (6.3)
+  presence <- mammal_presence_effects(
+    pa, data, selected$reference_category, lure_pa, has_aspen
+  )
 
-  for (i in seq_along(m_pa)) {
-    if (inherits(m_pa[[i]], "try-error")) {
-      next
-    }
+  # Site-level logits: the age splines' offset
+  data$p <- stats::predict(pa, newdata = data)
 
-    terms_i <- attr(m_pa[[i]]$terms, "term.labels")
-    cover <- colSums(d_p[, terms_i, drop = FALSE])
-    # pAspen is not cover; v2's south leaves it out of the sum
-    # (the north has none)
-    cover <- cover[
-      !names(cover) %in% c("Climate", "seas_days", "pAspen")
-    ]
+  # Step 2: Abundance effects on the prediction matrix (6.4)
+  abundance <- mammal_abundance_effects(agp, grid, has_aspen)
 
-    if ((nrow(d_p) - sum(cover)) > 0) {
-      f <- stats::as.formula(paste(
-        "p_count_agp ~", paste(setdiff(terms_i, "Climate"),
-                               collapse = " + ")
-      ))
-      m_agp[[length(m_agp) + 1]] <- try(stats::glm(
-        f, data = d_p, family = stats::Gamma(link = "log"),
-        mustart = agp_start
-      ), silent = TRUE)
-    }
+  # Step 3: Stand-age splines, north only (6.5)
+  aged <- if (ages) {
+    mammal_age_splines(data, presence$coef, presence$terms)
+  } else {
+    list(p_age = list(), p_age_se = list())
   }
 
-  m_agp[[length(m_agp) + 1]] <- try(stats::glm(
-    p_count_agp ~ seas_days, data = d_p,
-    family = stats::Gamma(link = "log"), mustart = agp_start
-  ), silent = TRUE)
+  # Step 4: Spread each category over its fine types (6.5)
+  spread <- mammal_spread(
+    presence, abundance$coef, aged, grid, ages
+  )
 
-  aic_agp <- vapply(m_agp, mammal_aicc, numeric(1))
+  # Step 5: v2's Mule Deer adjustment
+  spread$mean <- mammal_mule_deer(spread$mean, species)
 
-  if (!any(is.finite(aic_agp))) {
-    fail("every abundance model failed")
+  # Step 6: Calibrate total abundance to the observed mean (6.6)
+  spread$mean <- spread$mean * mammal_total_calibration(
+    pa, agp, data, presence$at_constants, lure_pa, lure_agp,
+    has_aspen
+  )
+
+  # Step 7: Cutblock convergence, north only (6.11)
+  if (ages) {
+    spread$mean <- mammal_cutblock_convergence(spread$mean)
   }
 
-  agp <- m_agp[[which.min(aic_agp)]]
+  # v2 adds Bare and Water at zero to every table (7.1)
+  coef_agp <- abundance$coef
+  coef_agp_se <- abundance$se
+  spread$pa[c("Bare", "Water")] <- 0
+  spread$pa_se[c("Bare", "Water")] <- 0
+  spread$mean[c("Bare", "Water")] <- 0
+  coef_agp[c("Bare", "Water")] <- 0
+  coef_agp_se[c("Bare", "Water")] <- 0
 
-  # Step 3: Presence effects, one category at a time (6.3)
-  terms_pa <- c(attr(pa$terms, "term.labels"),
-                intercept_cats[best_pa])
-  held <- c("seas_days", "Climate", if (has_aspen) "pAspen")
-  constants <- list(seas_days = 100, Climate = 0)
-  if (has_aspen) constants$pAspen <- 0
+  table_of <- function(values, se = NA_real_) {
+    data.frame(
+      term = names(values), estimate = unname(values),
+      se = if (length(se) == length(values)) unname(se) else NA_real_,
+      stringsAsFactors = FALSE
+    )
+  }
 
-  # Every one-hot row is read at seas_days = 100, Climate = 0 and
-  # pAspen = 0, including the rows for those terms themselves,
-  # as v2's duplicated data-frame columns make it
+  presence_table <- table_of(spread$pa, spread$pa_se)
+
+  selected$coefficients <- presence_table
+  selected$outputs <- list(
+    presence = presence_table,
+    abundance = table_of(coef_agp, coef_agp_se),
+    total = table_of(spread$mean)
+  )
+
+  selected
+}
+
+## 4.2 mammal_presence_effects() ----
+
+#' Presence per Habitat Category, Calibrated (v2 6.3)
+#'
+#' Every one-hot row is read at seas_days = 100, Climate = 0 and
+#' pAspen = 0, including the rows for those terms themselves, as
+#' v2's duplicated data-frame columns make it. The level is then
+#' shifted on the logit scale so mean fitted presence matches mean
+#' observed; Climate is a slope and keeps its own coefficient.
+#'
+#' @param pa The presence GLM.
+#' @param data The stage's data.
+#' @param reference Character. The category the winning presence
+#'   candidate leaves out.
+#' @param lure_pa Numeric. The presence lure ratio.
+#' @param has_aspen Logical.
+#' @return A list of `coef` and `se` (named by term), `terms`, and
+#'   `at_constants` (the data at v2's held values).
+#'
+#' @example # Example usage of the function
+#' # mammal_presence_effects(pa, d, "Shrub", 1.4, FALSE)
+mammal_presence_effects <- function(pa, data, reference, lure_pa,
+                                    has_aspen) {
+  count <- data$response_raw
+  terms_pa <- c(attr(pa$terms, "term.labels"), reference)
+  constants <- mammal_held_constants(has_aspen)
+  held <- names(constants)
+
   pa_link <- vapply(terms_pa, function(term) {
     onehot <- stats::setNames(
       as.list(as.numeric(terms_pa == term)), terms_pa
@@ -281,13 +321,6 @@ select_mammal_v2_hurdle <- function(
   coef_pa[["Climate"]] <- stats::plogis(stats::coef(pa)[["Climate"]])
   climate_se <- coef_pa_se[["Climate"]]
 
-  # The pAspen slope, added back in the calibration (south)
-  paspen_pa <- if ("pAspen" %in% names(stats::coef(pa))) {
-    stats::coef(pa)[["pAspen"]]
-  } else {
-    0
-  }
-
   # Calibrate the level: mean fitted presence to mean observed
   at_constants <- data
   at_constants$seas_days <- 100
@@ -305,119 +338,170 @@ select_mammal_v2_hurdle <- function(
   coef_pa[["Climate"]] <- climate_pa
   coef_pa_se[["Climate"]] <- climate_se
 
-  # Site-level logits: the age splines' offset
-  data$p <- stats::predict(pa, newdata = data)
+  list(
+    coef = coef_pa, se = coef_pa_se, terms = terms_pa,
+    at_constants = at_constants
+  )
+}
 
-  # Step 4: Abundance effects on the prediction matrix (6.4)
-  pm <- grid
-  newdata <- pm
+## 4.3 mammal_abundance_effects() ----
+
+#' Abundance Given Presence on the Prediction Matrix (v2 6.4)
+#'
+#' @param agp The abundance GLM.
+#' @param grid The prediction matrix.
+#' @param has_aspen Logical.
+#' @return A list of `coef` and `se`, on the response scale, with
+#'   Climate first at 1 (no effect on abundance).
+#'
+#' @example # Example usage of the function
+#' # mammal_abundance_effects(agp, pm, FALSE)
+mammal_abundance_effects <- function(agp, grid, has_aspen) {
+  constants <- mammal_held_constants(has_aspen)
+  newdata <- grid
   for (one in names(constants)) newdata[[one]] <- constants[[one]]
 
   agp_pred <- stats::predict(agp, newdata = newdata, se.fit = TRUE)
-  t_mean_agp <- stats::setNames(as.numeric(agp_pred$fit), rownames(pm))
-  t_se_agp <- stats::setNames(as.numeric(agp_pred$se.fit), rownames(pm))
+  t_mean_agp <- stats::setNames(
+    as.numeric(agp_pred$fit), rownames(grid)
+  )
+  t_se_agp <- stats::setNames(
+    as.numeric(agp_pred$se.fit), rownames(grid)
+  )
 
-  paspen_agp <- if ("pAspen" %in% names(stats::coef(agp))) {
-    stats::coef(agp)[["pAspen"]]
-  } else {
-    0
-  }
+  list(
+    coef = c(Climate = 1, exp(t_mean_agp)),
+    se = c(Climate = 0, t_se_agp)
+  )
+}
 
-  coef_agp <- c(Climate = 1, exp(t_mean_agp))
-  coef_agp_se <- c(Climate = 0, t_se_agp)
+## 4.4 mammal_age_splines() ----
 
-  # Step 5: Stand-age splines, north only (6.5)
+#' Presence by Stand Age, from v2's Splines (v2 6.5)
+#'
+#' One frame per stand type from units where an age class covers
+#' more than 10%, a binomial GAM on sqrt(age) with the site-level
+#' presence logit as offset, used where it beats the
+#' intercept-only model by AICc weight.
+#'
+#' @param data The stage's data, with `p`, the site-level logits.
+#' @param coef_pa Named numeric. Calibrated presence per term.
+#' @param terms_pa Character. The presence terms.
+#' @return A list of `p_age` and `p_age_se`, per term that took a
+#'   spline: nine values, R and 1 to 8.
+#'
+#' @example # Example usage of the function
+#' # mammal_age_splines(d, coef_pa, names(coef_pa))
+mammal_age_splines <- function(data, coef_pa, terms_pa) {
   stand_types <- c("Spruce", "Pine", "Decid", "Mixedwood", "TreedBog")
+  seas_wt <- data$weight
   p_age <- p_age_se <- list()
+  stand <- stats::setNames(vector("list", 5), stand_types)
 
-  if (ages) {
-    stand <- stats::setNames(vector("list", 5), stand_types)
+  for (i in 0:8) {
+    label <- if (i == 0) "R" else i
+    age <- if (i == 0) 0.5 else i
 
-    for (i in 0:8) {
-      label <- if (i == 0) "R" else i
-      age <- if (i == 0) 0.5 else i
+    for (type in stand_types) {
+      column <- paste0(type, label)
+      if (!column %in% names(data)) next
+      rows <- which(data[[column]] > 0.1)
+      if (length(rows) == 0) next
 
-      for (type in stand_types) {
-        column <- paste0(type, label)
-        if (!column %in% names(data)) next
-        rows <- which(data[[column]] > 0.1)
-        if (length(rows) == 0) next
-
-        stand[[type]] <- rbind(stand[[type]], data.frame(
-          p_count = data$p_count_pa[rows], age = age,
-          wt1 = data[[column]][rows] * seas_wt[rows],
-          p = data$p[rows]
-        ))
-      }
-    }
-
-    frames <- c(stand, list(
-      UpCon = rbind(stand$Spruce, stand$Pine),
-      DecidMixed = rbind(stand$Decid, stand$Mixedwood),
-      TreedAll = do.call(rbind, stand)
-    ))
-
-    fit_gam <- function(df, spline) {
-      f <- if (spline) {
-        p_count ~ s(sqrt(age), k = 4, m = 2) + offset(p)
-      } else {
-        p_count ~ 1 + offset(p)
-      }
-      suppressWarnings(mgcv::gam(
-        f, data = df, family = "binomial", weights = df$wt1
+      stand[[type]] <- rbind(stand[[type]], data.frame(
+        p_count = data$response[rows], age = age,
+        wt1 = data[[column]][rows] * seas_wt[rows],
+        p = data$p[rows]
       ))
     }
-
-    null_age <- lapply(frames, fit_gam, spline = FALSE)
-    spline_age <- lapply(seq_along(frames), function(i) {
-      if (sum(sign(frames[[i]]$p_count)) > 4) {
-        fit_gam(frames[[i]], TRUE)
-      } else {
-        null_age[[i]]
-      }
-    })
-    names(spline_age) <- names(frames)
-
-    # The spline is used where it beats the null by AICc weight
-    spline_weight <- vapply(names(frames), function(nm) {
-      q <- c(mammal_aicc(spline_age[[nm]]), mammal_aicc(null_age[[nm]]))
-      q <- q - min(q)
-      exp(-0.5 * q[1]) / sum(exp(-0.5 * q))
-    }, numeric(1))
-
-    age_map <- list(
-      Spruce = "Spruce", Pine = "Pine", Decid = "Decid",
-      Mixedwood = "Mixedwood", TreedBog = "TreedBog",
-      TreedWet = "TreedBog", UpCon = "UpCon",
-      DecidMixed = "DecidMixed", UplandForest = "TreedAll",
-      TreedAll = "TreedAll"
-    )
-
-    smooth <- function(y) {
-      c(mean(y[1:2]), y[2:4], mean(y[4:6]), mean(y[5:7]),
-        mean(y[6:8]), mean(y[7:9]), mean(y[8:9]))
-    }
-
-    for (term in names(age_map)) {
-      model_key <- age_map[[term]]
-      if (!term %in% terms_pa) next
-      if (spline_weight[[model_key]] <= 0.5) next
-
-      predicted <- stats::predict(
-        spline_age[[model_key]],
-        newdata = data.frame(
-          age = c(0.5, 1:8), p = stats::qlogis(coef_pa[[term]])
-        ),
-        se.fit = TRUE
-      )
-      p_age[[term]] <- smooth(stats::plogis(as.numeric(predicted$fit)))
-      p_age_se[[term]] <- smooth(as.numeric(predicted$se.fit))
-    }
   }
 
-  # Step 6: Spread each category over its fine types (6.5)
+  frames <- c(stand, list(
+    UpCon = rbind(stand$Spruce, stand$Pine),
+    DecidMixed = rbind(stand$Decid, stand$Mixedwood),
+    TreedAll = do.call(rbind, stand)
+  ))
+
+  fit_gam <- function(df, spline) {
+    f <- if (spline) {
+      p_count ~ s(sqrt(age), k = 4, m = 2) + offset(p)
+    } else {
+      p_count ~ 1 + offset(p)
+    }
+    suppressWarnings(mgcv::gam(
+      f, data = df, family = "binomial", weights = df$wt1
+    ))
+  }
+
+  null_age <- lapply(frames, fit_gam, spline = FALSE)
+  spline_age <- lapply(seq_along(frames), function(i) {
+    if (sum(sign(frames[[i]]$p_count)) > 4) {
+      fit_gam(frames[[i]], TRUE)
+    } else {
+      null_age[[i]]
+    }
+  })
+  names(spline_age) <- names(frames)
+
+  # The spline is used where it beats the null by AICc weight
+  spline_weight <- vapply(names(frames), function(nm) {
+    q <- c(mammal_aicc(spline_age[[nm]]), mammal_aicc(null_age[[nm]]))
+    q <- q - min(q)
+    exp(-0.5 * q[1]) / sum(exp(-0.5 * q))
+  }, numeric(1))
+
+  age_map <- list(
+    Spruce = "Spruce", Pine = "Pine", Decid = "Decid",
+    Mixedwood = "Mixedwood", TreedBog = "TreedBog",
+    TreedWet = "TreedBog", UpCon = "UpCon",
+    DecidMixed = "DecidMixed", UplandForest = "TreedAll",
+    TreedAll = "TreedAll"
+  )
+
+  smooth <- function(y) {
+    c(mean(y[1:2]), y[2:4], mean(y[4:6]), mean(y[5:7]),
+      mean(y[6:8]), mean(y[7:9]), mean(y[8:9]))
+  }
+
+  for (term in names(age_map)) {
+    model_key <- age_map[[term]]
+    if (!term %in% terms_pa) next
+    if (spline_weight[[model_key]] <= 0.5) next
+
+    predicted <- stats::predict(
+      spline_age[[model_key]],
+      newdata = data.frame(
+        age = c(0.5, 1:8), p = stats::qlogis(coef_pa[[term]])
+      ),
+      se.fit = TRUE
+    )
+    p_age[[term]] <- smooth(stats::plogis(as.numeric(predicted$fit)))
+    p_age_se[[term]] <- smooth(as.numeric(predicted$se.fit))
+  }
+
+  list(p_age = p_age, p_age_se = p_age_se)
+}
+
+## 4.5 mammal_spread() ----
+
+#' Spread Each Category over Its Fine Types (v2 6.5)
+#'
+#' @param presence A mammal_presence_effects() result.
+#' @param coef_agp Named numeric. Abundance per fine type.
+#' @param aged A mammal_age_splines() result.
+#' @param grid The prediction matrix.
+#' @param ages Logical. Whether the region has stand ages.
+#' @return A list of `pa`, `pa_se` and `mean` (presence times
+#'   abundance), each named by fine type.
+#'
+#' @example # Example usage of the function
+#' # mammal_spread(presence, coef_agp, aged, pm, TRUE)
+mammal_spread <- function(presence, coef_agp, aged, grid, ages) {
+  stand_types <- c("Spruce", "Pine", "Decid", "Mixedwood", "TreedBog")
+  coef_pa <- presence$coef
+  coef_pa_se <- presence$se
   out_pa <- out_pa_se <- out_mean <- numeric(0)
-  terms_pa1 <- setdiff(terms_pa, c("seas_days", "pAspen"))
+  terms_pa1 <- setdiff(presence$terms, c("seas_days", "pAspen"))
 
   put <- function(names_in, pa_values, pa_se, agp_value) {
     out_pa[names_in] <<- pa_values
@@ -431,17 +515,22 @@ select_mammal_v2_hurdle <- function(
       next
     }
 
-    if (!term %in% names(pm)) next
-    fine_types <- rownames(pm)[pm[[term]] == 1]
+    if (!term %in% names(grid)) next
+    fine_types <- rownames(grid)[grid[[term]] == 1]
 
     for (fine in fine_types) {
-      agp_value <- if (fine %in% names(coef_agp)) coef_agp[[fine]] else 0
+      agp_value <- if (fine %in% names(coef_agp)) {
+        coef_agp[[fine]]
+      } else {
+        0
+      }
 
       if (ages && fine %in% stand_types) {
         age_names <- paste0(fine, c("R", 1:8))
 
-        if (!is.null(p_age[[term]])) {
-          put(age_names, p_age[[term]], p_age_se[[term]], agp_value)
+        if (!is.null(aged$p_age[[term]])) {
+          put(age_names, aged$p_age[[term]], aged$p_age_se[[term]],
+              agp_value)
         } else {
           put(age_names, rep(coef_pa[[term]], 9),
               rep(coef_pa_se[[term]], 9), agp_value)
@@ -452,94 +541,120 @@ select_mammal_v2_hurdle <- function(
     }
   }
 
-  # v2's Mule Deer adjustment: old pine, and in winter old
-  # deciduous, stands are pulled toward the 100-119 class
+  list(pa = out_pa, pa_se = out_pa_se, mean = out_mean)
+}
+
+## 4.6 mammal_mule_deer() ----
+
+#' v2's Mule Deer Adjustment to Old Stands
+#'
+#' Old pine, and in winter old deciduous, stands are pulled
+#' toward the 100-119 class.
+#'
+#' @param out_mean Named numeric. Total abundance per fine type.
+#' @param species Character. The harness species name.
+#' @return `out_mean`, adjusted for Mule Deer and unchanged
+#'   otherwise.
+#'
+#' @example # Example usage of the function
+#' # mammal_mule_deer(out_mean, "MuleDeer_Winter")
+mammal_mule_deer <- function(out_mean, species) {
   base_species <- sub("_(Summer|Winter)$", "", species)
 
-  if (identical(base_species, "MuleDeer")) {
-    types <- c("Pine", if (grepl("_Winter$", species)) "Decid")
-    for (type in types) {
-      old <- paste0(type, c("7", "8"))
-      ref <- paste0(type, "6")
-      if (all(c(old, ref) %in% names(out_mean))) {
-        out_mean[old] <- (out_mean[old] + out_mean[[ref]]) / 2
-      }
+  if (!identical(base_species, "MuleDeer")) {
+    return(out_mean)
+  }
+
+  types <- c("Pine", if (grepl("_Winter$", species)) "Decid")
+
+  for (type in types) {
+    old <- paste0(type, c("7", "8"))
+    ref <- paste0(type, "6")
+    if (all(c(old, ref) %in% names(out_mean))) {
+      out_mean[old] <- (out_mean[old] + out_mean[[ref]]) / 2
     }
   }
 
-  # Step 7: Calibrate total abundance to the observed mean (6.6)
+  out_mean
+}
+
+## 4.7 mammal_total_calibration() ----
+
+#' The Factor That Calibrates Total Abundance (v2 6.6)
+#'
+#' Mean observed lure-corrected count over mean predicted
+#' presence times abundance, both at v2's held values with the
+#' pAspen slopes added back.
+#'
+#' @param pa,agp The presence and abundance GLMs.
+#' @param data The stage's data.
+#' @param at_constants The data at v2's held values.
+#' @param lure_pa,lure_agp Numeric. The two lure ratios.
+#' @param has_aspen Logical.
+#' @return A number.
+#'
+#' @example # Example usage of the function
+#' # mammal_total_calibration(pa, agp, d, at, 1.4, 1.1, FALSE)
+mammal_total_calibration <- function(pa, agp, data, at_constants,
+                                     lure_pa, lure_agp, has_aspen) {
+  slope <- function(model) {
+    if ("pAspen" %in% names(stats::coef(model))) {
+      stats::coef(model)[["pAspen"]]
+    } else {
+      0
+    }
+  }
+  aspen <- if (has_aspen) data$pAspen else 0
+  count <- data$response_raw
+
   t_p_pa <- stats::plogis(
-    stats::predict(pa, newdata = at_constants) +
-      paspen_pa * (if (has_aspen) data$pAspen else 0)
+    stats::predict(pa, newdata = at_constants) + slope(pa) * aspen
   )
   t_p_agp <- stats::predict(agp, newdata = at_constants) +
-    paspen_agp * (if (has_aspen) data$pAspen else 0)
+    slope(agp) * aspen
   p_obs_total <- ifelse(
     data$lured == "Yes", count / (lure_pa * lure_agp), count
   )
-  out_mean <- out_mean *
-    (mean(p_obs_total) / mean(t_p_pa * exp(t_p_agp)))
 
-  # Step 8: Cutblock convergence, north only (6.11)
-  if (ages) {
-    # The same recovery weights as the plant pipeline
-    recovery <- cutblock_recovery_weights()
-    convergence <- list(
-      CCSpruce = list("Spruce", recovery$conifer),
-      CCPine = list("Pine", recovery$conifer),
-      CCMixedwood = list("Mixedwood", recovery$deciduous),
-      CCDecid = list("Decid", recovery$deciduous)
-    )
+  mean(p_obs_total) / mean(t_p_pa * exp(t_p_agp))
+}
 
-    for (cc in names(convergence)) {
-      for (k in 1:3) {
-        age <- k + 1
-        w <- convergence[[cc]][[2]][k]
-        cc_name <- paste0(cc, age)
-        natural <- paste0(convergence[[cc]][[1]], age)
+## 4.8 mammal_cutblock_convergence() ----
 
-        if (all(c(cc_name, natural) %in% names(out_mean))) {
-          out_mean[[cc_name]] <- out_mean[[cc_name]] * (1 - w) +
-            out_mean[[natural]] * w
-        }
+#' Converge Young Cutblocks onto Natural Stands (v2 6.11)
+#'
+#' The same recovery weights as the plant pipeline, applied to
+#' age classes 2 to 4.
+#'
+#' @param out_mean Named numeric. Total abundance per fine type.
+#' @return `out_mean`, converged.
+#'
+#' @example # Example usage of the function
+#' # mammal_cutblock_convergence(out_mean)
+mammal_cutblock_convergence <- function(out_mean) {
+  recovery <- cutblock_recovery_weights()
+  convergence <- list(
+    CCSpruce = list("Spruce", recovery$conifer),
+    CCPine = list("Pine", recovery$conifer),
+    CCMixedwood = list("Mixedwood", recovery$deciduous),
+    CCDecid = list("Decid", recovery$deciduous)
+  )
+
+  for (cc in names(convergence)) {
+    for (k in 1:3) {
+      age <- k + 1
+      w <- convergence[[cc]][[2]][k]
+      cc_name <- paste0(cc, age)
+      natural <- paste0(convergence[[cc]][[1]], age)
+
+      if (all(c(cc_name, natural) %in% names(out_mean))) {
+        out_mean[[cc_name]] <- out_mean[[cc_name]] * (1 - w) +
+          out_mean[[natural]] * w
       }
     }
   }
 
-  # v2 adds Bare and Water at zero to every table (7.1)
-  out_pa[c("Bare", "Water")] <- 0
-  out_pa_se[c("Bare", "Water")] <- 0
-  out_mean[c("Bare", "Water")] <- 0
-  coef_agp[c("Bare", "Water")] <- 0
-  coef_agp_se[c("Bare", "Water")] <- 0
-
-  table_of <- function(values, se = NA_real_) {
-    data.frame(
-      term = names(values), estimate = unname(values),
-      se = if (length(se) == length(values)) unname(se) else NA_real_,
-      stringsAsFactors = FALSE
-    )
-  }
-
-  presence <- table_of(out_pa, out_pa_se)
-  abundance <- table_of(coef_agp, coef_agp_se)
-
-  result <- selection_result(
-    fit = list(fit = pa, ok = TRUE, message = NA_character_),
-    coefficients = presence,
-    ic_table = data.frame(
-      model = paste0("pa_", seq_along(aic_pa)), ic = aic_pa,
-      ok = is.finite(aic_pa), stringsAsFactors = FALSE
-    )
-  )
-
-  result$outputs <- list(
-    presence = presence,
-    abundance = abundance,
-    total = table_of(out_mean)
-  )
-
-  result
+  out_mean
 }
 
 # End of script ----

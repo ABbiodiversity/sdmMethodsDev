@@ -10,6 +10,69 @@ test_that("every standard spec validates", {
   ))
 })
 
+test_that("one call swaps the habitat method of every run", {
+  specs <- lapply(
+    standard_specs(), replace_stage_method, engine = "xgboost"
+  )
+
+  for (key in names(specs)) {
+    expect_silent(validate_spec(specs[[key]]))
+  }
+
+  # The mammal hurdle keeps its structure; both halves take the
+  # new engine, and v2's GLM table-building is removed with them
+  habitat <- specs$mammal_summer$stages[[1]]
+  expect_equal(habitat$selection, "hurdle")
+  expect_equal(habitat$part_selection, "single")
+  expect_equal(habitat$engine, "xgboost")
+  expect_null(habitat$post_process)
+  expect_equal(specs$bird$stages[[2]]$engine, "xgboost")
+})
+
+test_that("a hurdle's inner rule is checked against its engine", {
+  spec <- replace_stage_method(
+    mammal_spec(), engine = "xgboost", selection = "aic_best"
+  )
+
+  expect_error(validate_spec(spec), "inner rule `aic_best` needs")
+})
+
+test_that("the hurdle fits both halves with any engine", {
+  set.seed(1)
+  n <- 300
+  data <- data.frame(
+    x = stats::runif(n), cover = stats::rbinom(n, 1, 0.5),
+    seas_days = 100
+  )
+  data$response_raw <- stats::rbinom(n, 1, 0.4) *
+    stats::rgamma(n, 2, 1)
+  data$response <- sign(data$response_raw)
+  grid <- data.frame(cover = c(0, 1), row.names = c("A", "B"))
+
+  for (engine in c("glm", "xgboost")) {
+    selected <- selection_run(
+      "hurdle", list(stats::as.formula(". ~ . + x + cover")),
+      response ~ 1, data, get_engine(engine), "binomial",
+      grid = grid,
+      constants = list(x = 0.5),
+      # seas_days is constant here, so the effort-only null
+      # candidate would be rank-deficient
+      abundance_null = NULL,
+      part_selection = if (engine == "glm") "aic_best" else "single"
+    )
+
+    expect_named(
+      selected$outputs, c("presence", "abundance", "total")
+    )
+    expect_equal(
+      selected$outputs$total$estimate,
+      selected$outputs$presence$estimate *
+        selected$outputs$abundance$estimate
+    )
+    expect_length(selected$predict(data, "response"), n)
+  }
+})
+
 test_that("a misspelt field is reported, not ignored", {
   spec <- bird_spec()
   spec$stages[[2]]$selction <- "staged_bic"
