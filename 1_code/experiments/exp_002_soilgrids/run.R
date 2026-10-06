@@ -12,7 +12,7 @@
 #   in 2_pipeline/exp_002_soilgrids/:
 #     - <run>/<region>/ result stores, and run_log.csv
 #   in 3_output/exp_002_soilgrids/:
-#     - tables/ (summaries, and comparison_*.csv against
+#     - tables/ (summaries, and comparison_metrics.csv against
 #       exp_000), run_record.md
 # notes:
 #   - A test experiment: does adding near-surface soil properties
@@ -95,7 +95,7 @@ config <- experiment_config(
 # 2. Run ----
 # Fit, summarize, and compare with exp_000; every experiment is
 # compared with it. The comparison is written to
-# tables/comparison_*.csv.
+# tables/comparison_metrics.csv.
 results <- run_experiment(
   config,
   translate = list(bird = bird_habitat_translation)

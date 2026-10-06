@@ -81,9 +81,7 @@ again.
 ## How to read the result
 
 Every experiment is compared with exp_000; see
-`3_output/exp_002_soilgrids/tables/comparison_*.csv`. The habitat effects on
-the grid (`comparison_grid.csv`) show whether adding soil to the climate stage
-moved the habitat estimates through the carried `Climate` term.
+`3_output/exp_002_soilgrids/tables/comparison_metrics.csv`.
 
 ## Assumptions and caveats
 

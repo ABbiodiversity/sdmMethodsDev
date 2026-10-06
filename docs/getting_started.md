@@ -198,15 +198,11 @@ that, it is a name in a spec, as in lever 2.
 ### Reading the comparison
 
 Every experiment is compared with exp_000 automatically:
-`run_experiment()` writes three tables to `tables/`, and prints
-the headline (set `baseline = NULL` in `experiment_config()` to
-skip it):
-
-| File | Holds |
-| --- | --- |
-| `comparison_summary.csv` | Per taxon, region and metric: the median difference from exp_000, and the share of species that did better |
-| `comparison_metrics.csv` | Per species and metric, with both runs' 10–90% bands |
-| `comparison_grid.csv` | Per species: rank correlation and absolute difference of the habitat effects on the grid |
+`run_experiment()` prints the headline per taxon, region and
+metric (the median difference from exp_000, and the share of
+species that did better), and writes `tables/comparison_metrics.csv`:
+one row per species and metric, with both runs' 10–90% bands. Set
+`baseline = NULL` in `experiment_config()` to skip it.
 
 "Better" means:
 

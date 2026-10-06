@@ -67,8 +67,6 @@ vignettes/*.pdf
 !3_output/**/tables/coverage.csv
 !3_output/**/tables/metric_summary.csv
 !3_output/**/tables/grid_summary.csv
-!3_output/**/tables/comparison_summary.csv
-!3_output/**/tables/comparison_grid.csv
 !3_output/**/tables/v2_self_agreement_summary.csv
 
 AGENTS.md

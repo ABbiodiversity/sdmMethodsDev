@@ -4,27 +4,22 @@
 # created: 2026-10-03
 # inputs:
 #   in each experiment's out_dir/tables/:
-#     - metric_summary.csv, grid_summary.csv (collect_results())
+#     - metric_summary.csv (collect_results())
 # outputs:
 #   in the candidate's out_dir/tables/:
 #     - comparison_metrics.csv: one row per species and metric
-#     - comparison_summary.csv: one row per taxon, region, metric
-#     - comparison_grid.csv: one row per species, grid agreement
+#   the per-taxon, region and metric summary is returned (and
+#   printed by run_experiment()) but not written
 # notes:
 #   - Every experiment after exp_000 asks the same thing: did the
 #     change do better or worse than the v2 baseline? This answers
 #     it the same way for any method, from the two experiments'
 #     summary tables, so a new experiment needs one call.
-#   - Two currencies, both engine-agnostic:
-#     - Model fit: the out-of-bag metrics, which score each draw
-#       on the units it left out. In-sample metrics flatter a
-#       flexible method, so they are not the default.
-#     - Habitat effects: the grid predictions, one per habitat
-#       type, compared by rank correlation and absolute
-#       difference. A GLM and a boosted tree both have these;
-#       only one has coefficients.
+#   - Model fit is compared on the out-of-bag metrics, which
+#     score each draw on the units it left out. In-sample metrics
+#     flatter a flexible method, so they are not the default.
 #   - Rows are matched on taxon, region, season, part, species
-#     and metric (or grid unit), so two experiments that name
+#     and metric, so two experiments that name
 #     their runs differently still line up.
 #   - "Better" depends on the metric: higher AUC, deviance
 #     explained and Spearman; lower RMSE; a calibration slope
@@ -75,9 +70,10 @@ better_direction <- function(metric) {
 #'   3_output/exp_000_parity_v2.
 #' @param metrics Character vector of metrics to compare, or NULL
 #'   for the out-of-bag fit metrics.
-#' @param write Logical. Write the three tables to
-#'   `candidate_dir/tables/`.
-#' @return A list of data frames: `metrics`, `summary` and `grid`.
+#' @param write Logical. Write `metrics` to
+#'   `candidate_dir/tables/comparison_metrics.csv`.
+#' @return A list of data frames: `metrics` (per species) and
+#'   `summary` (per taxon, region and metric).
 #'
 #' @example # Example usage of the function
 #' # compare_experiments("3_output/exp_001_brt",
@@ -179,53 +175,19 @@ compare_experiments <- function(
     )
   }
 
-  # Step 3: Habitat effects on the grid, per species
-  grid_candidate <- read_summary(candidate_dir, "grid_summary")
-  grid_baseline <- read_summary(baseline_dir, "grid_summary")
-  grid <- NULL
-
-  if (!is.null(grid_candidate) && !is.null(grid_baseline)) {
-    grid_joined <- merge(
-      grid_baseline[, c(keys, "grid_unit", "median"), with = FALSE],
-      grid_candidate[, c(keys, "grid_unit", "median"), with = FALSE],
-      by = c(keys, "grid_unit"),
-      suffixes = c("_baseline", "_candidate")
-    )
-
-    grid <- grid_joined[, list(
-      grid_units = .N,
-      spearman = if (.N >= 3) {
-        suppressWarnings(stats::cor(
-          median_baseline, median_candidate, method = "spearman"
-        ))
-      } else {
-        NA_real_
-      },
-      median_absolute_difference = stats::median(
-        abs(median_candidate - median_baseline), na.rm = TRUE
-      )
-    ), by = keys]
-  }
-
   out <- list(
     metrics = as.data.frame(joined),
-    summary = as.data.frame(summary),
-    grid = if (is.null(grid)) NULL else as.data.frame(grid)
+    summary = as.data.frame(summary)
   )
 
   if (write) {
     tables_dir <- file.path(candidate_dir, "tables")
     dir.create(tables_dir, recursive = TRUE, showWarnings = FALSE)
-
-    for (name in names(out)) {
-      if (!is.null(out[[name]])) {
-        fwrite(
-          out[[name]],
-          file.path(tables_dir, paste0("comparison_", name, ".csv")),
-          na = ""
-        )
-      }
-    }
+    fwrite(
+      out$metrics,
+      file.path(tables_dir, "comparison_metrics.csv"),
+      na = ""
+    )
   }
 
   out

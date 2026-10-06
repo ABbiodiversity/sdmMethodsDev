@@ -18,10 +18,12 @@
 #     experiment, so it lives in the harness: an experiment's own
 #     scripts start from these tables.
 #   - Draws are summarized by median and the 10th and 90th
-#     percentiles rather than mean and standard deviation. A
+#     percentiles, which is what comparisons read. A
 #     coefficient's distribution over draws is routinely skewed,
 #     and a rare species can produce an extreme draw that would
-#     drag a mean somewhere no draw actually is.
+#     drag a mean somewhere no draw actually is. The mean and
+#     standard deviation are added to every summary for readers
+#     and tools that expect them.
 #   - `boot1` is the iteration-1 value, the full-data fit. It is
 #     the like-for-like quantity where a reference fits once
 #     rather than bootstrapping, as the v2 mammal models do.
@@ -147,21 +149,18 @@ store_meta <- function(dir) {
 #' @param rows A data frame with `boot` and the value column.
 #' @param value Character. The column to summarize.
 #' @param keys Character vector of grouping columns.
-#' @param moments Logical. Add the mean and standard deviation.
-#' @return A data.table of the keys plus n, median, p10, p90 and
-#'   boot1, and mean and sd when `moments` is TRUE. n counts the
-#'   finite values; boot1 is the iteration-1 value where there is
-#'   exactly one.
+#' @return A data.table of the keys plus n, median, p10, p90,
+#'   boot1, mean and sd. n counts the finite values; boot1 is the
+#'   iteration-1 value where there is exactly one.
 #'
 #' @example # Example usage of the function
-#' # summarise_draws(metrics, "value", c("species", "metric"),
-#' #                 moments = TRUE)
-summarise_draws <- function(rows, value, keys, moments = FALSE) {
+#' # summarise_draws(metrics, "value", c("species", "metric"))
+summarise_draws <- function(rows, value, keys) {
   rows <- as.data.table(rows)
 
   # The column is passed through .SDcols rather than named inside
   # the call, because a column may itself be called `value`
-  rows[, draw_summary(.SD[[1L]], boot, moments),
+  rows[, draw_summary(.SD[[1L]], boot),
        by = keys, .SDcols = value]
 }
 
@@ -171,20 +170,18 @@ summarise_draws <- function(rows, value, keys, moments = FALSE) {
 #'
 #' The median and 10-90% band are the summary every comparison
 #' reads, because a distribution over draws is often skewed. The
-#' mean and standard deviation are added where asked, for readers
-#' and tools that expect them; with a skewed distribution they
-#' describe it less well.
+#' mean and standard deviation are there for readers and tools
+#' that expect them; with a skewed distribution they describe it
+#' less well.
 #'
 #' @param x Numeric vector, one value per draw.
 #' @param boot Integer vector of the draw each value came from.
-#' @param moments Logical. Add the mean and standard deviation.
-#' @return A list of n, median, p10, p90 and boot1, then mean and
-#'   sd when `moments` is TRUE. sd is NA with fewer than two
-#'   values.
+#' @return A list of n, median, p10, p90, boot1, mean and sd. sd
+#'   is NA with fewer than two values.
 #'
 #' @example # Example usage of the function
-#' # draw_summary(c(0.1, 0.3, 0.2), 1:3, moments = TRUE)
-draw_summary <- function(x, boot, moments = FALSE) {
+#' # draw_summary(c(0.1, 0.3, 0.2), 1:3)
+draw_summary <- function(x, boot) {
   first <- x[boot == 1L]
   first <- if (length(first) == 1 && is.finite(first)) {
     first
@@ -206,10 +203,8 @@ draw_summary <- function(x, boot, moments = FALSE) {
   }
 
   # Appended, so the columns before them keep their positions
-  if (moments) {
-    out$mean <- if (length(finite) == 0) NA_real_ else mean(finite)
-    out$sd <- if (length(finite) < 2) NA_real_ else stats::sd(finite)
-  }
+  out$mean <- if (length(finite) == 0) NA_real_ else mean(finite)
+  out$sd <- if (length(finite) < 2) NA_real_ else stats::sd(finite)
 
   out
 }
@@ -279,12 +274,12 @@ collect_results <- function(pipeline_dir, data_dir = NULL,
       }
     }
 
-    summarised <- function(rows, value, keys, moments = FALSE) {
+    summarised <- function(rows, value, keys) {
       if (is.null(rows) || nrow(rows) == 0) {
         return(NULL)
       }
 
-      cbind(labels, summarise_draws(rows, value, keys, moments))
+      cbind(labels, summarise_draws(rows, value, keys))
     }
 
     list(
@@ -304,7 +299,7 @@ collect_results <- function(pipeline_dir, data_dir = NULL,
         coefficients, "estimate", c("stage", "species", "term")
       ),
       metric_summary = summarised(
-        metrics, "value", c("species", "metric"), moments = TRUE
+        metrics, "value", c("species", "metric")
       ),
       grid_summary = summarised(
         grid, "prediction", c("species", "grid_unit")

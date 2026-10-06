@@ -465,8 +465,8 @@ experiment_changes <- function(config) {
 #' Compare an Experiment's Summaries with the Baseline's
 #'
 #' Run by run_experiment() for every experiment but the baseline.
-#' Writes tables/comparison_summary.csv, comparison_metrics.csv
-#' and comparison_grid.csv; see compare_experiments(). A baseline
+#' Writes tables/comparison_metrics.csv and prints the per-taxon
+#' headline; see compare_experiments(). A baseline
 #' that has not been run is reported and skipped rather than
 #' stopping the experiment.
 #'
@@ -502,7 +502,7 @@ compare_to_baseline <- function(
     baseline_dir = baseline_dir
   )
 
-  # The headline, for the console; the full tables are written
+  # The headline, for the console; per-species rows are written
   shown <- comparison$summary[
     comparison$summary$metric %in% c(
       "oob_auc", "oob_deviance_explained", "oob_calibration_slope"
@@ -515,7 +515,7 @@ compare_to_baseline <- function(
 
   cat(
     "Against ", baseline,
-    " (out-of-bag; full tables in tables/comparison_*.csv):\n",
+    " (out-of-bag; per species in comparison_metrics.csv):\n",
     sep = ""
   )
   print(shown, row.names = FALSE)

@@ -64,9 +64,7 @@ against are from a 100-draw run of the same species.
 
 | File | Read it for |
 | --- | --- |
-| `comparison_summary.csv` | Per taxon, region (and mammal season) and metric: the median difference from exp_000, and the share of species that did better |
 | `comparison_metrics.csv` | Per species, both runs' out-of-bag metrics and 10–90% bands |
-| `comparison_grid.csv` | Whether the habitat effects moved: rank correlation and absolute difference on the habitat grid |
 
 Out-of-bag metrics score each draw on the survey units it left out, which
 matters here: a tree fits the units it trained on far more closely than a

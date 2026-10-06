@@ -9,7 +9,7 @@
 #   in 2_pipeline/exp_NNN_short_description/:
 #     - <run>/<region>/ result stores, and run_log.csv
 #   in 3_output/exp_NNN_short_description/:
-#     - tables/ (summaries, and comparison_*.csv against the
+#     - tables/ (summaries, and comparison_metrics.csv against the
 #       baseline), run_record.md
 # notes:
 #   - Copy this folder to 1_code/experiments/exp_NNN_*/, set `id`
@@ -71,7 +71,7 @@ config <- experiment_config(
 # 2. Run ----
 # Fit, summarize, and compare with the v2 baseline (exp_000);
 # every experiment is compared with it. The comparison is
-# written to tables/comparison_*.csv. Add `steps` for anything
+# written to tables/comparison_metrics.csv. Add `steps` for anything
 # this experiment needs beyond that.
 results <- run_experiment(
   config,

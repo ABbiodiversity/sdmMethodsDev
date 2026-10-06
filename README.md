@@ -281,7 +281,7 @@ flowchart TD
         ST["result stores<br/>2_pipeline/id/run/region/"]
         CR["collect_results()<br/>per-species summaries"]
         T["3_output/id/tables/"]
-        B["compare with exp_000<br/>comparison_*.csv<br/>every experiment but exp_000"]
+        B["compare with exp_000<br/>comparison_metrics.csv<br/>every experiment but exp_000"]
         X["the experiment's own steps<br/>exp_000: compare to v2 · plot · report"]
         RR["run_record.md"]
 
@@ -335,8 +335,8 @@ flowchart TD
 5. **Summarize.** `collect_results()` reduces the stores to per-species
    tables in `3_output/<id>/tables/`.
 6. **Compare with exp_000.** Every experiment except exp_000 itself is
-   compared with the v2 baseline: `tables/comparison_*.csv`, with the
-   headline printed. Set `baseline = NULL` in `experiment_config()` to skip.
+   compared with the v2 baseline: `tables/comparison_metrics.csv`, with
+   the per-taxon headline printed. Set `baseline = NULL` in `experiment_config()` to skip.
 7. **The experiment's own steps**, in order. For exp_000: compare with v2,
    plot, write the report.
 8. **Record.** `run_record.md` says what ran, for the commit.
@@ -758,12 +758,13 @@ flowchart LR
 
 The red files are written for every experiment by the harness; the blue ones
 are exp_000's own steps. Every other experiment also writes
-`comparison_*.csv` against exp_000.
+`comparison_metrics.csv` against exp_000.
 
 A *draw* is one bootstrap iteration; draw 1 is the full data. Every summary
-reduces the draws to a median and a 10th–90th percentile band (`p10`, `p90`)
-rather than a mean and standard deviation, because the spread over draws is
-often skewed. `boot1` is the draw-1 value.
+reduces the draws to a median and a 10th–90th percentile band (`p10`, `p90`),
+which is what comparisons read because the spread over draws is often
+skewed. Each also carries the `mean` and standard deviation (`sd`) for readers
+and tools that expect them. `boot1` is the draw-1 value.
 
 ### Result stores (`2_pipeline/<exp_id>/<run>/<region>/`)
 
@@ -785,9 +786,8 @@ often skewed. `boot1` is the draw-1 value.
 | `run_record.md`, `report.md` | `figures/` |
 | `tables/coverage.csv` | `tables/coefficient_summary.csv` |
 | `tables/metric_summary.csv` | `tables/parity_terms.csv` |
-| `tables/grid_summary.csv` | `tables/comparison_metrics.csv` |
-| `tables/comparison_summary.csv`, `tables/comparison_grid.csv` (experiments after exp_000) | |
-| `tables/parity_summary.csv`, `tables/v2_self_agreement_summary.csv` | |
+| `tables/grid_summary.csv` | |
+| `tables/parity_summary.csv`, `tables/v2_self_agreement_summary.csv` | `tables/comparison_metrics.csv` |
 
 **Commit only runs that count.** A trial writes the same files as a full run.
 Commit `3_output/` after a run with the full species list and
@@ -841,13 +841,15 @@ metric summaries are not comparable with these.
 
 **`tables/grid_summary.csv`** — the final model's prediction for each
 habitat type, one row per taxon × region × species × `grid_unit`, on the
-response scale. Each row is a pure stand of that type at the stage's
+response scale, with `n`, `median`, `p10`, `p90`, `boot1`, `mean` and `sd`
+over draws. Each row is a pure stand of that type at the stage's
 constants (`Climate` 0, the new protocol where fitted, 100 sampling days for
 mammals). v2's later coefficient adjustments, such as the plant stand-age
 splines, are in the coefficients, not the grid.
 
 **`tables/coefficient_summary.csv`** (gitignored) — one row per run ×
-region × stage × species × term. A term means something different by taxon
+region × stage × species × term, with `n`, `median`, `p10`, `p90`, `boot1`,
+`mean` and `sd` over draws. A term means something different by taxon
 and stage:
 
 | Taxon and stage | `term` holds |
@@ -858,13 +860,13 @@ and stage:
 | Birds, `landcover` | Raw `glm` coefficients (e.g. `vegcCrop`) |
 | Birds, `habitat` | The same, translated onto v2's standardized habitat types, log scale |
 
-**`tables/comparison_*.csv`** (every experiment except exp_000) — against
-exp_000, written automatically by `run_experiment()`: `comparison_summary.csv` per taxon, region and metric, with the
-median difference, the share of species that did better, and each side's
-draw count (a mismatch is warned about);
-`comparison_metrics.csv` per species, with both sides' median, band, mean and
-standard deviation; `comparison_grid.csv` with the rank
-correlation of habitat effects on the grid. "Better" is higher AUC, deviance
+**`tables/comparison_metrics.csv`** (every experiment except exp_000;
+gitignored) — against exp_000, written automatically by `run_experiment()`:
+one row per species and metric, with both sides' median, band, mean and
+standard deviation, the difference, and whether the experiment did better.
+The per-taxon headline (median difference, share of species that did
+better, each side's draw count) is printed to the console, not written; a
+draw-count mismatch is warned about. "Better" is higher AUC, deviance
 explained and Spearman, lower RMSE, and a calibration slope closer to 1.
 
 ### exp_000's parity outputs
@@ -951,7 +953,7 @@ and [`docs/taxon_quirks.md`](docs/taxon_quirks.md).
    candidate formulas, or `specs` for a different engine or selection rule.
    Keep exp_000's species, draws and seed unless they are the question.
 5. Run it, first at 5 draws to check it works. It is compared with exp_000
-   automatically, in `tables/comparison_*.csv`. Compare like with like: run
+   automatically, in `tables/comparison_metrics.csv`. Compare like with like: run
    exp_000 at the same number of draws; a mismatch is warned about.
 
 [`docs/getting_started.md`](docs/getting_started.md#test-a-change) walks

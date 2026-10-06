@@ -236,7 +236,7 @@ if (!is.null(run_coefficients)) {
 
     keys <- c("taxon", "group", "region", "ref_region", "stage",
               "ref_part", "species", "term")
-    values <- c("n", "median", "p10", "p90", "boot1")
+    values <- c("n", "median", "p10", "p90", "boot1", "mean", "sd")
 
     averaged <- stats::aggregate(
       mammals[, values],

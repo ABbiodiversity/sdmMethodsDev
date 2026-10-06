@@ -102,7 +102,13 @@ rerun_summary <- rbindlist(lapply(names(rerun), function(species) {
       species = species, term = term,
       rerun_median = stats::median(values),
       rerun_p10 = stats::quantile(values, 0.1, names = FALSE),
-      rerun_p90 = stats::quantile(values, 0.9, names = FALSE)
+      rerun_p90 = stats::quantile(values, 0.9, names = FALSE),
+      rerun_mean = mean(values),
+      rerun_sd = if (length(values) < 2) {
+        NA_real_
+      } else {
+        stats::sd(values)
+      }
     )
   }))
 }))

@@ -140,6 +140,9 @@ test_that("an experiment is compared with its baseline by key", {
   expect_equal(out$summary$share_better, 0.5)
   expect_equal(out$summary$draws_baseline, 100)
   expect_true(file.exists(
+    file.path(root, "same", "tables", "comparison_metrics.csv")
+  ))
+  expect_false(file.exists(
     file.path(root, "same", "tables", "comparison_summary.csv")
   ))
 
@@ -159,13 +162,12 @@ test_that("the baseline does not compare with itself", {
   )
 })
 
-test_that("metric summaries carry the mean and standard deviation", {
+test_that("draw summaries carry the mean and standard deviation", {
   rows <- data.frame(
     species = "sp", metric = "oob_auc", boot = 1:4,
     value = c(0.6, 0.7, 0.8, NA)
   )
-  out <- summarise_draws(rows, "value", c("species", "metric"),
-                         moments = TRUE)
+  out <- summarise_draws(rows, "value", c("species", "metric"))
 
   expect_equal(out$n, 3)
   expect_equal(out$mean, 0.7)
@@ -176,8 +178,4 @@ test_that("metric summaries carry the mean and standard deviation", {
     c("species", "metric", "n", "median", "p10", "p90", "boot1",
       "mean", "sd")
   )
-  # Coefficient and grid summaries are unchanged
-  expect_false("mean" %in% names(
-    summarise_draws(rows, "value", c("species", "metric"))
-  ))
 })
