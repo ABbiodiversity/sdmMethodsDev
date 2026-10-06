@@ -563,6 +563,7 @@ sdmMethodsDev/
 │   ├── harness/                   # the shared pipeline; names no taxon or method
 │   │   ├── harness.R              # load_framework(): loads everything
 │   │   ├── experiment.R           # experiment_config(), run_experiment()
+│   │   ├── new_experiment.R       # new_experiment(): scaffold an experiment's folders
 │   │   ├── run_model.R            # run_specs(): prepare, fit (parallel), merge
 │   │   ├── spec.R                 # validate_spec() and spec helpers
 │   │   ├── registry.R             # register_*(), list_methods()
@@ -580,7 +581,7 @@ sdmMethodsDev/
 │   │   └── birds/                 # spec.R, standardize.R (v2's term translation)
 │   ├── experiments/
 │   │   ├── _shared/               # named focal-species sets
-│   │   ├── _template/             # copy to start an experiment
+│   │   ├── _template/             # what new_experiment() fills in
 │   │   ├── exp_000_parity_v2/     # run.R, 01_compare_to_v2.R, 02_plot_parity.R,
 │   │   │                          # 03_build_report.R, utils/parity_targets.R
 │   │   ├── exp_001_xgboost/       # test: habitat stage fitted with xgboost
@@ -946,8 +947,21 @@ and [`docs/taxon_quirks.md`](docs/taxon_quirks.md).
 
 ## Adding an experiment
 
-1. Copy `1_code/experiments/_template/` to `exp_00N_short_description/`.
-2. Set `id` in its `run.R` to the folder's name. Every path derives from it.
+1. Scaffold it, from the repository root:
+
+   ```r
+   source("1_code/harness/new_experiment.R")
+   new_experiment("covariate scale")  # dry_run = TRUE to preview
+   ```
+
+   This takes the next free number across `1_code/experiments/`,
+   `2_pipeline/` and `3_output/`, so a stale pipeline folder still holds
+   its number. It then creates `1_code/experiments/<id>/` from
+   `_template/` with `id`, title, author and date filled in,
+   `2_pipeline/<id>/logs/`, and `3_output/<id>/` with `figures/`,
+   `tables/` and a stub `report.md`.
+2. `id` in its `run.R` is already the folder's name. Every path derives
+   from it, so leave it as it is.
 3. State the question and design in its `README.md`.
 4. Change one thing relative to exp_000: `stage_models` for different
    candidate formulas, or `specs` for a different engine or selection rule.

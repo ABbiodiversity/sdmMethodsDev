@@ -24,6 +24,9 @@
 #        use, such as the named focal-species sets.
 #   - Within a methods folder, files whose names start with an
 #     underscore are shared helpers and are loaded first.
+#   - harness/new_experiment.R, which scaffolds a new
+#     experiment's folders, is loaded too, but also works sourced
+#     on its own, before an experiment exists.
 # ---
 
 # 1. Setup ----
@@ -67,7 +70,8 @@ load_harness <- function(
     "run_model.R",
     "summarise.R",
     "compare.R",
-    "experiment.R"
+    "experiment.R",
+    "new_experiment.R"
   )
 
   source_all(file.path(harness_dir, files), envir)

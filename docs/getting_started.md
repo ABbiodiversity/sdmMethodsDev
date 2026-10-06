@@ -114,9 +114,19 @@ for plants. It is not the single best candidate.
 
 ## Test a change
 
-Copy `1_code/experiments/_template/` to
-`1_code/experiments/exp_001_short_description/`, set `id`, and
-write the question in the README. Then change one thing. There are
+Scaffold an experiment from the repository root:
+
+```r
+source("1_code/harness/new_experiment.R")
+new_experiment("short description")
+```
+
+It numbers the experiment (one past the highest `exp_NNN` in
+`1_code/experiments/`, `2_pipeline/` or `3_output/`), copies
+`1_code/experiments/_template/` with `id` set, and creates the
+matching `2_pipeline/<id>/logs/` and `3_output/<id>/` folders
+(`figures/`, `tables/`, `report.md`). Write the question in the
+README. Then change one thing. There are
 three levers, from least to most invasive.
 
 ### 1. Different candidate formulas: `stage_models`

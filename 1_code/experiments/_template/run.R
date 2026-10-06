@@ -12,9 +12,11 @@
 #     - tables/ (summaries, and comparison_metrics.csv against the
 #       baseline), run_record.md
 # notes:
-#   - Copy this folder to 1_code/experiments/exp_NNN_*/, set `id`
-#     below to the folder's name, and state the question in the
-#     README.
+#   - Start an experiment with new_experiment("description")
+#     (harness/new_experiment.R), which numbers it, fills this
+#     header and creates its 2_pipeline/ and 3_output/ folders.
+#     Copying by hand instead, set `id` below to the folder's name.
+#   - State the question in the README.
 #   - Change one thing relative to exp_000, so a difference in the
 #     comparison is a difference in that thing. Use the same
 #     species, draws and seed as exp_000 unless they are the
