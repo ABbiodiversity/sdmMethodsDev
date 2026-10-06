@@ -1,5 +1,15 @@
-# Result stores, shards and seeds behave as a parallel run relies
-# on them to.
+# ---
+# title: Tests - Result Stores, Shards and Seeds
+# author: Brendan Casey
+# created: 2026-10-03
+# inputs: none; temporary stores under tempdir()
+# outputs: none; testthat results
+# notes:
+#   - Result stores, shards and seeds behave as a parallel run relies
+#     on them to.
+#   - Run through 1_code/tests/run_tests.R, which loads the
+#     framework and sets `data_dir`.
+# ---
 
 test_that("merged shards equal a store written in one pass", {
   root <- file.path(tempdir(), "shard_test")
@@ -179,3 +189,5 @@ test_that("draw summaries carry the mean and standard deviation", {
       "mean", "sd")
   )
 })
+
+# End of script ----

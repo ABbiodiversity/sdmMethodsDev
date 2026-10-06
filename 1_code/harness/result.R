@@ -2,6 +2,7 @@
 # title: The Standard Result Object
 # author: Brendan Casey
 # created: 2026-09-09
+# inputs: none; writes to the store directory it is given
 # outputs:
 #   in the store directory:
 #     - grid_predictions.csv

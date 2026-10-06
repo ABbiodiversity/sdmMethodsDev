@@ -1,7 +1,17 @@
-# new_experiment() numbers an experiment from every folder that
-# could hold one, and scaffolds all three of its folders or none.
-# Each test builds a throwaway repository, so the real one is
-# never touched.
+# ---
+# title: Tests - Experiment Scaffolding
+# author: Brendan Casey
+# created: 2026-10-06
+# inputs: none; throwaway repositories under tempfile()
+# outputs: none; testthat results
+# notes:
+#   - new_experiment() numbers an experiment from every folder that
+#     could hold one, and scaffolds all three of its folders or none.
+#     Each test builds a throwaway repository, so the real one is
+#     never touched.
+#   - Run through 1_code/tests/run_tests.R, which loads the
+#     framework and sets `data_dir`.
+# ---
 
 # A minimal repository: the real template, and an exp_ folder in
 # each of the given roots
@@ -125,3 +135,5 @@ test_that("a dry run writes nothing", {
     list.files(root, recursive = TRUE, include.dirs = TRUE), before
   )
 })
+
+# End of script ----

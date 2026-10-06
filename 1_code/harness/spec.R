@@ -587,7 +587,8 @@ replace_stage_method <- function(
     spec$models_overridden, paste0(stage, " <- ", label)
   )
   spec$notes <- paste0(
-    spec$notes %||% "", " Stage `", stage, "` fitted with ", label, "."
+    spec$notes %||% "", " Stage `", stage, "` fitted with ",
+    label, "."
   )
 
   spec

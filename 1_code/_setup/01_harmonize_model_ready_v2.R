@@ -2381,7 +2381,7 @@ for (matrix_name in names(prediction_matrices)) {
 # The four aggregate columns the vegetation models predict onto.
 # Their absence is what separates the snapshot's veg.pm from the
 # CSV the v2 scripts read, so it is reported here rather than
-# found later by check_prediction_terms().
+# found later, at prediction time.
 veg_aggregates <- c("Peatland", "Mineral", "Upland", "CCR1234")
 absent_aggregates <- setdiff(
   veg_aggregates,

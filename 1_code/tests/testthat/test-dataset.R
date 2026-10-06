@@ -1,5 +1,15 @@
-# The harmonized lookups agree with each other and with the files
-# they describe. Skipped when the dataset is not present.
+# ---
+# title: Tests - Dataset Lookups
+# author: Brendan Casey
+# created: 2026-10-03
+# inputs: the published test dataset (`data_dir`)
+# outputs: none; testthat results
+# notes:
+#   - The harmonized lookups agree with each other and with the files
+#     they describe. Skipped when the dataset is not present.
+#   - Run through 1_code/tests/run_tests.R, which loads the
+#     framework and sets `data_dir`.
+# ---
 
 skip_if_not(dir.exists(data_dir), "No test dataset")
 
@@ -111,3 +121,5 @@ test_that("an experiment's covariate file is checked and joined", {
   joined <- add_covariate_files(x, good, "new_1")
   expect_equal(joined$new_1, c(10, 20, NA))
 })
+
+# End of script ----

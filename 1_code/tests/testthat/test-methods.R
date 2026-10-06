@@ -1,5 +1,15 @@
-# Every registered method meets its contract, and the registry
-# behaves as a spec relies on it to.
+# ---
+# title: Tests - Method Contracts and Registry
+# author: Brendan Casey
+# created: 2026-10-03
+# inputs: none; the loaded framework
+# outputs: none; testthat results
+# notes:
+#   - Every registered method meets its contract, and the registry
+#     behaves as a spec relies on it to.
+#   - Run through 1_code/tests/run_tests.R, which loads the
+#     framework and sets `data_dir`.
+# ---
 
 test_that("every registered engine passes check_engine()", {
   for (name in registered_names("engine")) {
@@ -88,3 +98,5 @@ test_that("an engine without coefficients can run the single rule", {
   problems <- validate_spec(spec, stop_on_error = FALSE)
   expect_true(any(grepl("aic_average.*needs", problems)))
 })
+
+# End of script ----

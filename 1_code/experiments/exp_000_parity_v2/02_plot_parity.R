@@ -396,7 +396,7 @@ bell_terms <- copy(plottable)
 if (!"negligible" %in% names(bell_terms)) {
   message(
     "parity_terms.csv has no `negligible` column; rerun ",
-    "02_compare_to_v2.R. Every term is drawn."
+    "01_compare_to_v2.R. Every term is drawn."
   )
   bell_terms[, negligible := FALSE]
 }

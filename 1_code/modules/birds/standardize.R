@@ -231,7 +231,9 @@ bird_translation_context <- function(data_dir, region) {
 
   # Step 3: The design matrix, with v2's column names
   design <- stats::model.matrix(
-    stats::as.formula(paste("~", paste(model_terms, collapse = " + "))),
+    stats::as.formula(
+      paste("~", paste(model_terms, collapse = " + "))
+    ),
     stats::model.frame(
       stats::as.formula(
         paste("~", paste(model_terms, collapse = " + "))

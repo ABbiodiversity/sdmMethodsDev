@@ -164,7 +164,9 @@ parity_verdict <- function(
       return("no comparison")
     }
 
-    return(if (max_absolute_difference <= targets$numerical_tolerance) {
+    return(if (
+      max_absolute_difference <= targets$numerical_tolerance
+    ) {
       "pass"
     } else {
       "fail"

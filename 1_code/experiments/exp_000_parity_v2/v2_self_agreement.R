@@ -26,7 +26,7 @@
 #     different unseeded draws; 19 terms by 100 draws for each
 #     species both hold. Bryum.All is not published, so it
 #     drops out (133 of the rerun's 134 species).
-#   - Scored exactly as 02_compare_to_v2.R scores the harness, in
+#   - Scored exactly as 01_compare_to_v2.R scores the harness, in
 #     both directions: is one run's median inside the other's
 #     10th-to-90th percentile band, and how far apart are the
 #     medians relative to half that band. The two directions are

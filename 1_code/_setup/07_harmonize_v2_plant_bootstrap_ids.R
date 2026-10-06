@@ -144,7 +144,10 @@ for (taxon in taxa) {
     }
 
     unmatched <- unmatched + sum(!draws[, 1] %in% sites)
-    saveRDS(unname(draws), file.path(out_dir, paste0(species, ".rds")))
+    saveRDS(
+      unname(draws),
+      file.path(out_dir, paste0(species, ".rds"))
+    )
     written <- written + 1L
   }
 

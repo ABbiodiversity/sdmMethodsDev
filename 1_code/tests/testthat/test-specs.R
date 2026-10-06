@@ -1,5 +1,15 @@
-# The v2 specs are valid, and validate_spec() catches the mistakes
-# a user is likely to make.
+# ---
+# title: Tests - Taxon Spec Validation
+# author: Brendan Casey
+# created: 2026-10-03
+# inputs: none; the loaded framework
+# outputs: none; testthat results
+# notes:
+#   - The v2 specs are valid, and validate_spec() catches the mistakes
+#     a user is likely to make.
+#   - Run through 1_code/tests/run_tests.R, which loads the
+#     framework and sets `data_dir`.
+# ---
 
 test_that("every standard spec validates", {
   for (key in names(standard_specs())) {
@@ -116,3 +126,5 @@ test_that("stage_models replaces a set and is recorded", {
     spec_covariates(spec, "climate"), c("MAP", "FFP")
   )
 })
+
+# End of script ----
