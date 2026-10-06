@@ -4,8 +4,7 @@
 # created: 2026-10-05
 # inputs:
 #   - 0_data/test_dataset/, from _setup/01-09, checked by 02
-#   - 0_data/v2_results/, from _setup/05 (top level, the "drives"
-#     reference) and 08 (abmiexplorer/)
+#   - 0_data/v2_results/abmiexplorer/, from _setup/08
 # outputs:
 #   in //ABMI-DATA2/science/sdmMethodsDev/0_data/ (SDM_SHARE_ROOT
 #   overrides it), for each dataset:

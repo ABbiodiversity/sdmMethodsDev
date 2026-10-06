@@ -11,7 +11,7 @@
 # outputs: none; returns objects in memory
 # notes:
 #   - A port of the translation in v2's 08.PackageCoefficients.R
-#     (cloned in 1_code/_setup/04_package_bird_coefficients.R).
+#     (kept in 0_data/v2_scripts/birds/).
 #     v2 publishes bird landcover effects on the standardized
 #     cross-taxa habitat types - WhiteSpruceR to WhiteSpruce8,
 #     Loamy, EnSoftLin and so on - not as raw glm coefficients,

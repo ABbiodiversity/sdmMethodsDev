@@ -34,11 +34,10 @@
 #   - Each file is copied to a .partial name, checked by md5, and
 #     only then renamed, so a reader never sees a half copy.
 #   - Not mirrored, deliberately:
-#     - _setup/04 and 05's inputs (the bird coefficient CSVs and
-#       model objects, COEFS.RData, the mammal coefficient
-#       tables). With the ABMIexploreR reference used for parity,
-#       04 and 05 are not re-run; their output, 0_data/
-#       v2_results/, is published frozen by 10_publish_datasets.R.
+#     - the v2 coefficient outputs on the drives (the bird
+#       coefficient CSVs, COEFS.RData, the mammal coefficient
+#       tables). Parity is scored against ABMIexploreR (08), so
+#       nothing in _setup/ reads them.
 #     - _setup/08's species-coefs.RData, which 08 downloads from
 #       the public ABMIexploreR repository at a pinned commit.
 #     - 0_data/v2_scripts/, which is tracked in git.

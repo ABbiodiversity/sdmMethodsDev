@@ -7,8 +7,8 @@
 #     n_bootstraps, v2_bootstraps, focal_species
 #   - `results$coefficient_summary`, from collect_results()
 #   - in config$v2_reference_dir:
-#     - v2_results.csv, built by _setup/08 (ABMIexploreR) or
-#       _setup/05 (the network drives)
+#     - v2_results.csv, built by _setup/08 from the pinned
+#       ABMIexploreR coefficients
 # outputs:
 #   - in out_dir/tables/: parity_terms.csv, parity_summary.csv
 #   - `results$parity`, `results$parity_summary` and

@@ -61,21 +61,22 @@ table.
 ## What the gate compares today
 
 `01_compare_to_v2.R` compares **every stage** against one
-`v2_results.csv`, so it runs with the network drives unmounted.
-`config$v2_reference` in `run.R` section 1.3 picks which build of it:
+`v2_results.csv`, so it runs with the network drives unmounted. That
+file is built by `_setup/08_harmonize_abmiexplorer_results.R` from
+`data/species-coefs.RData` in
+[ABMIexploreR](https://github.com/ABbiodiversity/ABMIexploreR),
+ABMI's published distribution of the v2 coefficients, pinned to
+commit `848eeed`. It holds the published species of every taxon,
+plus amphibians. `run.R` section 1.3 points the run at it.
 
-| `v2_reference` | Built by | Source | Holds |
-| -------------- | -------- | ------ | ----- |
-| `"abmiexplorer"` (default) | `_setup/08_harmonize_abmiexplorer_results.R` | `data/species-coefs.RData` from [ABMIexploreR](https://github.com/ABbiodiversity/ABMIexploreR), pinned to commit `848eeed` | Only the published species. Every taxon, plus amphibians. |
-| `"drives"` | `_setup/05_harmonize_v2_results.R` | `COEFS.RData`, the Mammals drive, `Birds2024.RData` | Every species v2 fitted. |
-
-The two builds use the same models for every taxon. On 2026-10-02
-every shared species and term matched to about 1e-15, except where
-some v2 draws failed. `05` drops failed draws; the package stores 100 finite
-draws for every cell. Re-scoring the `parity_check` run against both
-builds gave the same in-band rates, standardized differences and
-verdicts wherever both had the species. The differences are in
-coverage:
+The reference used to be compiled by hand from the v2 outputs on the
+network drives (`_setup/04` and `05`, now removed). On 2026-10-02 the
+two builds matched to about 1e-15 on every shared species and term,
+except where some v2 draws failed: the drives build dropped them, and
+the package stores 100 finite draws for every cell. Re-scoring the
+`parity_check` run against both gave the same in-band rates,
+standardized differences and verdicts wherever both had the species.
+What the package does not cover:
 
 - **Species.** `Bryum.All`, plus `Trhypochthonius.tectorum` in the
   north, are not published, so they have no package reference.
@@ -88,7 +89,7 @@ coverage:
   in the north only). The package stores them on the link scale, and
   `08` back-transforms them (logit for presence, log for abundance
   and total). Its 100 draws are one fit repeated, so they are scored
-  on iteration 1, as against `05`. South `WetlandMargin` and the
+  on iteration 1. South `WetlandMargin` and the
   placeholder `Bare` are not in the package. Woodland caribou and
   deer are not published.
 
@@ -110,7 +111,7 @@ all-zero padding cells.
   standardized template by `modules/birds/standardize.R`, a port of
   v2's `08.PackageCoefficients.R`. Checked against v2's own packaged
   output: translating v2's raw per-draw coefficients reproduces
-  `Birds2024.RData` exactly. The raw `landcover` stage is kept in the
+  v2's packaged bird coefficients exactly. The raw `landcover` stage is kept in the
   summary but not scored.
 - **Mammals:** the summer and winter runs are averaged, as v2's `.all`
   tables are, and compared at iteration 1, because v2 fits once. The
@@ -134,8 +135,11 @@ proposals until agreed**; the report says so.
 
 **How closely v2 agrees with itself.** `v2_self_agreement.R` compares two
 v2 runs of the same code on the same data: the bryophyte climate stage as
-published in `COEFS.RData`, and the rerun `_setup/03` made, 134 species by
-19 terms by 100 draws each, scored exactly as the gate scores the harness.
+ABMIexploreR publishes it, and the rerun `_setup/03` made, 19 terms by 100
+draws for each species both hold, scored exactly as the gate scores the
+harness. The table below was measured against v2's `COEFS.RData` (134
+species); the script now reads the ABMIexploreR reference, which matches
+it to ~1e-15 but does not publish `Bryum.All`.
 
 | Measure | v2 against itself |
 | --- | --- |
@@ -246,7 +250,7 @@ evidence for each and an ordered plan.
   "model.avg"`), and the bootstrap-id file holds 3 draws where the
   other taxa hold 100. `_setup/03_rerun_bryophyte_v2_reference.R`
   re-ran the frozen v2 functions: 134 of 134 species, 100 draws of 19
-  climate terms each, no failures. Separately, v2's `COEFS.RData` holds
+  climate terms each, no failures. Separately, ABMIexploreR publishes
   complete bryophyte arrays, and `v2_results.csv` uses those.
 - **The seed.** `seed` in `run.R` seeds every resampled taxon from
   one number, with a derived seed per species. v2 is unseeded, so

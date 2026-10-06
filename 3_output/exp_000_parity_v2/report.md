@@ -1,6 +1,6 @@
 # exp_000_parity_v2
 
-Generated 2026-10-03 14:32:58
+Generated 2026-10-06 04:47:32
 
 **Trial run.** 14 focal species, 5 of 100 draws. Its parity numbers show the pipeline ran; they are not a parity read.
 

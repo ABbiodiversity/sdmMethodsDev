@@ -117,8 +117,9 @@ test_dataset_dir <- function(data_dir = NULL, check = TRUE) {
 
 #' Resolve the v2 Results Folder
 #'
-#' The folder holds the "drives" reference at its top level and
-#' the "abmiexplorer" reference in abmiexplorer/.
+#' The parity reference, from _setup/08, is in abmiexplorer/.
+#' Files at the top level of the 2026-10-05 version are the
+#' retired network-drive build; nothing reads them.
 #'
 #' @param dir Character or NULL. A folder to use as is.
 #' @param check Logical. Check the folder before returning it.

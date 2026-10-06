@@ -15,13 +15,12 @@
 #     every species and draw in it is an error object reading
 #     `could not find function "model.avg"`, and the bootstrap-id
 #     file held 3 draws where the other three taxa hold 100.
-#   - Two usable references exist instead. v2's own COEFS.RData
-#     holds complete bryophyte arrays, and _setup/05 takes the
-#     bryophyte rows of v2_results.csv from it.
-#     _setup/03_rerun_bryophyte_v2_reference.R also regenerated
-#     the climate stage into 2_pipeline/v2_reference/.
-#   - 02_compare_to_v2.R reads neither yet, so bryophytes are not
-#     compared. Moving the gate onto v2_results.csv fixes that.
+#   - The parity reference is ABMIexploreR's bryophyte arrays
+#     (_setup/08), which are complete and match v2's own
+#     COEFS.RData to ~1e-15. _setup/03_rerun_bryophyte_v2_
+#     reference.R also regenerated the climate stage into
+#     2_pipeline/v2_reference/, for v2_self_agreement.R and the
+#     stored bootstrap draws.
 #   - Anything true of every plant-group taxon belongs in
 #     _shared/plant_group.R, not here.
 # ---
@@ -53,7 +52,7 @@ bryophyte_spec <- function(use_protocol = NULL,
     bootstrap = bootstrap,
     reference_note = paste0(
       "The published v2 model file is unusable; the v2 ",
-      "reference is COEFS.RData, via v2_results.csv."
+      "reference is ABMIexploreR's, via v2_results.csv."
     )
   )
 }

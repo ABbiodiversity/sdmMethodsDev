@@ -20,10 +20,16 @@
 #   - 0_data/v2_results/abmiexplorer/v2_results.csv
 #   - 0_data/v2_results/abmiexplorer/v2_results_coverage.csv
 # notes:
-#   - An alternative to 05_harmonize_v2_results.R. Same output
-#     schema, so 02_compare_to_v2.R reads either; run.R's
-#     `v2_reference` chooses which. This one needs no network
-#     drive for any taxon but birds, and those only for names.
+#   - The v2 parity reference: exp_000_parity_v2's
+#     01_compare_to_v2.R scores every run against its
+#     v2_results.csv. It needs no network drive for any taxon
+#     but birds, and those only for names.
+#   - It replaced 05_harmonize_v2_results.R, which compiled the
+#     same schema by hand from the v2 outputs on the network
+#     drives (COEFS.RData, the mammal coefficient tables, and a
+#     Birds2024.RData that 04_package_bird_coefficients.R
+#     rebuilt). Both were removed once this was checked against
+#     them; "05" below refers to that build.
 #
 #   - ABMIexploreR is ABMI's published distribution of the v2
 #     coefficients: one `species.coefs` list holding, per taxon,

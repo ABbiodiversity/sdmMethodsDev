@@ -450,8 +450,6 @@ flowchart TD
         S07["07 v2 plant draws"]
         S09["09 harmonize lookups<br/>manifest · species queue · bird grids"]
         S03["03 rerun bryophyte reference"]
-        S04["04 package bird coefficients"]
-        S05["05 harmonize v2 results"]
         S08["08 harmonize ABMIexploreR"]
     end
 
@@ -463,9 +461,7 @@ flowchart TD
     VP --> S06 --> DS
     VP --> S07 --> DS
     DS --> S09 --> DS
-    VP --> S03 --> S05
-    VP --> S04 --> S05
-    S05 --> VR
+    VP --> S03
     AX --> S08 --> VR
 
     %% ----------------------------
@@ -488,8 +484,6 @@ flowchart TD
     style S07 fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
     style S09 fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
     style S03 fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
-    style S04 fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
-    style S05 fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
     style S08 fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
 
     %% Products
@@ -503,13 +497,11 @@ flowchart TD
 | `01_harmonize_model_ready_v2.R` | The `model_ready_v2` snapshot, the mammal camera climate, the WildTrax species lookup, the v2 prediction matrices, the bird `Stratified.Rdata` | `0_data/test_dataset/` |
 | `02_validate_test_dataset.R` | The test dataset and the same sources | Nothing; prints a pass / fail tally |
 | `03_rerun_bryophyte_v2_reference.R` | The v2 plant project's bryophyte data, and the frozen v2 functions | `2_pipeline/v2_reference/bryophyte-species-models.Rdata` |
-| `04_package_bird_coefficients.R` (legacy) | The per-draw v2 bird coefficient CSVs | `2_pipeline/v2_reference/Birds2024.RData` |
-| `05_harmonize_v2_results.R` (legacy) | v2 plant `COEFS.RData`, the mammal coefficient tables, `Birds2024.RData` | `0_data/v2_results/` |
 | `06_harmonize_bird_translation_lookup.R` | v2's bird `Xn-veg-v2024.Rdata` | `lookup/bird_veg_age_matrix.csv` |
 | `07_harmonize_v2_plant_bootstrap_ids.R` | v2's stored plant bootstrap draws | `lookup/v2_bootstrap_ids/` |
 | `08_harmonize_abmiexplorer_results.R` | ABMIexploreR's packaged coefficients | `0_data/v2_results/abmiexplorer/` |
 | `09_harmonize_lookups.R` | `0_data/test_dataset/lookup/` only (offline) | `species_queue.csv`, `factor_levels.csv`, `dataset_manifest.csv`, the bird prediction grids |
-| `10_publish_datasets.R` | `0_data/test_dataset/`, `0_data/v2_results/` | A new `<version>/` of each on ABMI-DATA2, with `checksums.csv` |
+| `10_publish_datasets.R` | `0_data/test_dataset/`, `0_data/v2_results/abmiexplorer/` | A new `<version>/` of each on ABMI-DATA2, with `checksums.csv` |
 
 - **`00`** copies every external file `_setup/` reads to
   `//ABMI-DATA2/science/sdmMethodsDev/0_data/setup_inputs/`, unchanged and
@@ -529,18 +521,13 @@ flowchart TD
   shows up rather than cancelling out. It writes nothing.
 - **`03`** exists because the published bryophyte reference is unusable:
   every draw is an error object. It re-runs the frozen v2 functions
-  unmodified, climate stage only.
-- **`04`** rebuilds the packaged bird output, absent from the bird drive. It
-  is v2's `08.PackageCoefficients.R` with only the paths changed. **`04`
-  and `05` are legacy:** parity is scored against `08`'s ABMIexploreR
-  build, which agrees with theirs to about 1e-15 on shared species. Their
-  output is kept and published frozen in `v2_results/`, and their inputs
-  (hours of Google Drive reads, and ~38 GB of bird model objects) are not
-  mirrored.
-- **`05`** flattens the three v2 storage formats into one table. Mammal
-  results average the two seasons, as v2's `.all` tables do.
-  `Birds2024.RData` labels draws 2 to 100 in file-listing order (`b2` is draw
-  10), a v2 packaging quirk: medians and bands are unaffected.
+  unmodified, climate stage only. Its rerun feeds `07`'s bryophyte draws
+  and exp_000's `v2_self_agreement.R`.
+- There is no `04` or `05`. They compiled the v2 reference by hand from
+  the network drives and were removed once `08`'s ABMIexploreR build was
+  shown to agree with theirs to about 1e-15 on shared species. The
+  2026-10-05 published `v2_results/` still holds their output at its top
+  level; nothing reads it.
 - **`06`** copies the matrix v2 uses to translate bird landcover coefficients
   onto the standardized habitat types. Re-run it whenever `01` rebuilds
   `lookup/`.
@@ -548,7 +535,8 @@ flowchart TD
   fits exactly the rows v2 fitted. The sets are large (1.3 GB for vascular
   plants); `SDM_V2_BOOT_TAXA` and `SDM_V2_BOOT_SPECIES` restrict it.
 - **`08`** harmonizes ABMIexploreR's published coefficients, pinned to a
-  commit; exp_000 scores against this build by default.
+  commit, into the v2 reference exp_000 scores every run against. Mammal
+  results average the two seasons, as v2's `.all` tables do.
 - **`09`** writes one form of the lookups for every taxon: one species queue
   (the three taxon leads' lookups had three schemas), one factor-level table,
   the bird habitat grids, and `dataset_manifest.csv`, which names each
@@ -605,7 +593,7 @@ sdmMethodsDev/
 │
 ├── 2_pipeline/                    # result stores and intermediates; gitignored
 │   ├── <exp_id>/<run>/<region>/   # one result store per run and region
-│   └── v2_reference/              # rebuilt v2 references, from _setup/03 and 04
+│   └── v2_reference/              # rerun bryophyte reference, from _setup/03
 │
 ├── 3_output/                      # deliverables, per experiment; summaries committed
 │   └── <exp_id>/                  # tables/, figures/, report.md, run_record.md
@@ -701,11 +689,10 @@ The published v2 results as one long table, so a run is scored against one
 file rather than three storage formats on two drives: `taxon`, `region`,
 `stage`, `part`, `season`, `species`, `species_v2`, `term`, `v2_median`,
 `v2_p10`, `v2_p90`, `v2_se`, `v2_n` and `source`. Plant climate is fitted once
-province-wide in v2, so those rows carry `region = "all"`. Two builds share the
-schema: `abmiexplorer/` (the published species, from `_setup/08`; exp_000's
-default) and the network-drive build (every species v2 fitted, from
-`_setup/05`). `v2_results_coverage.csv` records which source each part came
-from.
+province-wide in v2, so those rows carry `region = "all"`. The reference is
+in `abmiexplorer/`, built by `_setup/08` from ABMI's published ABMIexploreR
+coefficients, so it holds the published species only.
+`v2_results_coverage.csv` records which source each part came from.
 
 ### `v2_scripts/`
 
@@ -984,7 +971,8 @@ through each lever.
    plant-group taxon or on `birds/spec.R` or `mammals/spec.R` otherwise, and
    add its run to `modules/_shared/standard_specs.R`. If v2 does something no
    registered method covers, add one to `1_code/methods/`.
-6. Add the taxon's published v2 results to `_setup/05`.
+6. Add the taxon's published v2 results to `_setup/08`, if ABMIexploreR
+   publishes them.
 7. Check that `validate_spec()` passes and `run_tests.R` runs clean, then
    check the result against the originals. Record every taxon-specific
    behaviour in `docs/taxon_quirks.md`.
@@ -996,7 +984,7 @@ through each lever.
 | Experiments | `exp_NNN_short_description` | `exp_001_covariate_scale` |
 | Taxon slugs | As the data files name them | `vascular_plant`, `mite`, `bird` |
 | Module folders | Plural taxon name | `vascular_plants/`, `soil_mites/` |
-| Setup scripts | `NN_` run order, in `1_code/_setup/` | `05_harmonize_v2_results.R` |
+| Setup scripts | `NN_` run order, in `1_code/_setup/` | `08_harmonize_abmiexplorer_results.R` |
 
 An experiment's identifier is used verbatim in `1_code/experiments/`,
 `2_pipeline/` and `3_output/`. Soil mites use the data slug `mite`.
@@ -1020,7 +1008,9 @@ in `_setup/` has to be run. Off the network, copy the published folders
 locally and set `SDM_TEST_DATASET` and `SDM_V2_RESULTS` to them.
 
 Rebuilding the dataset needs the same share, once per snapshot, from the
-repository root:
+repository root. `source("1_code/_setup/run.R")` runs the steps below in
+order, with switches for each in its section 1.2 (`00`, `03` and `10` are off
+by default), and logs timings to `2_pipeline/_setup/run_log.csv`. By hand:
 
 ```r
 source("1_code/_setup/01_harmonize_model_ready_v2.R")
@@ -1038,8 +1028,7 @@ source("1_code/_setup/10_publish_datasets.R")
 ```
 
 `00_mirror_setup_inputs.R` is run once, by someone who can reach the
-original drives, and again only if a source changes. `04` and `05` are
-legacy and need the original drives.
+original drives, and again only if a source changes.
 
 Set these to read or write somewhere other than the default:
 
@@ -1054,11 +1043,10 @@ Set these to read or write somewhere other than the default:
 | `SDM_MAMMAL_CLIMATE_PRED` | `01`, `02` | `All Species Climate Predictions.csv` |
 | `SDM_V2_LOOKUP` | `01` | The v2 folder holding the two plant prediction-matrix CSVs |
 | `SDM_WT_SPECIES` | `01` | `WildTrax Species Strings.RData` |
-| `SDM_BIRD_DATA` | `01`, `02`, `04` | The bird `Stratified.Rdata` v2 was fitted on; mirrored from `work_abmi/1_projects/active/sdmMethodsDev/remote/birds_data_v2/` |
-| `SDM_V2_PROJECT` | `03`, `05`, `07` | The v2 plant project (`VegetationModels`) |
-| `SDM_V2_BIRD_ROOT` | `04`, `05`, `06` | The v2 bird project (`BirdModels`) |
+| `SDM_BIRD_DATA` | `01`, `02` | The bird `Stratified.Rdata` v2 was fitted on; mirrored from `work_abmi/1_projects/active/sdmMethodsDev/remote/birds_data_v2/` |
+| `SDM_V2_PROJECT` | `03`, `07` | The v2 plant project (`VegetationModels`) |
+| `SDM_V2_BIRD_ROOT` | `06` | The v2 bird project (`BirdModels`) |
 | `SDM_V2_BIRD_LOOKUP` | `08` | The v2 bird `birdlist.csv` |
-| `SDM_V2_MAMMAL_ROOT` | `05` | The v2 mammal habitat-modelling results for 2024 |
 
 ## Related resources
 

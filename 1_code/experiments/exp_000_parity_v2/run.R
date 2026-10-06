@@ -4,8 +4,8 @@
 # created: 2026-09-09
 # inputs:
 #   - the published test dataset (harness/data_source.R)
-#   - the published v2 results, the v2 reference (section 1.3;
-#     see harness/data_source.R)
+#   - the published v2 results, the ABMIexploreR reference
+#     (section 1.3; see harness/data_source.R)
 #   - the framework: 1_code/harness/, methods/, modules/
 # outputs:
 #   in 2_pipeline/exp_000_parity_v2/:
@@ -93,30 +93,17 @@ config <- experiment_config(
   unit_predictions = "none"
 )
 
-## 1.3 Choose the v2 reference ----
-# Which build of the published v2 coefficients the run is scored
-# against. Both write the same schema.
-#   abmiexplorer  ABMI's ABMIexploreR package, pinned to a commit
-#                 (_setup/08); the published species, every taxon
-#   drives        the v2 project outputs on the network drives
-#                 (_setup/05); every species v2 fitted
+## 1.3 The v2 reference ----
+# The published v2 coefficients the run is scored against: ABMI's
+# ABMIexploreR package, pinned to a commit and harmonized by
+# _setup/08. It holds the published species of every taxon. The
+# report prints the label and builder.
 config$v2_reference <- "abmiexplorer"
-
 config$v2_reference_dir <- file.path(
-  v2_results_dir(),
-  switch(
-    config$v2_reference,
-    abmiexplorer = "abmiexplorer",
-    drives = "",
-    stop("v2_reference must be \"abmiexplorer\" or \"drives\".", call. = FALSE)
-  )
+  v2_results_dir(), "abmiexplorer"
 )
-
-config$v2_reference_builder <- switch(
-  config$v2_reference,
-  abmiexplorer = "1_code/_setup/08_harmonize_abmiexplorer_results.R",
-  drives = "1_code/_setup/05_harmonize_v2_results.R"
-)
+config$v2_reference_builder <-
+  "1_code/_setup/08_harmonize_abmiexplorer_results.R"
 
 # 2. Run ----
 # Fits every species, collects the stores into summary tables,
