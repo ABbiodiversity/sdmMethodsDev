@@ -35,4 +35,3 @@ format:
 # Renders ```mermaid blocks as diagrams, as GitHub does
 filters:
   - mermaid.lua
-#test
