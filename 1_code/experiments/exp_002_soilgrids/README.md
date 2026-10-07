@@ -75,6 +75,11 @@ reads the layer from the `//ABMI-DATA2` share; set `SDM_SOILGRIDS` to a local
 copy of the raster to read it from there instead. Delete the file to extract
 again.
 
+It also reads the published test dataset and exp_000's
+`3_output/exp_000_parity_v2/tables/`, and writes stores to
+`2_pipeline/exp_002_soilgrids/` and summaries to
+`3_output/exp_002_soilgrids/`.
+
 `run.R` uses 5 draws to check the pipeline. For a result, set
 `n_bootstraps = 100` and compare against a 100-draw exp_000.
 

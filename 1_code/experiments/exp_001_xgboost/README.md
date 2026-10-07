@@ -24,7 +24,8 @@ draws with tuned settings.
 
 - **What changes:** the habitat stage's engine, selection rule and
   candidate set. `run.R` makes the change with one call for every run:
-  `lapply(standard_specs(), replace_stage_method, engine = "xgboost")`.
+  `lapply(standard_specs(), replace_stage_method, engine = "xgboost",
+  control = xgb_settings)`.
 - **Why one formula:** a tree chooses its own variables, splits and
   interactions, so it is given every candidate covariate once (as main
   effects) rather than v2's competing formulas.
@@ -54,6 +55,11 @@ From the repository root:
 source("1_code/experiments/exp_001_xgboost/run.R")
 ```
 
+It reads the published test dataset and exp_000's
+`3_output/exp_000_parity_v2/tables/`, and writes stores to
+`2_pipeline/exp_001_xgboost/` and summaries to
+`3_output/exp_001_xgboost/`.
+
 `run.R` uses 5 draws to check the pipeline. For a result, set
 `n_bootstraps = 100`, and make sure the exp_000 tables it is compared
 against are from a 100-draw run of the same species.
@@ -73,9 +79,10 @@ GLM does, so in-sample metrics would flatter it.
 ## Assumptions and caveats
 
 - **The xgboost settings are untuned.** At most 1000 rounds, learning
-  rate 0.05, depth 3, subsample 0.5, minimum child weight 1. The number of
-  rounds is chosen by early stopping on a seeded 20% holdout of each draw,
-  then the model is refitted on all of the draw. A fair comparison tunes
+  rate 0.05, depth 3, subsample 0.5, minimum child weight 1 (`run.R`
+  section 1.2). The number of rounds is chosen by early stopping on a
+  seeded 20% holdout of each draw, then the model is refitted on all of
+  the draw. A fair comparison tunes
   these, ideally per taxon.
 - **The grid compares like with like only roughly.** The grid holds each
   habitat type as a pure stand at `Climate` 0. A GLM extrapolates to that
@@ -93,9 +100,9 @@ GLM does, so in-sample metrics would flatter it.
 - **Bird counts keep the QPAD offset**, which the engine passes as the
   base margin in fitting and prediction.
 - **gbm was replaced.** The first version of this experiment
-  (`exp_001_gbm`, 2026-10-03; its output is kept in
-  `3_output/exp_001_gbm/`) used `gbm`, which cannot fit the mammal hurdle:
-  its bernoulli rejects a 0–1 proportion and it has no Gamma family.
+  (`exp_001_gbm`, 2026-10-03) used `gbm`, which cannot fit the mammal
+  hurdle: its bernoulli rejects a 0–1 proportion and it has no Gamma
+  family.
 
 ## Result
 

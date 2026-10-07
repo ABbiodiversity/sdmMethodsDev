@@ -71,7 +71,8 @@ such as `xgboost`'s `objective = "binary:logistic"`, translates it.
 ### Testing an engine
 
 ```r
-check_engine(engine_mine())
+check_engine(my_engine())  # a definition, or a registered name
+check_engine("glm")
 ```
 
 `check_engine()` fits small synthetic binomial and Poisson data,
@@ -81,14 +82,15 @@ the engine meets the dataset.
 
 ### Which rules an engine can use
 
-An engine without an information criterion or coefficients - a
-boosted regression tree, a random forest - can still run any
+An engine without an information criterion or coefficients (a
+boosted regression tree, a random forest) can still run any
 stage, using the `single` rule: one formula, fitted as given. To
 compare it with v2 on a stage v2 fits with model averaging,
 replace that stage's engine, selection and models together. The
 v2 post-processing steps that read coefficients (the plant
 stand-age splines, say) then do not apply, and the stage should
-drop them; see `docs/getting_started.md`.
+drop them; see
+[`docs/getting_started.md`](../../docs/getting_started.md#2-a-different-engine-or-rule-specs).
 
 `replace_stage_method()` does all of this in one call. Its stage
 defaults to the spec's `habitat_stage`, so the same call serves
@@ -99,8 +101,8 @@ specs <- lapply(standard_specs(), replace_stage_method,
                 engine = "xgboost")
 ```
 
-A **composite** rule - one that declares `part_selection`, as
-`hurdle` does - keeps its place, and the new rule becomes the one
+A **composite** rule (one that declares `part_selection`, as
+`hurdle` does) keeps its place, and the new rule becomes the one
 each part runs. The mammal hurdle's structure (presence on every
 unit, abundance where the species was found) is a property of the
 data, so it stays; the new engine fits both halves, and v2's
