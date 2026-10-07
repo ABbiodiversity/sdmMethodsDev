@@ -4,6 +4,8 @@
 # author: Brendan Casey
 # created: 2026-10-02
 # inputs:
+#   Read via setup_input() (utils/input_paths.R); the original
+#   locations are listed, and SDM_* variables can point back.
 #   - data/species-coefs.RData from the ABbiodiversity/ABMIexploreR
 #     GitHub repository, at the commit pinned in section 1.2
 #   - Data/lookups/birdlist.csv on the BirdModels drive, for the
@@ -16,24 +18,17 @@
 #   - 0_data/v2_results/abmiexplorer/v2_results.csv
 #   - 0_data/v2_results/abmiexplorer/v2_results_coverage.csv
 # notes:
-#   - An alternative to 05_harmonize_v2_results.R. Same output
-#     schema, so 02_compare_to_v2.R reads either; run.R's
-#     `v2_reference` chooses which. This one needs no network
-#     drive for any taxon but birds, and those only for names.
-#
-#   - ABMIexploreR is ABMI's published distribution of the v2
-#     coefficients: one `species.coefs` list holding, per taxon,
-#     species x term x draw arrays for Vegetation (north), Soil
-#     (south) and Climate (province-wide), on the link scale.
-#
-#   - Pinned to a commit, not to HEAD. The data file changes
-#     between commits: on 2026-07-27 the mammal models added in
-#     July 2025 (an earlier fit, presence in the north only) were
-#     replaced by the 2024 models the harness reproduces. An
-#     unpinned read would move the reference under a finished
-#     run. Only the data file is
-#     downloaded; installing the package would pull terra and
-#     friends for nothing this script uses.
+#   - Builds the v2 parity reference exp_000 scores against.
+#     Only birds need a network drive, for names. "05" below is
+#     the retired by-hand build from the v2 network outputs, which
+#     this was verified against.
+#   - ABMIexploreR holds species x term x draw arrays per taxon
+#     for Vegetation (north), Soil (south) and Climate, on the
+#     link scale.
+#   - Pinned to a commit: the data file changes between commits
+#     (on 2026-07-27 the mammal models were replaced by the 2024
+#     models the harness reproduces). Only the data file is
+#     downloaded, not the package and its dependencies.
 #
 #   - Checked against 05's reference on 2026-10-02, at the pinned
 #     commit:
@@ -59,14 +54,11 @@
 #     - Amphibians are in the package and have no module yet.
 #       Their rows are written; nothing joins them.
 #
-#   - The package relabels some terms against the names the
-#     harness writes, and mammals on the cross-taxa template
-#     rather than their native terms. Where the values were
-#     verified identical, an alias row is added under the
-#     harness's name and the package's row is kept; see
-#     term_aliases(). Bird TreedFen
+#   - The package relabels some terms, and puts mammals on the
+#     cross-taxa template. Verified-identical terms get an alias
+#     row under the harness's name (term_aliases()). Bird TreedFen
 #     is one coefficient in the package and nine age classes in
-#     v2 (r ~ 0.99 with each), so it is not aliased.
+#     v2 (r ~ 0.99), so it is not aliased.
 #
 #   - The package pads every species to a full term template
 #     with exact zeros. A cell whose every draw is exactly zero
@@ -95,14 +87,15 @@ explorer_file <- "data/species-coefs.RData"
 ## 1.3 Resolve the other locations ----
 project_root <- normalizePath(getwd(), winslash = "/")
 
+# The _setup inputs mirrored on ABMI-DATA2 (setup_input())
+source(file.path(project_root, "1_code/_setup/utils/input_paths.R"))
+
 # The same lookup v2's 08.PackageCoefficients.R uses to turn
 # bird codes into the names the package carries.
 bird_lookup_path <- Sys.getenv(
   "SDM_V2_BIRD_LOOKUP",
-  unset = paste0(
-    "G:/.shortcut-targets-by-id/",
-    "17Ymt13eHfKvIiuoMl6x-Kn74Z2uVbbzS/BirdModels/",
-    "Data/lookups/birdlist.csv"
+  unset = setup_input(
+    "bird_models", "Data/lookups/birdlist.csv"
   )
 )
 
@@ -144,9 +137,8 @@ if (!file.exists(coefs_path)) {
 
   cat("Downloading", url, "\n")
 
-  # Written to a temporary name first, so an interrupted
-  # download never leaves a truncated file where a good one is
-  # expected.
+  # Via a temporary name, so an interrupted download leaves no
+  # truncated file
   partial <- paste0(coefs_path, ".part")
   old_timeout <- options(timeout = max(600, getOption("timeout")))
   status <- utils::download.file(url, partial, mode = "wb")
@@ -384,9 +376,8 @@ flatten_array <- function(values, slug, model, hurdle = NA) {
   padding <- counts > 0 & is.na(hurdle) &
     rowSums(draws != 0, na.rm = TRUE) == 0
 
-  # v2 fits mammals once; the package repeats that fit in every
-  # draw. A repeated fit is one value, not a distribution, so it
-  # is written as v2_n 1 and scored on iteration 1.
+  # The package repeats v2's single mammal fit in every draw:
+  # written as v2_n 1, scored on iteration 1
   single_fit <- slug == "mammal" &&
     all(apply(draws, 1, function(x) {
       length(unique(x[!is.na(x)])) <= 1
@@ -496,8 +487,7 @@ for (taxon in names(species_coefs)) {
     rows <- add_aliases(rows, slug)
     blocks[[label]] <- rows
 
-    # A bird without a code keeps its package name and cannot
-    # join, so the count is reported rather than discovered.
+    # Birds without a code cannot join; report the count
     unkeyed <- if (slug == "bird" && !is.null(rows)) {
       sum(!unique(rows$species_v2) %in% names(bird_codes))
     } else {

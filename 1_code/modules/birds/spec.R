@@ -5,27 +5,13 @@
 # inputs: none
 # outputs: none; returns objects in memory
 # notes:
-#   - The v2 configuration for birds, as data.
-#   - Counts with a QPAD log-offset, which is what makes a count
-#     comparable across survey protocol and detectability. The
-#     offset is not optional: without it a bird model is fitting
-#     effort as much as abundance.
-#   - Two stages. Climate is model-averaged by AICc. Landcover is
-#     staged forward selection: groups of formulas, each fitted
-#     as an update to the previous group's winner, keeping the
-#     smallest model within 2 BIC of the best.
-#   - The climate set is v2's 25 candidates (06.ModelClimate.R):
-#     the null, eight climate combinations, and each of the eight
-#     with linear and with quadratic spatial terms. The spatial
-#     terms are the UTM easting and northing sites.csv carries
-#     for birds, aliased to v2's names.
-#   - Climate is fitted once per draw on every survey, as v2
-#     does, and shared by both regions (`scope = "province"`).
-#   - Bootstrap ids are precomputed and stored against surveyid
-#     rather than survey_unit_id, so the draw is translated
-#     through the design block.
-#   - What this spec reproduces of v2 is stated once, in
-#     `v2_coverage`. The report is generated from it.
+#   - Counts with a QPAD log-offset (required: it separates
+#     effort and detectability from abundance).
+#   - Climate: v2's 25 candidates averaged by AICc, province-wide
+#     per draw. Landcover: staged_bic, smallest model within 2
+#     BIC of the best.
+#   - v2's stored draws are keyed on surveyid and translated to
+#     survey units.
 # ---
 
 # 1. Setup ----
@@ -45,6 +31,8 @@
 bird_spec <- function() {
   list(
     taxon = "bird",
+    # The stage a methods experiment replaces by default
+    habitat_stage = "landcover",
     response_name = "response",
 
     # Counts are modelled as given; the offset carries effort.
@@ -53,14 +41,15 @@ bird_spec <- function() {
     weight_column = NULL,
     tier = NULL,
 
-    # v2's spatial terms are the survey's UTM easting and northing
-    # in metres, which sites.csv carries for birds.
+    # v2's spatial terms: UTM easting and northing, in metres
     aliases = list(Easting = "easting", Northing = "northing"),
 
     regions = list(
       north = list(
         filter = ~ useNorth == 1,
-        grid = NULL,
+        # One row per habitat type, rebuilt by _setup/09 from
+        # v2's coefficient translation matrix
+        grid = "bird_north",
         term_block = "veg",
         habitat_models = "landcover_bird_north_v2",
         # v2 weights the landcover models by region
@@ -68,7 +57,9 @@ bird_spec <- function() {
       ),
       south = list(
         filter = ~ useSouth == 1,
-        grid = NULL,
+        # One row per habitat type, rebuilt by _setup/09 from
+        # v2's coefficient translation matrix
+        grid = "bird_south",
         term_block = "soil",
         habitat_models = "landcover_bird_south_v2",
         weight_column = "soilw"
@@ -78,35 +69,27 @@ bird_spec <- function() {
     stages = list(
       list(
         name = "climate",
-        # v2's 25 candidates, averaged at once by AICc
-        # (06.ModelClimate.R); only the landcover stage walks
-        # groups.
+        # 06.ModelClimate.R
         models = "climate_bird_v2",
         engine = "glm",
         selection = "aic_average",
         ic = "AICc",
-        # Fitted once on every survey in the draw, as v2 fits it,
-        # and shared by both regions. Unweighted, as in v2.
+        # Province-wide and unweighted, as in v2
         scope = "province",
         weighted = FALSE,
-        # v2 carries the averaged prediction on the response
-        # scale WITHOUT the QPAD offset: exp(link), the rate.
-        # 06.ModelClimate.R asks for predict(type = "link") on a
-        # MuMIn average, which is built from the averaged
-        # coefficients and drops the offset. Checked 2026-10-02:
-        # v2's stored AMRO draw-1 prediction averages 0.118;
-        # exp(link) on the same surveys gives 0.118, and
-        # exp(link + offset) gives 0.315. Carrying the offset cut
-        # the landcover Climate coefficient about threefold
-        # (AMRO draw 1: 1.60 against v2's 4.91; 4.76 without).
+        # v2 carries exp(link) WITHOUT the QPAD offset: MuMIn's
+        # averaged predict(type = "link") drops it. Evidence (AMRO
+        # draw 1): v2's stored prediction mean 0.118 = exp(link);
+        # exp(link + offset) = 0.315, and carrying the offset cut
+        # the landcover Climate coefficient from 4.91 (v2) to
+        # 1.60.
         carry_as = "Climate",
         carry_scale = "exp",
         carry_offset = FALSE
       ),
       list(
         name = "landcover",
-        # Set per region: vegetation classes in the north, soil
-        # classes in the south.
+        # Per region: veg in the north, soil in the south
         models = NULL,
         engine = "glm",
         selection = "staged_bic",
@@ -123,15 +106,12 @@ bird_spec <- function() {
     resample = list(
       scheme = "precomputed",
       id_column = "surveyid",
-      # v2 selects a draw with %in%, so a survey drawn twice is
-      # fitted once.
+      # v2 selects a draw with %in%: repeats are fitted once
       unique_ids = TRUE,
       # One draw for the whole province, filtered per region.
       scope = "province"
     ),
 
-    # What this spec reproduces of v2, per stage. The single
-    # source of truth for coverage: the report reads it.
     v2_coverage = list(
       climate = v2_status(
         "reproduced",
@@ -164,8 +144,6 @@ bird_spec <- function() {
       )
     ),
 
-    # Facts about this taxon's configuration. Coverage is in
-    # v2_coverage, not here.
     notes = paste0(
       "QPAD offset inside the formula. The landcover groups' ",
       "derived terms (wtAge, isCon, fcc2) are all present; ",

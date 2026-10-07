@@ -5,24 +5,12 @@
 # inputs: none
 # outputs: none; returns objects in memory
 # notes:
-#   - Bryophytes, lichens, soil mites and vascular plants each
-#     have their own module directory, because each is free to
-#     diverge and a taxon-specific quirk should have one obvious
-#     home. What they still share is the v2 pipeline shape, and
-#     that lives here so four copies cannot drift apart.
-#   - "Plant group" names a survey design rather than a taxonomy.
-#     Soil mites are animals; they are here because v2 fits them
-#     with the plant scripts, on the plant survey design.
-#   - Each taxon module states its own facts and calls this
-#     builder. Nothing in here looks a taxon up in a table, so
-#     adding a quirk means editing that taxon's file rather than
-#     adding a branch to a shared one.
-#   - The underscore prefix marks this as shared machinery rather
-#     than a taxon, matching _setup/ and _deprecated/.
-#   - What this spec reproduces of v2 is stated once, in
-#     `v2_coverage` below. The report is generated from it, so
-#     change it here when the harness changes, and nowhere else.
-#     Per-quirk detail is in docs/taxon_quirks.md.
+#   - The v2 pipeline shape shared by the four plant-group taxa
+#     (a survey design, not a taxonomy). Taxon quirks live in each
+#     taxon's module, which calls this builder.
+#   - `v2_coverage` below is the single statement of what is
+#     reproduced; the report reads it. Detail is in
+#     docs/taxon_quirks.md.
 # ---
 
 # 1. Setup ----
@@ -34,27 +22,18 @@
 
 #' Build a v2 Spec for One Plant-Group Taxon
 #'
-#' The v2 pipeline shape shared by bryophytes, lichens, soil
-#' mites and vascular plants. Called by each taxon module rather
-#' than directly.
+#' Called by each taxon module rather than directly.
 #'
-#' @param taxon Character. The data slug, which keys the response
-#'   file, the species catalogue and the covariate catalogue.
-#'   Note that soil mites carry the slug "mite".
+#' @param taxon Character. The data slug ("mite" for soil mites).
 #' @param protocol_in_v2 Logical. Whether v2 fits Protocol for
-#'   this taxon. Recorded so a run can say whether it followed v2
-#'   or overrode it.
+#'   this taxon.
 #' @param use_protocol Logical, or NULL to take the v2 value.
-#'   Setting it equalizes a term v2 applies inconsistently, which
-#'   is what a cross-taxa experiment wants.
 #' @param reference_note Character, or NULL. One clause on where
 #'   this taxon's v2 reference comes from, appended to the spec
 #'   notes. Bryophytes differ from the other three.
-#' @param bootstrap Character. "spatial_block" draws v2's
-#'   spatially blocked bootstrap afresh; "v2_ids" replays the
-#'   draws v2 itself made, stored per species by
-#'   _setup/07_harmonize_v2_plant_bootstrap_ids.R, which makes
-#'   parity numerical draw by draw.
+#' @param bootstrap Character. "spatial_block" draws afresh;
+#'   "v2_ids" replays v2's stored draws (_setup/07), making
+#'   parity numerical.
 #' @return A spec list, as run_spec() consumes.
 #'
 #' @example # Example usage of the function
@@ -86,11 +65,9 @@ plant_group_spec <- function(
     use_protocol <- protocol_in_v2
   }
 
-  # The habitat sets are spliced from the mite script, which
-  # fits no Protocol. In the bryophyte and lichen scripts the
-  # same formulas carry the term directly after Climate and
-  # nowhere else, so inserting it there reproduces them. The
-  # climate set carries no Protocol in any variant.
+  # The habitat sets come from the mite script (no Protocol); the
+  # bryophyte and lichen scripts differ only by Protocol directly
+  # after Climate. No climate set carries Protocol.
   with_protocol <- function(set) {
     models <- get_model_set(set)
 
@@ -107,9 +84,10 @@ plant_group_spec <- function(
   list(
     taxon = taxon,
     response_name = "response",
+    # The stage a methods experiment replaces by default
+    habitat_stage = "habitat",
 
-    # Plant-group responses are cover or abundance values; v2
-    # models presence, so anything above zero is a detection.
+    # v2 models presence: any value above zero is a detection
     response_transform = "detection",
     family = "binomial",
     weight_column = NULL,
@@ -140,17 +118,14 @@ plant_group_spec <- function(
         selection = "aic_average",
         ic = "AICc",
         control = list(maxit = 250),
-        # Fitted once per draw on every unit, as v2's
-        # climate_models() is, and shared by both regions.
+        # Province-wide, as v2's climate_models()
         scope = "province",
-        # The habitat stage takes this stage's prediction as a
-        # term called Climate, which is how v2 composes them.
+        # Carried into the habitat stage as `Climate`, as in v2
         carry_as = "Climate"
       ),
       list(
         name = "habitat",
-        # Set per region below, because north fits vegetation
-        # types and south fits soil types.
+        # Per region below: veg in the north, soil in the south
         models = NULL,
         engine = "bayesglm",
         selection = "ivw_grid",
@@ -158,10 +133,7 @@ plant_group_spec <- function(
         control = list(maxit = 250),
         carry_from = "climate",
         carry_from_as = "Climate",
-        # v2 predicts each candidate onto the grid holding
-        # Climate at zero, and at the new protocol where Protocol
-        # is fitted, so the habitat effects are read at an
-        # average climate under one protocol.
+        # v2 predicts the grid at Climate = 0 and the new protocol
         grid_constants = if (use_protocol) {
           list(
             Climate = 0,
@@ -175,12 +147,12 @@ plant_group_spec <- function(
         } else {
           c("Intercept", "Climate")
         },
-        # v2's stand-age splines, then its cutblock convergence,
-        # both before the footprint pooling (coef_adjust). The
-        # splines read the aged stand-cover columns, which no
-        # formula names. Both leave the south unchanged.
+        # v2's post-averaging steps, in v2's order (pooling
+        # borrows from a spline-fitted age class). The splines
+        # read aged stand-cover columns no formula names.
         post_process = list(
-          plant_age_splines, plant_cutblock_convergence, plant_paspen
+          plant_age_splines, plant_cutblock_convergence,
+          plant_paspen, plant_footprint_pooling
         ),
         # The validation also weights each fine cutblock class by
         # its own effect, and the formulas name only lumped ones.
@@ -192,20 +164,13 @@ plant_group_spec <- function(
             c("R", 1:4), paste0
           )))
         ),
-        coef_adjust = TRUE,
-        # v2 skips the habitat model when the draw, after the
-        # region filter, holds fewer than 20 detections.
         min_detections = 20L
       )
     ),
 
-    # One draw per species for the whole province, as v2's
-    # bootstrap_data() makes it, filtered to each region's units
-    # when the habitat stage is fitted.
-    #
-    # No seed here. The experiment sets one base seed, `boot_seed`
-    # in run.R, and each species derives its own from it. Without
-    # one the fresh draws are unseeded, as in v2.
+    # One province-wide draw per species, as v2's
+    # bootstrap_data(). No seed here: the experiment's seed is
+    # used.
     resample = if (bootstrap == "v2_ids") {
       list(
         scheme = "precomputed",
@@ -220,8 +185,6 @@ plant_group_spec <- function(
       )
     },
 
-    # What this spec reproduces of v2, per stage. The single
-    # source of truth for coverage: the report reads it.
     v2_coverage = list(
       climate = v2_status(
         "reproduced",
@@ -269,11 +232,13 @@ plant_group_spec <- function(
     # out-of-bag as well; see plant_v2_validation().
     validate = plant_v2_validation,
 
+    # The final model the harness scores and reports: v2's own
+    # prediction from the published coefficient tables
+    final_prediction = plant_v2_full_prediction,
+
     use_protocol = use_protocol,
     protocol_is_v2 = identical(use_protocol, protocol_in_v2),
 
-    # Facts about this taxon's configuration. Coverage is in
-    # v2_coverage, not here.
     notes = paste0(
       "Protocol ", if (use_protocol) "fitted" else "not fitted",
       if (identical(use_protocol, protocol_in_v2)) {
@@ -345,11 +310,10 @@ plant_v2_term_labels <- function(terms) {
 # 4. v2 habitat machinery ----
 # Ports of the steps v2's vegetation_models() applies after the
 # inverse-variance weighting (hierarchical-model_functions.R),
-# in v2's order: the stand-age splines (section 7), then the
-# cutblock convergence (7.5). The footprint pooling (8.0) follows
-# in the harness, as coef_adjust. Each takes and returns the
-# selection result, so the habitat stage runs them as
-# `post_process` steps.
+# in v2's order: the stand-age splines (section 7), the cutblock
+# convergence (7.5), and the footprint pooling (8.0). Each takes
+# and returns the selection result, so the habitat stage runs
+# them as `post_process` steps.
 
 ## 4.1 plant_stand_types() ----
 
@@ -405,7 +369,7 @@ plant_age_columns <- function() {
 #' unchanged.
 #'
 #' @param selected A selection result from the ivw_grid rule,
-#'   carrying `site_prediction`.
+#'   whose `predict()` gives the site-level IVW prediction.
 #' @param data The stage's data: detection in `response`, and the
 #'   unaged and aged stand-cover columns, `Grass` and `Shrub`.
 #' @return The selection result with the 45 aged effects added.
@@ -422,15 +386,21 @@ plant_age_splines <- function(selected, data) {
     return(selected)
   }
 
-  if (is.null(selected$site_prediction) ||
-        length(selected$site_prediction) != nrow(data)) {
+  # Site-level IVW prediction (link scale), computed only where
+  # aged stand types exist
+  prediction <- if (is.function(selected$predict)) {
+    selected$predict(data, "link")
+  } else {
+    NULL
+  }
+
+  if (is.null(prediction) || length(prediction) != nrow(data)) {
     stop("The age splines need the site-level IVW prediction.",
          call. = FALSE)
   }
 
   cutoff <- 0.1
   count <- data$response
-  prediction <- selected$site_prediction
 
   # Step 1: One frame per stand type
   stand <- stats::setNames(vector("list", length(types)), types)
@@ -581,16 +551,17 @@ plant_age_splines <- function(selected, data) {
 #' # selected <- plant_cutblock_convergence(selected, stage_data)
 plant_cutblock_convergence <- function(selected, data = NULL) {
   coefficients <- selected$coefficients
+  recovery <- cutblock_recovery_weights()
   weights <- list(
-    WhiteSpruce = c(0.50, 0.849, 0.96),
-    Pine = c(0.50, 0.849, 0.96),
-    Deciduous = c(0.705, 0.912, 0.97),
-    Mixedwood = c(0.705, 0.912, 0.97)
+    WhiteSpruce = recovery$conifer,
+    Pine = recovery$conifer,
+    Deciduous = recovery$deciduous,
+    Mixedwood = recovery$deciduous
   )
 
   for (type in names(weights)) {
-    for (k in seq_along(2:4)) {
-      age <- (2:4)[k]
+    for (k in 1:3) {
+      age <- k + 1
       w <- weights[[type]][k]
       cc <- match(paste0("CC", type, age), coefficients$term)
       natural <- match(paste0(type, age), coefficients$term)
@@ -666,7 +637,230 @@ plant_paspen <- function(selected, data = NULL) {
   selected
 }
 
-## 4.6 plant_v2_validation() ----
+## 4.6 plant_footprint_pooling() ----
+
+#' Pool Poorly Sampled Footprint Effects, as a Post-Process Step
+#'
+#' v2's section 8.0, applied after the stand-age splines and the
+#' cutblock convergence because it borrows from a spline-fitted
+#' age class. See coef_adjust_plant_veg() for what is pooled.
+#'
+#' @param selected A selection result.
+#' @param data Unused; the post_process signature.
+#' @return The selection result with the four footprint effects
+#'   pooled.
+#'
+#' @example # Example usage of the function
+#' # selected <- plant_footprint_pooling(selected, stage_data)
+plant_footprint_pooling <- function(selected, data = NULL) {
+  selected$coefficients <- coef_adjust_plant_veg(
+    selected$coefficients
+  )
+
+  selected
+}
+
+## 4.7 coef_adjust_plant_veg() ----
+
+#' Borrow Strength for Poorly Sampled Footprint Types
+#'
+#' v2's `coef.adjust`. Some human footprint types are rarely the
+#' dominant cover at a survey unit, so their effect is estimated
+#' from little data. v2 pools each with a type it is assumed to
+#' resemble, by inverse-variance weight:
+#'
+#' - `HardLin` borrows from `UrbInd`.
+#' - The three soft linear types - `EnSoftLin`, `EnSeismic` and
+#'   `TrSoftLin` - each borrow from a composite of young
+#'   regenerating stands, weighted by how much those stand types
+#'   overlap soft linear features in the provincial summary.
+#'
+#' The weights are v2's, measured from a 1 km summary and fixed
+#' since 2020-11-17. They are an assumption about which habitats
+#' resemble which, not an estimate, so they are stated here
+#' rather than derived.
+#'
+#' @param coefficients A data frame of term, estimate and se.
+#' @param overlap Numeric vector of four proportions, for
+#'   white spruce, pine, deciduous and black spruce regeneration.
+#' @return The coefficients, with the four terms adjusted.
+#'
+#' @example # Example usage of the function
+#' # coef_adjust_plant_veg(selected$coefficients)
+coef_adjust_plant_veg <- function(
+  coefficients,
+  overlap = c(0.049, 0.0893, 0.434, 0.396)
+) {
+  if (is.null(coefficients)) {
+    return(NULL)
+  }
+
+  value <- stats::setNames(
+    coefficients$estimate, coefficients$term
+  )
+  error <- stats::setNames(coefficients$se, coefficients$term)
+
+  # Pool two estimates by precision.
+  pool <- function(a, a_se, b, b_se) {
+    precision <- 1 / a_se^2 + 1 / b_se^2
+
+    list(
+      estimate = (a / a_se^2 + b / b_se^2) / precision,
+      se = sqrt(1 / precision)
+    )
+  }
+
+  present <- function(...) {
+    all(c(...) %in% names(value)) &&
+      all(is.finite(value[c(...)])) &&
+      all(is.finite(error[c(...)]))
+  }
+
+  # Step 1: Hard linear features borrow from urban and industrial
+  if (present("HardLin", "UrbInd")) {
+    pooled <- pool(
+      value["HardLin"], error["HardLin"],
+      value["UrbInd"], error["UrbInd"]
+    )
+    value["HardLin"] <- pooled$estimate
+    error["HardLin"] <- pooled$se
+  }
+
+  # Step 2: Soft linear features borrow from young regeneration
+  young_types <- c(
+    "CCWhiteSpruceR", "CCPineR", "CCDeciduousR", "BlackSpruce1"
+  )
+
+  if (present(young_types)) {
+    weights <- overlap / sum(overlap)
+
+    young <- sum(weights * value[young_types])
+    # The weighted variance carries no between-type component,
+    # because the weights are fixed rather than estimated.
+    young_se <- sqrt(sum(weights * error[young_types]^2))
+
+    for (one in c("EnSoftLin", "EnSeismic", "TrSoftLin")) {
+      if (!present(one)) {
+        next
+      }
+
+      pooled <- pool(value[one], error[one], young, young_se)
+      value[one] <- pooled$estimate
+      error[one] <- pooled$se
+    }
+  }
+
+  coefficients$estimate <- unname(value[coefficients$term])
+  coefficients$se <- unname(error[coefficients$term])
+
+  coefficients
+}
+
+## 4.8 plant_v2_parts() ----
+
+#' The Pieces of v2's Plant Prediction at a Set of Units
+#'
+#' v2 predicts a plant from its coefficient tables, not from a
+#' fitted model: the climate prediction, and a landcover
+#' prediction that weights each habitat type's effect by its
+#' cover at the unit. Shared by the validation AUCs and by the
+#' final prediction, so the two cannot drift apart.
+#'
+#' The cover terms are the published effects, less the unaged
+#' stand types, which v2 publishes only by age class. A term's
+#' column may carry the block suffix the harmonizer gave columns
+#' in more than one block (UrbInd_veg, UrbInd_soil).
+#'
+#' Reproduced as written: the protocol coefficient, a logit, is
+#' subtracted from an "Old" survey's landcover prediction on the
+#' probability scale.
+#'
+#' @param stage_coefficients Named list of data frames of term
+#'   and estimate: `climate` and `habitat`.
+#' @param data The units to predict at.
+#' @return A list: `climate` (probability), `raw` (landcover,
+#'   probability scale), `landcover` (`raw` with the protocol
+#'   adjustment), `slope` (the Climate effect), `aspen`, the cover
+#'   matrix `x` and the cover terms' `effects` (logit scale).
+#'
+#' @example # Example usage of the function
+#' # parts <- plant_v2_parts(stage_coefficients, region_frame)
+plant_v2_parts <- function(stage_coefficients, data) {
+  climate <- stage_coefficients$climate
+  habitat <- stage_coefficients$habitat
+
+  estimate <- stats::setNames(habitat$estimate, habitat$term)
+  head_terms <- c("Intercept", "Climate", "Protocol", "paspen")
+
+  column_of <- function(term) {
+    candidates <- c(term, paste0(term, c("_veg", "_soil")))
+    hit <- candidates[candidates %in% names(data)]
+    if (length(hit) == 0) NA_character_ else hit[1]
+  }
+
+  cover <- setdiff(
+    names(estimate), c(head_terms, plant_stand_types())
+  )
+  cover <- cover[is.finite(estimate[cover])]
+  cover_columns <- vapply(cover, column_of, character(1))
+  cover <- cover[!is.na(cover_columns)]
+  cover_columns <- cover_columns[!is.na(cover_columns)]
+
+  x <- as.matrix(data[, cover_columns, drop = FALSE])
+  raw <- drop(x %*% stats::plogis(estimate[cover]))
+  landcover <- raw
+
+  if ("Protocol" %in% names(estimate) &&
+        "Protocol" %in% names(data)) {
+    old <- as.character(data$Protocol) == "Old"
+    landcover[old] <- landcover[old] - estimate[["Protocol"]]
+  }
+
+  list(
+    climate = stats::plogis(
+      predict_from_coefficients(climate, data, "link")
+    ),
+    raw = raw,
+    landcover = landcover,
+    slope = estimate[["Climate"]],
+    aspen = if ("paspen" %in% names(estimate) &&
+                  "paspen" %in% names(data)) {
+      data$paspen * estimate[["paspen"]]
+    } else {
+      0
+    },
+    x = x,
+    effects = estimate[cover]
+  )
+}
+
+## 4.9 plant_v2_full_prediction() ----
+
+#' v2's Final Plant Prediction: Landcover and Climate Together
+#'
+#' The prediction v2's "Full" validation AUC scores. The plant
+#' specs name it as their `final_prediction`, so the harness's
+#' own metrics score the model v2 reports, after its stand-age
+#' splines, cutblock convergence and footprint pooling, rather
+#' than any single fitted candidate.
+#'
+#' @param stage_coefficients Named list with `climate` and
+#'   `habitat` coefficient tables.
+#' @param frame The units to predict at.
+#' @return A numeric vector of probabilities, one per row.
+#'
+#' @example # Example usage of the function
+#' # plant_v2_full_prediction(stage_coefficients, frame)
+plant_v2_full_prediction <- function(stage_coefficients, frame) {
+  parts <- plant_v2_parts(stage_coefficients, frame)
+
+  stats::plogis(
+    stats::qlogis(parts$raw) + parts$climate * parts$slope +
+      parts$aspen
+  )
+}
+
+## 4.10 plant_v2_validation() ----
 
 #' v2's Plant Validation AUCs, In-Bag and Out-of-Bag
 #'
@@ -682,10 +876,6 @@ plant_paspen <- function(selected, data = NULL) {
 #' in-sample. The same seven are also scored on the units the
 #' draw left out, which is the held-out read v2 does not have.
 #' Iteration 1 is the full data and has no out-of-bag units.
-#'
-#' Reproduced as written: the protocol coefficient, a logit, is
-#' subtracted from an "Old" survey's landcover prediction on the
-#' probability scale.
 #'
 #' @param stage_coefficients Named list of data frames of term
 #'   and estimate: `climate` and `habitat`.
@@ -715,73 +905,42 @@ plant_v2_validation <- function(
     )
   }
 
-  climate_prediction <- function(data) {
-    stats::plogis(predict_from_coefficients(climate, data, "link"))
-  }
-
   truncate <- function(x) {
     cap <- stats::quantile(x, 0.99, names = FALSE)
     ifelse(x >= cap, cap, x)
   }
 
-  estimate <- stats::setNames(habitat$estimate, habitat$term)
-  head <- c("Intercept", "Climate", "Protocol", "paspen")
-
-  # The cover terms are the published effects, less the unaged
-  # stand types, which v2 publishes only by age class. A term's
-  # column may carry the block suffix the harmonizer gave columns
-  # in more than one block (UrbInd_veg, UrbInd_soil).
-  column_of <- function(term) {
-    candidates <- c(term, paste0(term, c("_veg", "_soil")))
-    hit <- candidates[candidates %in% names(frame)]
-    if (length(hit) == 0) NA_character_ else hit[1]
-  }
-
-  cover <- setdiff(names(estimate), c(head, plant_stand_types()))
-  cover <- cover[is.finite(estimate[cover])]
-  cover_columns <- vapply(cover, column_of, character(1))
-  cover <- cover[!is.na(cover_columns)]
-  cover_columns <- cover_columns[!is.na(cover_columns)]
-
   score <- function(in_units) {
     all_units <- province_frame[
       province_frame$survey_unit_id %in% in_units, , drop = FALSE
     ]
-    region <- frame[frame$survey_unit_id %in% in_units, , drop = FALSE]
+    region <- frame[
+      frame$survey_unit_id %in% in_units, , drop = FALSE
+    ]
 
     if (nrow(region) == 0 || nrow(all_units) == 0) {
       return(rep(NA_real_, 7))
     }
 
-    climate_all <- climate_prediction(all_units)
-    climate_region <- climate_prediction(region)
+    parts <- plant_v2_parts(stage_coefficients, region)
+    climate_all <- stats::plogis(
+      predict_from_coefficients(climate, all_units, "link")
+    )
+
+    # The truncation caps the region's climate at the 99th
+    # percentile over every unit in the draw
     cap <- stats::quantile(climate_all, 0.99, names = FALSE)
-    climate_region_trunc <- ifelse(climate_region >= cap, cap,
-                                   climate_region)
+    climate_region_trunc <- ifelse(
+      parts$climate >= cap, cap, parts$climate
+    )
 
-    x <- as.matrix(region[, cover_columns, drop = FALSE])
-    effect <- stats::plogis(estimate[cover])
-    landcover <- drop(x %*% effect)
-
-    if ("Protocol" %in% names(estimate) && "Protocol" %in% names(region)) {
-      old <- as.character(region$Protocol) == "Old"
-      landcover[old] <- landcover[old] - estimate[["Protocol"]]
-    }
-
-    slope <- estimate[["Climate"]]
-    aspen <- if ("paspen" %in% names(estimate) &&
-                   "paspen" %in% names(region)) {
-      region$paspen * estimate[["paspen"]]
-    } else {
-      0
-    }
-
-    raw <- drop(x %*% effect)
-    component <- climate_region * slope + aspen
-    component_trunc <- climate_region_trunc * slope + aspen
+    component <- parts$climate * parts$slope + parts$aspen
+    component_trunc <- climate_region_trunc * parts$slope +
+      parts$aspen
 
     joint <- function(shift) {
-      rowSums(x * stats::plogis(outer(shift, estimate[cover], `+`)))
+      shifted <- outer(shift, parts$effects, `+`)
+      rowSums(parts$x * stats::plogis(shifted))
     }
 
     observed <- as.integer(region$response > 0)
@@ -790,10 +949,13 @@ plant_v2_validation <- function(
     c(
       Climate = auc(observed_all, climate_all),
       Climate_Truncated = auc(observed_all, truncate(climate_all)),
-      Landcover = auc(observed, landcover),
-      Full = auc(observed, stats::plogis(stats::qlogis(raw) + component)),
+      Landcover = auc(observed, parts$landcover),
+      Full = auc(
+        observed, stats::plogis(stats::qlogis(parts$raw) + component)
+      ),
       Full_Truncated = auc(
-        observed, stats::plogis(stats::qlogis(raw) + component_trunc)
+        observed,
+        stats::plogis(stats::qlogis(parts$raw) + component_trunc)
       ),
       Full_Joint = auc(observed, joint(component)),
       Full_Joint_Truncated = auc(observed, joint(component_trunc))
@@ -813,8 +975,10 @@ plant_v2_validation <- function(
     score(out_of_bag)
   }
 
-  names_out <- c("Climate", "Climate_Truncated", "Landcover", "Full",
-                 "Full_Truncated", "Full_Joint", "Full_Joint_Truncated")
+  names_out <- c(
+    "Climate", "Climate_Truncated", "Landcover", "Full",
+    "Full_Truncated", "Full_Joint", "Full_Joint_Truncated"
+  )
 
   data.frame(
     metric = c(paste0("v2val_", names_out),
@@ -824,12 +988,36 @@ plant_v2_validation <- function(
   )
 }
 
-# 5. plant_group_specs() ----
+# 5. cutblock_recovery_weights() ----
+
+#' v2's Cutblock Recovery Weights
+#'
+#' How far a cutblock of age class 2, 3 and 4 has converged on the
+#' natural stand of the same age, by stand group. Fixed in v2 and
+#' shared by its plant (section 7.5) and mammal (section 6.11)
+#' pipelines, so stated once for both modules.
+#'
+#' The two pipelines' stand-age splines are not shared: their
+#' parameters differ (spline basis, detection threshold, model
+#' choice), and merging them would put parity at risk.
+#'
+#' @return A list of `conifer` and `deciduous` weights, one per
+#'   age class 2 to 4.
+#'
+#' @example # Example usage of the function
+#' # cutblock_recovery_weights()$conifer
+cutblock_recovery_weights <- function() {
+  list(
+    conifer = c(0.500, 0.849, 0.960),
+    deciduous = c(0.705, 0.912, 0.970)
+  )
+}
+
+# 6. plant_group_specs() ----
 
 #' Every Plant-Group Spec
 #'
-#' A convenience for running all four at once. Each taxon module
-#' must already be sourced.
+#' Each taxon module must already be sourced.
 #'
 #' @param use_protocol Logical, or NULL for the v2 setting per
 #'   taxon.

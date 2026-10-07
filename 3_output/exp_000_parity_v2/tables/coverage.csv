@@ -1,15 +1,15 @@
 taxon,run,region,season,part,species,draws,stages,has_coefficients,has_grid
-bird,bird,north,,,2,100,"climate, landcover, habitat",TRUE,FALSE
-bird,bird,south,,,2,100,"climate, landcover, habitat",TRUE,FALSE
-bryophyte,bryophyte,north,,,2,100,"climate, habitat",TRUE,FALSE
-bryophyte,bryophyte,south,,,2,100,"climate, habitat",TRUE,FALSE
-lichen,lichen,north,,,2,100,"climate, habitat",TRUE,FALSE
-lichen,lichen,south,,,2,100,"climate, habitat",TRUE,FALSE
-mammal,mammal_summer,north,summer,hurdle,2,100,"habitat_presence, habitat_abundance, habitat_total",TRUE,FALSE
-mammal,mammal_summer,south,summer,hurdle,2,100,"habitat_presence, habitat_abundance, habitat_total",TRUE,FALSE
-mammal,mammal_winter,north,winter,hurdle,2,100,"habitat_presence, habitat_abundance, habitat_total",TRUE,FALSE
-mammal,mammal_winter,south,winter,hurdle,2,100,"habitat_presence, habitat_abundance, habitat_total",TRUE,FALSE
-mite,mite,north,,,2,100,"climate, habitat",TRUE,TRUE
-mite,mite,south,,,2,100,"climate, habitat",TRUE,TRUE
-vascular_plant,vascular_plant,north,,,2,100,"climate, habitat",TRUE,TRUE
-vascular_plant,vascular_plant,south,,,2,100,"climate, habitat",TRUE,TRUE
+bird,bird,north,,,2,5,"climate, landcover, habitat",TRUE,TRUE
+bird,bird,south,,,2,5,"climate, landcover, habitat",TRUE,TRUE
+bryophyte,bryophyte,north,,,2,5,"climate, habitat",TRUE,TRUE
+bryophyte,bryophyte,south,,,2,5,"climate, habitat",TRUE,TRUE
+lichen,lichen,north,,,2,5,"climate, habitat",TRUE,TRUE
+lichen,lichen,south,,,2,5,"climate, habitat",TRUE,TRUE
+mammal,mammal_summer,north,summer,hurdle,2,5,"habitat_presence, habitat_abundance, habitat_total",TRUE,TRUE
+mammal,mammal_summer,south,summer,hurdle,2,5,"habitat_presence, habitat_abundance, habitat_total",TRUE,TRUE
+mammal,mammal_winter,north,winter,hurdle,2,5,"habitat_presence, habitat_abundance, habitat_total",TRUE,TRUE
+mammal,mammal_winter,south,winter,hurdle,2,5,"habitat_presence, habitat_abundance, habitat_total",TRUE,TRUE
+mite,mite,north,,,2,5,"climate, habitat",TRUE,TRUE
+mite,mite,south,,,2,5,"climate, habitat",TRUE,TRUE
+vascular_plant,vascular_plant,north,,,2,5,"climate, habitat",TRUE,TRUE
+vascular_plant,vascular_plant,south,,,2,5,"climate, habitat",TRUE,TRUE

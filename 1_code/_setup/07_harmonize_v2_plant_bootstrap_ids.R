@@ -3,6 +3,8 @@
 # author: Brendan Casey
 # created: 2026-09-29
 # inputs:
+#   Read via setup_input() (utils/input_paths.R); the original
+#   locations are listed, and SDM_* variables can point back.
 #   in the v2 plant project (SDM_V2_PROJECT):
 #     - 0_data/bootstrap/lichen-bootstrap-ids.Rdata
 #     - 0_data/bootstrap/mite-bootstrap-ids.Rdata
@@ -14,25 +16,17 @@
 #   in 0_data/test_dataset/lookup/v2_bootstrap_ids/<taxon>/:
 #     - <species>.rds, one per species
 # notes:
-#   - v2 draws its plant bootstrap once per species, without a
-#     seed, and stores the draws. Replaying them is what makes
-#     parity numerical rather than distributional: the harness
-#     then fits the rows v2 fitted, draw by draw. The plant specs
-#     read them with `bootstrap = "v2_ids"`.
-#   - Each file is v2's matrix for one species, survey units by
-#     100 draws, holding SiteYearQu, which is the test dataset's
-#     survey_unit_id for the plant-group taxa. Draw 1 is the full
-#     data; the others are drawn with replacement, so ids repeat.
-#   - Written per species rather than per taxon, because the full
-#     sets are large - 1.3 GB compressed for vascular plants - and
-#     a run needs only the species it models. Set SDM_V2_BOOT_TAXA
-#     and SDM_V2_BOOT_SPECIES (comma-separated) to harmonize a
-#     subset; unset, every species of every taxon is written.
-#   - Bryophytes come from the regenerated draws, because the
-#     published file holds 3 draws. Those are the draws the
-#     regenerated reference in 2_pipeline/v2_reference/ was fitted
-#     on, not the ones behind COEFS.RData, so bryophyte parity
-#     against v2_results.csv stays distributional.
+#   - v2's stored plant draws, replayed with
+#     `bootstrap = "v2_ids"` so parity can be numerical.
+#   - Each file: one species' matrix, units (SiteYearQu =
+#     survey_unit_id) by 100 draws; draw 1 is the full data.
+#   - Per species because the full sets are large (1.3 GB
+#     compressed for vascular plants). SDM_V2_BOOT_TAXA and
+#     SDM_V2_BOOT_SPECIES (comma-separated) select a subset.
+#   - Bryophytes use 03's regenerated draws (the published file
+#     holds 3), which are not those behind COEFS.RData, so
+#     bryophyte parity against v2_results.csv stays
+#     distributional.
 #   - Ids not in sites.csv are counted and reported, not dropped.
 # ---
 
@@ -44,9 +38,12 @@ library(data.table) # reading sites.csv (version: 1.16.4)
 ## 1.2 Resolve paths ----
 project_root <- normalizePath(getwd(), winslash = "/")
 
+# The _setup inputs mirrored on ABMI-DATA2 (setup_input())
+source(file.path(project_root, "1_code/_setup/utils/input_paths.R"))
+
 v2_project <- Sys.getenv(
   "SDM_V2_PROJECT",
-  unset = "//ABMI-DATA2/science/sc/ToEmily/VegetationModels"
+  unset = setup_input("vegetation_models")
 )
 
 sources <- c(
@@ -129,15 +126,17 @@ for (taxon in taxa) {
   for (species in keep) {
     draws <- ids[[species]]
 
-    # A species whose draws errored in v2 is stored as an error
-    # object, not a matrix; there is nothing to replay.
+    # Draws that errored in v2 are stored as error objects
     if (!is.matrix(draws) || !is.character(draws)) {
       skipped <- c(skipped, species)
       next
     }
 
     unmatched <- unmatched + sum(!draws[, 1] %in% sites)
-    saveRDS(unname(draws), file.path(out_dir, paste0(species, ".rds")))
+    saveRDS(
+      unname(draws),
+      file.path(out_dir, paste0(species, ".rds"))
+    )
     written <- written + 1L
   }
 

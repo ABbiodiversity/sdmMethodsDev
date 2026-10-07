@@ -3,33 +3,23 @@
 # author: Brendan Casey
 # created: 2026-09-29
 # inputs:
+#   Read via setup_input() (utils/input_paths.R); the original
+#   locations are listed, and SDM_* variables can point back.
 #   in the BirdModels project (SDM_V2_BIRD_ROOT):
 #     - Data/lookups/Xn-veg-v2024.Rdata
 # outputs:
 #   in 0_data/test_dataset/lookup/:
 #     - bird_veg_age_matrix.csv
 # notes:
-#   - v2 does not report raw bird landcover coefficients. Its
-#     08.PackageCoefficients.R translates them onto the
-#     standardized cross-taxa habitat types - WhiteSpruceR to
-#     WhiteSpruce8 and the rest - by multiplying them by the
-#     `age` matrix in Xn-veg-v2024.Rdata: one row per standardized
-#     type, one column per raw model term, holding the design
-#     values of a pure stand of that type, with the age terms
-#     integrated over each age class.
-#   - The harness translates bird coefficients the same way, in
-#     1_code/modules/birds/standardize.R, so it needs this matrix.
-#     Copying it here keeps experiments runnable from
-#     0_data/test_dataset/ alone.
-#   - A separate script rather than a section of
-#     01_harmonize_model_ready_v2.R, because it reads one small
-#     file from a different source and 01 takes hours to re-run.
-#     It writes into test_dataset/lookup/ all the same; re-run it
-#     whenever 01 rebuilds that folder.
-#   - The matrix is written as read. Column names are the raw
-#     glm names v2 used, with interaction terms sorted
-#     (isCon:wtAge, not wtAge:isCon), which is how v2 matches
-#     them.
+#   - v2's 08.PackageCoefficients.R translates raw bird landcover
+#     coefficients onto the standardized habitat types by the
+#     `age` matrix (one row per type, one column per raw term:
+#     a pure stand's design values, age terms integrated over each
+#     class). modules/birds/standardize.R needs it.
+#   - Separate from 01 (hours to re-run), but re-run it whenever
+#     01 rebuilds lookup/.
+#   - Written as read: raw glm column names, interactions sorted
+#     (isCon:wtAge), as v2 matches them.
 # ---
 
 # 1. Setup ----
@@ -40,12 +30,12 @@ library(data.table) # CSV writing (version: 1.16.4)
 ## 1.2 Resolve paths ----
 project_root <- normalizePath(getwd(), winslash = "/")
 
+# The _setup inputs mirrored on ABMI-DATA2 (setup_input())
+source(file.path(project_root, "1_code/_setup/utils/input_paths.R"))
+
 v2_bird_root <- Sys.getenv(
   "SDM_V2_BIRD_ROOT",
-  unset = paste0(
-    "G:/.shortcut-targets-by-id/",
-    "17Ymt13eHfKvIiuoMl6x-Kn74Z2uVbbzS/BirdModels"
-  )
+  unset = setup_input("bird_models")
 )
 
 source_path <- file.path(

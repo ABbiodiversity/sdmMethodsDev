@@ -2,6 +2,7 @@
 # title: The Standard Result Object
 # author: Brendan Casey
 # created: 2026-09-09
+# inputs: none; writes to the store directory it is given
 # outputs:
 #   in the store directory:
 #     - grid_predictions.csv
@@ -10,27 +11,16 @@
 #     - metrics.csv
 #     - meta.json
 # notes:
-#   - Every run writes the same five files whatever the engine,
-#     which is what makes a GLM run and a boosted-tree run
-#     comparable. Comparison code reads this contract and nothing
-#     else.
-#   - grid_predictions.csv is the common currency. Coefficients
-#     cannot compare a GLM to a tree - a tree has no Peatland
-#     coefficient - but every engine can predict onto the rows of
-#     a prediction matrix, which is also the quantity v2 reports.
-#   - coefficients.csv is still written when the engine has
-#     coefficients, because parity against v2 is checked there.
-#     Its absence is recorded in meta.json rather than being
-#     silently empty.
-#   - Writing is append-per-species rather than one object at the
-#     end. A bird run is 172 species by 100 bootstraps, and
-#     holding all of it before the first write would risk losing
-#     a long run to a failure in its last species.
-#   - meta.json records the configuration a run cannot be
-#     reproduced without: engine, selection rule, covariates,
-#     seed, and the resampling scheme. The seed matters most - v2
-#     set none, so a v2-configured run is not reproducible even
-#     against itself.
+#   - Every engine writes the same files, so comparison code reads
+#     only this contract. grid_predictions.csv compares any
+#     engines; coefficients.csv is written only when the engine
+#     has coefficients (v2 parity is checked there).
+#   - Rows are appended per draw, so a failure late in a long run
+#     loses little. Parallel species write headerless shards;
+#     merge_result_shards() appends them in queue order, matching
+#     a serial run byte for byte.
+#   - unit_predictions.csv is opt-in: it can reach gigabytes
+#     (birds) and nothing downstream reads it.
 # ---
 
 # 1. Setup ----
@@ -40,37 +30,112 @@ library(data.table) # fast appending writes (version: 1.16.4)
 
 # 2. result_store() ----
 
-#' Open a Result Store
+## 2.1 result_columns() ----
+
+#' The Columns of Each Result File
 #'
-#' Creates the directory and records which files have been
-#' started, so each is written with a header once and appended to
-#' after that.
+#' @return A named list of character vectors.
+#'
+#' @example # Example usage of the function
+#' # result_columns()$metrics
+result_columns <- function() {
+  list(
+    grid_predictions = c(
+      "species", "region", "boot", "grid_unit", "prediction"
+    ),
+    unit_predictions = c(
+      "species", "region", "boot", "survey_unit_id", "prediction",
+      "observed"
+    ),
+    coefficients = c(
+      "species", "region", "stage", "boot", "term", "estimate", "se"
+    ),
+    metrics = c("species", "region", "boot", "metric", "value")
+  )
+}
+
+## 2.2 result_store() ----
+
+#' Open a Result Store
 #'
 #' @param dir Character. Directory to write into.
 #' @param overwrite Logical. Remove existing result files first.
-#'   FALSE lets a run add to a store, which is how a run that
-#'   stopped part way is continued.
+#'   FALSE continues a run that stopped part way.
+#' @param header Logical. Write a header line when a file is
+#'   started. FALSE for a shard, which is merged under one header.
+#' @param unit_predictions Character. "none" writes no unit
+#'   predictions, "oob" only the units a draw left out, "all"
+#'   every unit.
 #' @return A store object.
 #'
 #' @example # Example usage of the function
 #' # store <- result_store("2_pipeline/exp_001/bryophyte")
-result_store <- function(dir, overwrite = TRUE) {
+result_store <- function(
+  dir,
+  overwrite = TRUE,
+  header = TRUE,
+  unit_predictions = c("none", "oob", "all")
+) {
+  unit_predictions <- match.arg(unit_predictions)
   dir.create(dir, recursive = TRUE, showWarnings = FALSE)
 
-  files <- c(
-    "grid_predictions.csv", "unit_predictions.csv",
-    "coefficients.csv", "metrics.csv"
-  )
+  files <- paste0(names(result_columns()), ".csv")
 
   if (overwrite) {
-    existing <- file.path(dir, files)
+    existing <- file.path(dir, c(files, "meta.json"))
     file.remove(existing[file.exists(existing)])
   }
 
   structure(
-    list(dir = dir, files = files),
+    list(
+      dir = dir, files = files, header = header,
+      unit_predictions = unit_predictions
+    ),
     class = "result_store"
   )
+}
+
+## 2.3 merge_result_shards() ----
+
+#' Combine Shard Stores into One Store
+#'
+#' @param store A result_store() to write into, with a header.
+#' @param shard_dirs Character vector of shard directories, in the
+#'   order their rows should appear.
+#' @return NULL, invisibly.
+#'
+#' @example # Example usage of the function
+#' # merge_result_shards(store, file.path(shards, species))
+merge_result_shards <- function(store, shard_dirs) {
+  columns <- result_columns()
+
+  for (what in names(columns)) {
+    target <- file.path(store$dir, paste0(what, ".csv"))
+    parts <- file.path(shard_dirs, paste0(what, ".csv"))
+    parts <- parts[file.exists(parts)]
+
+    if (length(parts) == 0) {
+      next
+    }
+
+    # The header is written by fwrite itself, from an empty table,
+    # so its line ending matches the rows appended under it
+    if (!file.exists(target)) {
+      empty <- stats::setNames(
+        as.data.frame(
+          rep(list(character(0)), length(columns[[what]]))
+        ),
+        columns[[what]]
+      )
+      fwrite(empty, target)
+    }
+
+    for (part in parts) {
+      file.append(target, part)
+    }
+  }
+
+  invisible(NULL)
 }
 
 # 3. result_append() ----
@@ -92,20 +157,18 @@ result_append <- function(store, what, rows) {
   }
 
   path <- file.path(store$dir, paste0(what, ".csv"))
+  started <- file.exists(path)
 
-  # data.table writes the header only on the first call, so the
-  # file stays a single valid CSV across appends
+  # Header on first write only; shards have none
   fwrite(
-    rows, path, append = file.exists(path),
-    col.names = !file.exists(path), na = ""
+    rows, path, append = started,
+    col.names = store$header && !started, na = ""
   )
 
   invisible(NULL)
 }
 
 # 4. Writers ----
-# One per file, each fixing the column set so that a downstream
-# comparison can rely on it.
 
 ## 4.1 write_grid_predictions() ----
 
@@ -144,15 +207,30 @@ write_grid_predictions <- function(
 #' @param boot Integer.
 #' @param survey_unit_id Character vector.
 #' @param prediction,observed Numeric vectors.
-#' @return NULL, invisibly.
+#' @param in_bag Logical vector, TRUE where the unit was in the
+#'   draw. Used when the store keeps out-of-bag units only.
+#' @return NULL, invisibly. Nothing is written when the store's
+#'   `unit_predictions` is "none".
 #'
 #' @example # Example usage of the function
 #' # write_unit_predictions(store, "ALFL", "north", 1, ids,
 #' #                        preds, obs)
 write_unit_predictions <- function(
   store, species, region, boot, survey_unit_id, prediction,
-  observed
+  observed, in_bag = NULL
 ) {
+  if (store$unit_predictions == "none") {
+    return(invisible(NULL))
+  }
+
+  # Only the held-out units, where the run asks for those alone
+  if (store$unit_predictions == "oob" && !is.null(in_bag)) {
+    keep <- !in_bag
+    survey_unit_id <- survey_unit_id[keep]
+    prediction <- prediction[keep]
+    observed <- observed[keep]
+  }
+
   result_append(store, "unit_predictions", data.frame(
     species = species,
     region = region,
@@ -173,9 +251,8 @@ write_unit_predictions <- function(
 #' @param boot Integer.
 #' @param coefficients A data frame of term, estimate and se, or
 #'   NULL for an engine that has none.
-#' @param stage Character. The stage the coefficients came from.
-#'   Every stage is recorded, not only the last, so a staged
-#'   model can be compared stage by stage.
+#' @param stage Character. The stage the coefficients came from;
+#'   every stage is recorded, not only the last.
 #' @return NULL, invisibly.
 #'
 #' @example # Example usage of the function
@@ -232,9 +309,8 @@ write_metrics <- function(store, species, region, boot, metrics) {
 
 #' Record What a Run Was
 #'
-#' Everything needed to say what produced the other four files.
-#' Written as JSON by hand rather than through jsonlite, so the
-#' harness keeps its base-R-plus-data.table dependency.
+#' Hand-written JSON, not jsonlite, to keep the harness to base R
+#' plus data.table.
 #'
 #' @param store A result_store().
 #' @param meta A named list of scalars and character vectors.
@@ -292,9 +368,8 @@ write_meta <- function(store, meta) {
 
 #' Read a Result Store Back
 #'
-#' What comparison scripts use. A missing file returns NULL
-#' rather than stopping, because an engine without coefficients
-#' legitimately writes none.
+#' A missing file returns NULL: an engine without coefficients
+#' writes none.
 #'
 #' @param dir Character. A store directory.
 #' @param what Character. Which file, without the extension.

@@ -91,7 +91,7 @@ prediction for plants, and a calibrated probability for mammals.
 | Factor levels | `vegc` 22, `soilc` 17, `method` 4, `block` 60. Stored order matters, since a level absent from one bootstrap sample must not renumber the rest | OK. Until 2026-09-29 `method` was loaded as `method_veg` and `method_soil` and missed the lookup, so it fell back to alphabetical order with `1SPM` as reference instead of `PC`; `apply_factor_levels()` now follows the suffixes |
 | Column suffixes | Six columns arrive suffixed `_veg` or `_soil` and are rewritten by `term_map()` | OK |
 | No coordinates | 0 of 215,758 rows in `sites.csv` carry latitude or longitude | GAP blocks spatial resampling and every spatial term |
-| Reference output | The packaged `Birds2024.RData` is absent from the drive. `_setup/04` rebuilds it from the per-draw CSVs, on the standardized term template, and `_setup/05` carries it into `v2_results.csv` | OK rebuilt and compared. `modules/birds/standardize.R` ports the translation onto the standardized template and reproduces the packaged values exactly. Note the package labels draws 2 to 100 in file-listing order (`b2` is draw 10) |
+| Reference output | The packaged `Birds2024.RData` is absent from the drive's `Results/`; only the per-draw CSVs and an archived copy survive. The parity reference is ABMIexploreR's packaged bird coefficients (`_setup/08`), which match it to ~1e-15 | OK compared. `modules/birds/standardize.R` ports the translation onto the standardized template and reproduces the packaged values exactly. Note the package labels draws 2 to 100 in file-listing order (`b2` is draw 10) |
 
 **The published bird results come from a different data vintage.**
 Run on the current `Stratified.Rdata`, v2's own climate code gives
@@ -108,7 +108,7 @@ check:
 
 | Date | On the bird drive |
 | --- | --- |
-| 2025-12-12 / 15 | Per-draw climate and landcover csvs in `Results/Archive/`, the reference `_setup/04` packages |
+| 2025-12-12 / 15 | Per-draw climate and landcover csvs in `Results/Archive/`, packaged by v2's `08.PackageCoefficients.R` |
 | 2026-01-16 | `Results/Archive/Birds2024.RData`, packaged from them |
 | 2026-02 to 03 | New WildTrax pulls; `Data/Archive/2025/Wrangled.Rdata` rebuilt |
 | 2026-08-19 | `Data/Archive/2025/Stratified.Rdata` rebuilt, in place |
@@ -122,7 +122,7 @@ only to 40%. The published results were fitted on a
 **Resolved 2026-10-02.** A copy of the pre-rebuild file was
 recovered and is kept at
 `work_abmi/1_projects/active/sdmMethodsDev/remote/birds_data_v2/Stratified.Rdata`,
-which `SDM_BIRD_DATA` now defaults to in `_setup/01`, `02` and `04`.
+which `SDM_BIRD_DATA` now defaults to in `_setup/01` and `02`.
 Its draws hold 58,210 surveys (the rebuilt file's hold 58,035), and
 v2's own climate code run on it reproduces the published AMRO draw-1
 coefficients to 2e-15. With the test dataset re-harmonized from it,
@@ -154,7 +154,7 @@ AUC would have been silently invalid. Fixed with `as.numeric()`.
 
 | Quirk | What v2 does | Status |
 | --- | --- | --- |
-| Hurdle structure | Binomial presence times Gamma abundance given presence, on a log link. Their product is total abundance | OK `mammal_spec(part = "hurdle")`, both halves together (hurdle.R) |
+| Hurdle structure | Binomial presence times Gamma abundance given presence, on a log link. Their product is total abundance | OK, the generic `hurdle` rule fits both halves through the stage's engine; v2's table-building is the `mammal_v2_habitat_tables()` post-process step (hurdle.R) |
 | Lure correction | Estimated **only** from numbered ABMI grid sites, which are the ones with matched lured and unlured deployments. Applied as `sign(Count) / lure_ratio`, then rescaled to a maximum of 1 | OK |
 | Abundance winsorizing | Capped at the 99th percentile of abundance given presence, before fitting | OK |
 | Season | Separate summer and winter models, with `wt_summer` and `wt_winter` passed as `glm` weights | OK |
@@ -237,9 +237,10 @@ plant taxa hold 100. Both sit upstream of the modelling, so the file
 cannot be salvaged, only regenerated.
 `1_code/_setup/03_rerun_bryophyte_v2_reference.R` does that for the
 climate stage, and has been run: 134 of 134 species, 100 draws each,
-no failures. Separately, v2's `COEFS.RData` holds complete bryophyte
-arrays, and `_setup/05` builds the bryophyte rows of `v2_results.csv`
-from it. The gate reads neither yet, so bryophytes are not compared.
+no failures. Separately, ABMIexploreR publishes complete bryophyte
+arrays (matching v2's `COEFS.RData` to ~1e-15), and `_setup/08` builds
+the bryophyte rows of `v2_results.csv` from them, so the gate compares
+bryophytes.
 
 ## Shared across all three
 

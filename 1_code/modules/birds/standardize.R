@@ -3,20 +3,17 @@
 # author: Brendan Casey; translation logic by Elly Knight (v2)
 # created: 2026-09-29
 # inputs:
-#   in 0_data/test_dataset/:
+#   in the test dataset (see harness/data_source.R):
 #     - covariates.csv, the bird rows
 #     - lookup/bird_veg_age_matrix.csv, from
 #       1_code/_setup/06_harmonize_bird_translation_lookup.R
 #     - lookup/covariate_columns.csv, lookup/bird_factor_levels.csv
 # outputs: none; returns objects in memory
 # notes:
-#   - A port of the translation in v2's 08.PackageCoefficients.R
-#     (cloned in 1_code/_setup/04_package_bird_coefficients.R).
-#     v2 publishes bird landcover effects on the standardized
-#     cross-taxa habitat types - WhiteSpruceR to WhiteSpruce8,
-#     Loamy, EnSoftLin and so on - not as raw glm coefficients,
-#     so the harness's raw coefficients have to be translated
-#     the same way before they can be compared.
+#   - Port of v2's 08.PackageCoefficients.R translation. v2
+#     publishes bird landcover effects on the standardized
+#     cross-taxa habitat types, not raw glm coefficients, so the
+#     harness's coefficients are translated the same way.
 #   - North: the raw coefficients are multiplied by v2's `age`
 #     matrix, one row per standardized type. Linear features and
 #     wellsites are re-expressed as the mean predicted abundance
@@ -30,8 +27,7 @@
 #     reads -10,000 rather than -Inf.
 #   - Standard errors are not translated. The gate compares
 #     estimates only.
-#   - Two v2 quirks are reproduced rather than corrected, because
-#     the point is to match v2:
+#   - v2 quirks reproduced for parity:
 #     - The mSoft substitution tests for zero after the
 #       coefficients are exponentiated, so it never fires.
 #     - The NESP north Climate effect is multiplied by 0.1 twice,
@@ -79,7 +75,7 @@ bird_sort_interaction <- function(x) {
 #' block - `road` became `road_veg` and `road_soil` - so model
 #' terms carry the suffix and v2's lookups do not.
 #'
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @param block Character. "veg" for north, "soil" for south.
 #' @return A data frame of source and master names, one row per
 #'   source column, preferring the given block.
@@ -184,7 +180,7 @@ bird_model_terms <- function(set) {
 #' the covariates under v2's names, the design matrix, and the
 #' row sets the linear-feature adjustment averages over.
 #'
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @param region Character. "north" or "south".
 #' @return A list.
 #'
@@ -231,7 +227,9 @@ bird_translation_context <- function(data_dir, region) {
 
   # Step 3: The design matrix, with v2's column names
   design <- stats::model.matrix(
-    stats::as.formula(paste("~", paste(model_terms, collapse = " + "))),
+    stats::as.formula(
+      paste("~", paste(model_terms, collapse = " + "))
+    ),
     stats::model.frame(
       stats::as.formula(
         paste("~", paste(model_terms, collapse = " + "))
@@ -335,9 +333,8 @@ standardize_bird_draw <- function(raw, context, species) {
     # Step 1: Standardized habitat types from the age matrix
     lam <- exp(drop(age %*% value(colnames(age))))
 
-    # Step 2: Linear features. v2 exponentiates, then tests for
-    # zero, so the mSoft substitution below never fires; kept
-    # so the code reads as v2's does.
+    # Step 2: Linear features. The mSoft substitution never fires
+    # (v2 tests for zero after exponentiating); kept as in v2.
     hf <- exp(value(c("mWell", "mSoft", "mEnSft", "mTrSft",
                       "mSeism")))
 
@@ -436,7 +433,7 @@ standardize_bird_draw <- function(raw, context, species) {
 #'
 #' @param coefficients A data frame of species, region, boot,
 #'   term and estimate: the landcover stage, one region.
-#' @param data_dir Character. Path to 0_data/test_dataset.
+#' @param data_dir Character. The test dataset folder.
 #' @param region Character. "north" or "south".
 #' @return A data frame of the same columns, on the standardized
 #'   template, with stage "habitat" and se NA.
@@ -484,6 +481,33 @@ standardize_bird_coefficients <- function(
   rownames(out) <- NULL
 
   out
+}
+
+# 5. bird_habitat_translation() ----
+
+#' Translate a Store's Bird Landcover onto v2's Habitat Template
+#'
+#' The form collect_results() takes in `translate`: given a
+#' store's coefficients, returns the landcover stage translated
+#' onto v2's standardized habitat types as extra rows, stage
+#' "habitat". The raw "landcover" rows stay as they are.
+#'
+#' @param coefficients A store's coefficients.
+#' @param data_dir Character. The test dataset folder.
+#' @param region Character. "north" or "south".
+#' @return A data frame of coefficient rows, or NULL.
+#'
+#' @example # Example usage of the function
+#' # collect_results(pipeline_dir, data_dir,
+#' #   translate = list(bird = bird_habitat_translation))
+bird_habitat_translation <- function(coefficients, data_dir, region) {
+  landcover <- coefficients[coefficients$stage == "landcover", ]
+
+  if (nrow(landcover) == 0) {
+    return(NULL)
+  }
+
+  standardize_bird_coefficients(landcover, data_dir, region)
 }
 
 # End of script ----

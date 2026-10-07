@@ -6,20 +6,26 @@ Written by `run_record()`. The result stores this describes are gitignored; this
 
 _Volatile. Excluded from cross-run comparison._
 
-- **git_commit**: c6852d4
+- **git_commit**: a45a17d
 - **pipeline_dir**: D:/local_projects/active/sdmMethodsDev/2_pipeline/exp_000_parity_v2
 - **r_version**: 4.5.0
-- **written_at**: 2026-10-03 11:16:41
+- **written_at**: 2026-10-06 11:25:57
 
 ## Configuration
 
-- **boot_seed**: 20260909
-- **data_dir**: test_dataset
+- **boot_seed**: 20260909.0000
+- **changes_from_v2**: none
+- **compared_with**: none (baseline)
+- **covariate_files**: none
+- **data_dir**: published 2026-10-05 (//ABMI-DATA2/science/sdmMethodsDev/0_data/test_dataset/2026-10-05)
 - **engines**: bayesglm, glm
 - **focal_species**: bird=AMRO, bird=YEWA, bryophyte=Bryum.All, bryophyte=Ceratodon.purpureus, lichen=Cladonia.chlorophaea, lichen=Physcia.adscendens, mammal=Coyote_Summer, mammal=Coyote_Winter, mammal=Moose_Summer, mammal=Moose_Winter, mite=Ceratozetes.gracilis, mite=Trhypochthonius.tectorum, vascular_plant=Galium.boreale, vascular_plant=Vicia.americana
-- **n_bootstraps**: 100
+- **jobs_not_ok**: 0
+- **jobs_ok**: 140
+- **jobs_total**: 140
+- **n_bootstraps**: 5
 - **plant_bootstrap**: spatial_block
-- **selection**: aic_average, custom, ivw_grid, staged_bic
+- **selection**: aic_average, hurdle, ivw_grid, staged_bic
 - **species_n**: 14
 - **stage_models**: spec defaults (v2 candidate sets)
 - **taxa**: bird, bryophyte, lichen, mammal_summer, mammal_winter, mite, vascular_plant
@@ -29,331 +35,331 @@ _Volatile. Excluded from cross-run comparison._
 
 | taxon | region | species | draws | coefficient_rows | metric_rows | grid_rows |
 | --- | --- | --- | --- | --- | --- | --- |
-| bird | north | 2 | 100 | 9380 | 2800 | 0 |
-| bird | south | 2 | 100 | 6986 | 2800 | 0 |
-| bryophyte | north | 2 | 100 | 22000 | 5600 | 0 |
-| bryophyte | south | 2 | 100 | 7800 | 5600 | 0 |
-| lichen | north | 2 | 100 | 22000 | 5600 | 0 |
-| lichen | south | 2 | 100 | 7800 | 5600 | 0 |
-| mammal_summer | north | 2 | 100 | 43450 | 2800 | 0 |
-| mammal_summer | south | 2 | 100 | 13731 | 2786 | 0 |
-| mammal_winter | north | 2 | 100 | 44008 | 2800 | 0 |
-| mammal_winter | south | 2 | 100 | 13800 | 2800 | 0 |
-| mite | north | 2 | 100 | 21800 | 5600 | 8600 |
-| mite | south | 2 | 100 | 7600 | 5600 | 3200 |
-| vascular_plant | north | 2 | 100 | 21800 | 5600 | 8600 |
-| vascular_plant | south | 2 | 100 | 7600 | 5600 | 3200 |
+| bird | north | 2 | 5 | 467 | 140 | 890 |
+| bird | south | 2 | 5 | 350 | 140 | 170 |
+| bryophyte | north | 2 | 5 | 1100 | 280 | 430 |
+| bryophyte | south | 2 | 5 | 390 | 280 | 160 |
+| lichen | north | 2 | 5 | 1100 | 280 | 430 |
+| lichen | south | 2 | 5 | 390 | 280 | 160 |
+| mammal_summer | north | 2 | 5 | 2204 | 140 | 450 |
+| mammal_summer | south | 2 | 5 | 690 | 140 | 200 |
+| mammal_winter | north | 2 | 5 | 2222 | 140 | 450 |
+| mammal_winter | south | 2 | 5 | 690 | 140 | 200 |
+| mite | north | 2 | 5 | 1090 | 280 | 430 |
+| mite | south | 2 | 5 | 380 | 280 | 160 |
+| vascular_plant | north | 2 | 5 | 1090 | 280 | 430 |
+| vascular_plant | south | 2 | 5 | 380 | 280 | 160 |
 
 ## Metrics
 
-| taxon | region | metric | n | median | p10 | p90 |
-| --- | --- | --- | --- | --- | --- | --- |
-| bird | north | insample_auc | 200 | 0.7500 | 0.7218 | 0.7798 |
-| bird | north | insample_calibration_slope | 200 | 0.7722 | 0.6665 | 0.8113 |
-| bird | north | insample_deviance_explained | 200 | 0.1986 | 0.1403 | 0.2614 |
-| bird | north | insample_n | 200 | 46751.0000 | 46746.9000 | 46756.1000 |
-| bird | north | insample_prevalence | 200 | 0.1847 | 0.1183 | 0.2520 |
-| bird | north | insample_rmse | 200 | 0.6168 | 0.5471 | 0.6665 |
-| bird | north | insample_spearman | 200 | 0.3268 | 0.3129 | 0.3440 |
-| bird | north | oob_auc | 200 | 0.7300 | 0.7283 | 0.7318 |
-| bird | north | oob_calibration_slope | 200 | 0.7890 | 0.6073 | 0.8883 |
-| bird | north | oob_deviance_explained | 200 | 0.1637 | 0.1508 | 0.1808 |
-| bird | north | oob_n | 200 | 124873.0000 | 124867.9000 | 124877.1000 |
-| bird | north | oob_prevalence | 200 | 0.1874 | 0.1341 | 0.2415 |
-| bird | north | oob_rmse | 200 | 0.6356 | 0.5854 | 0.6588 |
-| bird | north | oob_spearman | 200 | 0.3108 | 0.2728 | 0.3502 |
-| bird | south | insample_auc | 200 | 0.7048 | 0.6906 | 0.7212 |
-| bird | south | insample_calibration_slope | 200 | 0.8737 | 0.8625 | 0.9017 |
-| bird | south | insample_deviance_explained | 200 | 0.1578 | 0.0908 | 0.2349 |
-| bird | south | insample_n | 200 | 23638.0000 | 23635.0000 | 23641.0000 |
-| bird | south | insample_prevalence | 200 | 0.2151 | 0.1714 | 0.2596 |
-| bird | south | insample_rmse | 200 | 0.6840 | 0.6223 | 0.7470 |
-| bird | south | insample_spearman | 200 | 0.2942 | 0.2895 | 0.2994 |
-| bird | south | oob_auc | 200 | 0.7012 | 0.6882 | 0.7164 |
-| bird | south | oob_calibration_slope | 200 | 0.8829 | 0.8479 | 0.9478 |
-| bird | south | oob_deviance_explained | 200 | 0.1475 | 0.0919 | 0.2042 |
-| bird | south | oob_n | 200 | 67169.0000 | 67166.0000 | 67172.0000 |
-| bird | south | oob_prevalence | 200 | 0.2175 | 0.1751 | 0.2606 |
-| bird | south | oob_rmse | 200 | 0.6870 | 0.6369 | 0.7370 |
-| bird | south | oob_spearman | 200 | 0.2911 | 0.2888 | 0.2936 |
-| bryophyte | north | insample_auc | 200 | 0.6685 | 0.6364 | 0.6965 |
-| bryophyte | north | insample_calibration_slope | 200 | 0.9694 | 0.9335 | 1.0068 |
-| bryophyte | north | insample_deviance_explained | 200 | 0.0680 | 0.0445 | 0.0890 |
-| bryophyte | north | insample_n | 200 | 3069.0000 | 3035.0000 | 3101.0000 |
-| bryophyte | north | insample_prevalence | 200 | 0.4195 | 0.3957 | 0.4466 |
-| bryophyte | north | insample_rmse | 200 | 0.4715 | 0.4664 | 0.4759 |
-| bryophyte | north | insample_spearman | 200 | 0.2878 | 0.2314 | 0.3383 |
-| bryophyte | north | oob_auc | 198 | 0.6436 | 0.6102 | 0.6808 |
-| bryophyte | north | oob_calibration_slope | 198 | 0.8419 | 0.6967 | 0.9782 |
-| bryophyte | north | oob_deviance_explained | 198 | 0.0432 | 0.0209 | 0.0745 |
-| bryophyte | north | oob_n | 200 | 1783.0000 | 1751.0000 | 1817.0000 |
-| bryophyte | north | oob_prevalence | 198 | 0.4186 | 0.3933 | 0.4485 |
-| bryophyte | north | oob_rmse | 198 | 0.4773 | 0.4707 | 0.4833 |
-| bryophyte | north | oob_spearman | 198 | 0.2451 | 0.1874 | 0.3103 |
-| bryophyte | north | oob_v2val_Climate | 198 | 0.6045 | 0.5460 | 0.6535 |
-| bryophyte | north | oob_v2val_Climate_Truncated | 198 | 0.6045 | 0.5459 | 0.6535 |
-| bryophyte | north | oob_v2val_Full | 198 | 0.6547 | 0.6113 | 0.6909 |
-| bryophyte | north | oob_v2val_Full_Joint | 198 | 0.6525 | 0.6101 | 0.6885 |
-| bryophyte | north | oob_v2val_Full_Joint_Truncated | 198 | 0.6534 | 0.6104 | 0.6886 |
-| bryophyte | north | oob_v2val_Full_Truncated | 198 | 0.6555 | 0.6115 | 0.6910 |
-| bryophyte | north | oob_v2val_Landcover | 198 | 0.5970 | 0.5707 | 0.6262 |
-| bryophyte | north | v2val_Climate | 200 | 0.6069 | 0.5588 | 0.6582 |
-| bryophyte | north | v2val_Climate_Truncated | 200 | 0.6069 | 0.5588 | 0.6582 |
-| bryophyte | north | v2val_Full | 200 | 0.6680 | 0.6329 | 0.7027 |
-| bryophyte | north | v2val_Full_Joint | 200 | 0.6660 | 0.6316 | 0.6994 |
-| bryophyte | north | v2val_Full_Joint_Truncated | 200 | 0.6662 | 0.6326 | 0.6996 |
-| bryophyte | north | v2val_Full_Truncated | 200 | 0.6682 | 0.6341 | 0.7028 |
-| bryophyte | north | v2val_Landcover | 200 | 0.6103 | 0.5865 | 0.6342 |
-| bryophyte | south | insample_auc | 200 | 0.7094 | 0.6571 | 0.7537 |
-| bryophyte | south | insample_calibration_slope | 200 | 0.9613 | 0.9174 | 1.0075 |
-| bryophyte | south | insample_deviance_explained | 200 | 0.0987 | 0.0544 | 0.1444 |
-| bryophyte | south | insample_n | 200 | 1461.5000 | 1440.9000 | 1484.0000 |
-| bryophyte | south | insample_prevalence | 200 | 0.3038 | 0.2345 | 0.3768 |
-| bryophyte | south | insample_rmse | 200 | 0.4321 | 0.3912 | 0.4661 |
-| bryophyte | south | insample_spearman | 200 | 0.3290 | 0.2631 | 0.3747 |
-| bryophyte | south | oob_auc | 198 | 0.6867 | 0.6283 | 0.7410 |
-| bryophyte | south | oob_calibration_slope | 198 | 0.8419 | 0.6738 | 0.9682 |
-| bryophyte | south | oob_deviance_explained | 198 | 0.0611 | 0.0230 | 0.1224 |
-| bryophyte | south | oob_n | 200 | 848.5000 | 826.0000 | 869.1000 |
-| bryophyte | south | oob_prevalence | 198 | 0.3062 | 0.2295 | 0.3842 |
-| bryophyte | south | oob_rmse | 198 | 0.4434 | 0.3959 | 0.4758 |
-| bryophyte | south | oob_spearman | 198 | 0.2901 | 0.2154 | 0.3532 |
-| bryophyte | south | oob_v2val_Climate | 198 | 0.6045 | 0.5460 | 0.6535 |
-| bryophyte | south | oob_v2val_Climate_Truncated | 198 | 0.6045 | 0.5459 | 0.6535 |
-| bryophyte | south | oob_v2val_Full | 198 | 0.6605 | 0.6050 | 0.7223 |
-| bryophyte | south | oob_v2val_Full_Joint | 198 | 0.6613 | 0.6046 | 0.7229 |
-| bryophyte | south | oob_v2val_Full_Joint_Truncated | 198 | 0.6613 | 0.6048 | 0.7229 |
-| bryophyte | south | oob_v2val_Full_Truncated | 198 | 0.6605 | 0.6050 | 0.7223 |
-| bryophyte | south | oob_v2val_Landcover | 198 | 0.6058 | 0.5744 | 0.6394 |
-| bryophyte | south | v2val_Climate | 200 | 0.6069 | 0.5588 | 0.6582 |
-| bryophyte | south | v2val_Climate_Truncated | 200 | 0.6069 | 0.5588 | 0.6582 |
-| bryophyte | south | v2val_Full | 200 | 0.6758 | 0.6249 | 0.7251 |
-| bryophyte | south | v2val_Full_Joint | 200 | 0.6771 | 0.6255 | 0.7263 |
-| bryophyte | south | v2val_Full_Joint_Truncated | 200 | 0.6771 | 0.6256 | 0.7263 |
-| bryophyte | south | v2val_Full_Truncated | 200 | 0.6759 | 0.6249 | 0.7251 |
-| bryophyte | south | v2val_Landcover | 200 | 0.6182 | 0.5948 | 0.6421 |
-| lichen | north | insample_auc | 200 | 0.8071 | 0.7657 | 0.8473 |
-| lichen | north | insample_calibration_slope | 200 | 0.9991 | 0.9802 | 1.0132 |
-| lichen | north | insample_deviance_explained | 200 | 0.2375 | 0.1849 | 0.2980 |
-| lichen | north | insample_n | 200 | 3674.5000 | 3639.0000 | 3709.0000 |
-| lichen | north | insample_prevalence | 200 | 0.3844 | 0.3787 | 0.3905 |
-| lichen | north | insample_rmse | 200 | 0.4111 | 0.3869 | 0.4329 |
-| lichen | north | insample_spearman | 200 | 0.5160 | 0.4480 | 0.5856 |
-| lichen | north | oob_auc | 198 | 0.8015 | 0.7542 | 0.8424 |
-| lichen | north | oob_calibration_slope | 198 | 0.9725 | 0.9251 | 1.0142 |
-| lichen | north | oob_deviance_explained | 198 | 0.2240 | 0.1638 | 0.2887 |
-| lichen | north | oob_n | 200 | 2136.5000 | 2102.0000 | 2172.0000 |
-| lichen | north | oob_prevalence | 198 | 0.3841 | 0.3745 | 0.3945 |
-| lichen | north | oob_rmse | 198 | 0.4147 | 0.3893 | 0.4382 |
-| lichen | north | oob_spearman | 198 | 0.5063 | 0.4286 | 0.5763 |
-| lichen | north | oob_v2val_Climate | 198 | 0.7084 | 0.6845 | 0.7263 |
-| lichen | north | oob_v2val_Climate_Truncated | 198 | 0.7084 | 0.6845 | 0.7263 |
-| lichen | north | oob_v2val_Full | 198 | 0.8039 | 0.7636 | 0.8410 |
-| lichen | north | oob_v2val_Full_Joint | 198 | 0.8020 | 0.7631 | 0.8384 |
-| lichen | north | oob_v2val_Full_Joint_Truncated | 198 | 0.8021 | 0.7631 | 0.8386 |
-| lichen | north | oob_v2val_Full_Truncated | 198 | 0.8040 | 0.7638 | 0.8411 |
-| lichen | north | oob_v2val_Landcover | 198 | 0.7459 | 0.6978 | 0.8174 |
-| lichen | north | v2val_Climate | 200 | 0.7072 | 0.6898 | 0.7278 |
-| lichen | north | v2val_Climate_Truncated | 200 | 0.7072 | 0.6898 | 0.7278 |
-| lichen | north | v2val_Full | 200 | 0.8091 | 0.7720 | 0.8423 |
-| lichen | north | v2val_Full_Joint | 200 | 0.8077 | 0.7715 | 0.8400 |
-| lichen | north | v2val_Full_Joint_Truncated | 200 | 0.8077 | 0.7716 | 0.8402 |
-| lichen | north | v2val_Full_Truncated | 200 | 0.8092 | 0.7718 | 0.8425 |
-| lichen | north | v2val_Landcover | 200 | 0.7453 | 0.7048 | 0.8159 |
-| lichen | south | insample_auc | 200 | 0.8375 | 0.8219 | 0.8500 |
-| lichen | south | insample_calibration_slope | 200 | 0.9835 | 0.9416 | 1.0174 |
-| lichen | south | insample_deviance_explained | 200 | 0.2523 | 0.2053 | 0.2864 |
-| lichen | south | insample_n | 200 | 1482.5000 | 1459.0000 | 1509.0000 |
-| lichen | south | insample_prevalence | 200 | 0.1501 | 0.0887 | 0.2202 |
-| lichen | south | insample_rmse | 200 | 0.3089 | 0.2665 | 0.3531 |
-| lichen | south | insample_spearman | 200 | 0.4132 | 0.3181 | 0.4977 |
-| lichen | south | oob_auc | 198 | 0.8170 | 0.7870 | 0.8399 |
-| lichen | south | oob_calibration_slope | 198 | 0.9037 | 0.7274 | 1.0417 |
-| lichen | south | oob_deviance_explained | 198 | 0.2035 | 0.1335 | 0.2674 |
-| lichen | south | oob_n | 200 | 863.5000 | 837.0000 | 887.0000 |
-| lichen | south | oob_prevalence | 198 | 0.1503 | 0.0880 | 0.2276 |
-| lichen | south | oob_rmse | 198 | 0.3184 | 0.2720 | 0.3643 |
-| lichen | south | oob_spearman | 198 | 0.3848 | 0.2846 | 0.4861 |
-| lichen | south | oob_v2val_Climate | 198 | 0.7084 | 0.6845 | 0.7263 |
-| lichen | south | oob_v2val_Climate_Truncated | 198 | 0.7084 | 0.6845 | 0.7263 |
-| lichen | south | oob_v2val_Full | 198 | 0.7929 | 0.7520 | 0.8241 |
-| lichen | south | oob_v2val_Full_Joint | 198 | 0.7932 | 0.7527 | 0.8219 |
-| lichen | south | oob_v2val_Full_Joint_Truncated | 198 | 0.7932 | 0.7527 | 0.8219 |
-| lichen | south | oob_v2val_Full_Truncated | 198 | 0.7929 | 0.7520 | 0.8241 |
-| lichen | south | oob_v2val_Landcover | 198 | 0.7499 | 0.7160 | 0.7745 |
-| lichen | south | v2val_Climate | 200 | 0.7072 | 0.6898 | 0.7278 |
-| lichen | south | v2val_Climate_Truncated | 200 | 0.7072 | 0.6898 | 0.7278 |
-| lichen | south | v2val_Full | 200 | 0.8072 | 0.7724 | 0.8287 |
-| lichen | south | v2val_Full_Joint | 200 | 0.8057 | 0.7733 | 0.8261 |
-| lichen | south | v2val_Full_Joint_Truncated | 200 | 0.8057 | 0.7733 | 0.8261 |
-| lichen | south | v2val_Full_Truncated | 200 | 0.8072 | 0.7724 | 0.8287 |
-| lichen | south | v2val_Landcover | 200 | 0.7520 | 0.7339 | 0.7705 |
-| mammal_summer | north | insample_auc | 200 | 0.7195 | 0.6076 | 0.8295 |
-| mammal_summer | north | insample_calibration_slope | 200 | 0.9415 | 0.7950 | 0.9994 |
-| mammal_summer | north | insample_deviance_explained | 200 | 0.1457 | 0.0267 | 0.2897 |
-| mammal_summer | north | insample_n | 200 | 2563.5000 | 2538.0000 | 2587.0000 |
-| mammal_summer | north | insample_prevalence | 200 | 0.2733 | 0.2209 | 0.3269 |
-| mammal_summer | north | insample_rmse | 200 | 0.3850 | 0.3230 | 0.4431 |
-| mammal_summer | north | insample_spearman | 200 | 0.3181 | 0.1570 | 0.4710 |
-| mammal_summer | north | oob_auc | 198 | 0.7008 | 0.5803 | 0.8199 |
-| mammal_summer | north | oob_calibration_slope | 198 | 0.8458 | 0.5527 | 0.9867 |
-| mammal_summer | north | oob_deviance_explained | 198 | 0.0563 | 0.0013 | 0.2662 |
-| mammal_summer | north | oob_n | 200 | 1489.5000 | 1466.0000 | 1515.0000 |
-| mammal_summer | north | oob_prevalence | 198 | 0.2735 | 0.2193 | 0.3287 |
-| mammal_summer | north | oob_rmse | 198 | 0.3917 | 0.3259 | 0.4480 |
-| mammal_summer | north | oob_spearman | 198 | 0.2890 | 0.1134 | 0.4545 |
-| mammal_summer | south | insample_auc | 199 | 0.7546 | 0.6196 | 0.7995 |
-| mammal_summer | south | insample_calibration_slope | 199 | 0.9613 | 0.8460 | 1.0524 |
-| mammal_summer | south | insample_deviance_explained | 199 | 0.1647 | 0.0214 | 0.2324 |
-| mammal_summer | south | insample_n | 199 | 674.0000 | 662.0000 | 689.0000 |
-| mammal_summer | south | insample_prevalence | 199 | 0.2069 | 0.1750 | 0.6994 |
-| mammal_summer | south | insample_rmse | 199 | 0.3563 | 0.3391 | 0.4250 |
-| mammal_summer | south | insample_spearman | 199 | 0.3342 | 0.1592 | 0.3998 |
-| mammal_summer | south | oob_auc | 197 | 0.7154 | 0.5675 | 0.7903 |
-| mammal_summer | south | oob_calibration_slope | 197 | 0.7382 | 0.3358 | 1.0724 |
-| mammal_summer | south | oob_deviance_explained | 197 | 0.0147 | -0.0349 | 0.2068 |
-| mammal_summer | south | oob_n | 199 | 391.0000 | 376.0000 | 403.0000 |
-| mammal_summer | south | oob_prevalence | 197 | 0.2300 | 0.1685 | 0.7076 |
-| mammal_summer | south | oob_rmse | 197 | 0.3897 | 0.3411 | 0.4384 |
-| mammal_summer | south | oob_spearman | 197 | 0.2707 | 0.0727 | 0.3889 |
-| mammal_winter | north | insample_auc | 200 | 0.7665 | 0.6675 | 0.8446 |
-| mammal_winter | north | insample_calibration_slope | 200 | 0.9541 | 0.8712 | 1.0110 |
-| mammal_winter | north | insample_deviance_explained | 200 | 0.1900 | 0.0702 | 0.3056 |
-| mammal_winter | north | insample_n | 200 | 2609.5000 | 2585.0000 | 2640.1000 |
-| mammal_winter | north | insample_prevalence | 200 | 0.1764 | 0.1455 | 0.2061 |
-| mammal_winter | north | insample_rmse | 200 | 0.3161 | 0.2973 | 0.3353 |
-| mammal_winter | north | insample_spearman | 200 | 0.3518 | 0.2111 | 0.4734 |
-| mammal_winter | north | oob_auc | 198 | 0.7540 | 0.6364 | 0.8417 |
-| mammal_winter | north | oob_calibration_slope | 198 | 0.8826 | 0.6191 | 1.0325 |
-| mammal_winter | north | oob_deviance_explained | 198 | 0.0839 | 0.0080 | 0.2921 |
-| mammal_winter | north | oob_n | 200 | 1517.5000 | 1486.9000 | 1542.0000 |
-| mammal_winter | north | oob_prevalence | 198 | 0.1742 | 0.1426 | 0.2060 |
-| mammal_winter | north | oob_rmse | 198 | 0.3199 | 0.2972 | 0.3413 |
-| mammal_winter | north | oob_spearman | 198 | 0.3263 | 0.1702 | 0.4645 |
-| mammal_winter | south | insample_auc | 200 | 0.7315 | 0.6779 | 0.8331 |
-| mammal_winter | south | insample_calibration_slope | 200 | 0.9493 | 0.8167 | 1.0904 |
-| mammal_winter | south | insample_deviance_explained | 200 | 0.1130 | 0.0574 | 0.2652 |
-| mammal_winter | south | insample_n | 200 | 695.0000 | 682.0000 | 709.0000 |
-| mammal_winter | south | insample_prevalence | 200 | 0.3351 | 0.0822 | 0.6144 |
-| mammal_winter | south | insample_rmse | 200 | 0.3196 | 0.2155 | 0.4099 |
-| mammal_winter | south | insample_spearman | 200 | 0.3081 | 0.2774 | 0.3331 |
-| mammal_winter | south | oob_auc | 198 | 0.7123 | 0.6520 | 0.8075 |
-| mammal_winter | south | oob_calibration_slope | 198 | 0.7412 | 0.4709 | 1.0531 |
-| mammal_winter | south | oob_deviance_explained | 198 | 0.0619 | 0.0061 | 0.1945 |
-| mammal_winter | south | oob_n | 200 | 403.0000 | 389.0000 | 416.0000 |
-| mammal_winter | south | oob_prevalence | 198 | 0.3423 | 0.0803 | 0.6235 |
-| mammal_winter | south | oob_rmse | 198 | 0.3325 | 0.2222 | 0.4211 |
-| mammal_winter | south | oob_spearman | 198 | 0.2687 | 0.2234 | 0.3096 |
-| mite | north | insample_auc | 200 | 0.7521 | 0.6888 | 0.8020 |
-| mite | north | insample_calibration_slope | 200 | 0.9863 | 0.9206 | 1.0220 |
-| mite | north | insample_deviance_explained | 200 | 0.1291 | 0.0625 | 0.1988 |
-| mite | north | insample_n | 200 | 3611.0000 | 3575.8000 | 3648.1000 |
-| mite | north | insample_prevalence | 200 | 0.1491 | 0.0931 | 0.2122 |
-| mite | north | insample_rmse | 200 | 0.3243 | 0.2837 | 0.3643 |
-| mite | north | insample_spearman | 200 | 0.3111 | 0.1924 | 0.4248 |
-| mite | north | oob_auc | 198 | 0.7259 | 0.6442 | 0.7940 |
-| mite | north | oob_calibration_slope | 198 | 0.9046 | 0.6725 | 1.0204 |
-| mite | north | oob_deviance_explained | 198 | 0.0943 | 0.0131 | 0.1858 |
-| mite | north | oob_n | 200 | 2100.0000 | 2062.9000 | 2135.2000 |
-| mite | north | oob_prevalence | 198 | 0.1509 | 0.0922 | 0.2141 |
-| mite | north | oob_rmse | 198 | 0.3327 | 0.2860 | 0.3702 |
-| mite | north | oob_spearman | 198 | 0.2796 | 0.1476 | 0.4139 |
-| mite | north | oob_v2val_Climate | 198 | 0.6902 | 0.6270 | 0.7420 |
-| mite | north | oob_v2val_Climate_Truncated | 198 | 0.6902 | 0.6270 | 0.7420 |
-| mite | north | oob_v2val_Full | 198 | 0.7251 | 0.6397 | 0.7915 |
-| mite | north | oob_v2val_Full_Joint | 198 | 0.7243 | 0.6393 | 0.7914 |
-| mite | north | oob_v2val_Full_Joint_Truncated | 198 | 0.7243 | 0.6394 | 0.7914 |
-| mite | north | oob_v2val_Full_Truncated | 198 | 0.7251 | 0.6398 | 0.7913 |
-| mite | north | oob_v2val_Landcover | 198 | 0.6958 | 0.5964 | 0.7674 |
-| mite | north | v2val_Climate | 200 | 0.6938 | 0.6397 | 0.7436 |
-| mite | north | v2val_Climate_Truncated | 200 | 0.6938 | 0.6396 | 0.7436 |
-| mite | north | v2val_Full | 200 | 0.7415 | 0.6711 | 0.7964 |
-| mite | north | v2val_Full_Joint | 200 | 0.7411 | 0.6708 | 0.7961 |
-| mite | north | v2val_Full_Joint_Truncated | 200 | 0.7411 | 0.6708 | 0.7961 |
-| mite | north | v2val_Full_Truncated | 200 | 0.7414 | 0.6710 | 0.7964 |
-| mite | north | v2val_Landcover | 200 | 0.7117 | 0.6394 | 0.7723 |
-| mite | south | insample_auc | 200 | 0.8147 | 0.7113 | 0.9040 |
-| mite | south | insample_calibration_slope | 200 | 0.9928 | 0.9285 | 1.0911 |
-| mite | south | insample_deviance_explained | 200 | 0.2006 | 0.0826 | 0.3433 |
-| mite | south | insample_n | 200 | 1492.5000 | 1471.0000 | 1516.1000 |
-| mite | south | insample_prevalence | 200 | 0.0681 | 0.0529 | 0.0865 |
-| mite | south | insample_rmse | 200 | 0.2315 | 0.1931 | 0.2731 |
-| mite | south | insample_spearman | 200 | 0.2713 | 0.2030 | 0.3223 |
-| mite | south | oob_auc | 198 | 0.7550 | 0.6586 | 0.8840 |
-| mite | south | oob_calibration_slope | 198 | 0.8287 | 0.5660 | 1.0766 |
-| mite | south | oob_deviance_explained | 198 | 0.0874 | -0.0174 | 0.2927 |
-| mite | south | oob_n | 200 | 870.5000 | 846.9000 | 892.0000 |
-| mite | south | oob_prevalence | 198 | 0.0680 | 0.0520 | 0.0901 |
-| mite | south | oob_rmse | 198 | 0.2352 | 0.2013 | 0.2827 |
-| mite | south | oob_spearman | 198 | 0.2294 | 0.1535 | 0.3140 |
-| mite | south | oob_v2val_Climate | 198 | 0.6902 | 0.6270 | 0.7420 |
-| mite | south | oob_v2val_Climate_Truncated | 198 | 0.6902 | 0.6270 | 0.7420 |
-| mite | south | oob_v2val_Full | 198 | 0.7758 | 0.6618 | 0.8935 |
-| mite | south | oob_v2val_Full_Joint | 198 | 0.7761 | 0.6619 | 0.8938 |
-| mite | south | oob_v2val_Full_Joint_Truncated | 198 | 0.7761 | 0.6619 | 0.8938 |
-| mite | south | oob_v2val_Full_Truncated | 198 | 0.7758 | 0.6618 | 0.8935 |
-| mite | south | oob_v2val_Landcover | 198 | 0.6739 | 0.6215 | 0.7295 |
-| mite | south | v2val_Climate | 200 | 0.6938 | 0.6397 | 0.7436 |
-| mite | south | v2val_Climate_Truncated | 200 | 0.6938 | 0.6396 | 0.7436 |
-| mite | south | v2val_Full | 200 | 0.7987 | 0.6949 | 0.8911 |
-| mite | south | v2val_Full_Joint | 200 | 0.7990 | 0.6953 | 0.8919 |
-| mite | south | v2val_Full_Joint_Truncated | 200 | 0.7990 | 0.6953 | 0.8919 |
-| mite | south | v2val_Full_Truncated | 200 | 0.7987 | 0.6949 | 0.8911 |
-| mite | south | v2val_Landcover | 200 | 0.6921 | 0.6525 | 0.7356 |
-| vascular_plant | north | insample_auc | 200 | 0.8356 | 0.8299 | 0.8404 |
-| vascular_plant | north | insample_calibration_slope | 200 | 0.9970 | 0.9837 | 1.0096 |
-| vascular_plant | north | insample_deviance_explained | 200 | 0.2724 | 0.2607 | 0.2811 |
-| vascular_plant | north | insample_n | 200 | 4350.0000 | 4321.9000 | 4383.0000 |
-| vascular_plant | north | insample_prevalence | 200 | 0.3962 | 0.3735 | 0.4214 |
-| vascular_plant | north | insample_rmse | 200 | 0.4002 | 0.3947 | 0.4053 |
-| vascular_plant | north | insample_spearman | 200 | 0.5681 | 0.5585 | 0.5769 |
-| vascular_plant | north | oob_auc | 198 | 0.8287 | 0.8197 | 0.8384 |
-| vascular_plant | north | oob_calibration_slope | 198 | 0.9723 | 0.9325 | 1.0229 |
-| vascular_plant | north | oob_deviance_explained | 198 | 0.2570 | 0.2396 | 0.2763 |
-| vascular_plant | north | oob_n | 200 | 2524.0000 | 2491.0000 | 2552.1000 |
-| vascular_plant | north | oob_prevalence | 198 | 0.3937 | 0.3713 | 0.4251 |
-| vascular_plant | north | oob_rmse | 198 | 0.4041 | 0.3966 | 0.4130 |
-| vascular_plant | north | oob_spearman | 198 | 0.5568 | 0.5420 | 0.5734 |
-| vascular_plant | north | oob_v2val_Climate | 198 | 0.6889 | 0.6788 | 0.6980 |
-| vascular_plant | north | oob_v2val_Climate_Truncated | 198 | 0.6890 | 0.6788 | 0.6980 |
-| vascular_plant | north | oob_v2val_Full | 198 | 0.8282 | 0.8186 | 0.8382 |
-| vascular_plant | north | oob_v2val_Full_Joint | 198 | 0.8270 | 0.8155 | 0.8373 |
-| vascular_plant | north | oob_v2val_Full_Joint_Truncated | 198 | 0.8272 | 0.8157 | 0.8374 |
-| vascular_plant | north | oob_v2val_Full_Truncated | 198 | 0.8282 | 0.8187 | 0.8384 |
-| vascular_plant | north | oob_v2val_Landcover | 198 | 0.8033 | 0.7927 | 0.8137 |
-| vascular_plant | north | v2val_Climate | 200 | 0.6903 | 0.6846 | 0.6956 |
-| vascular_plant | north | v2val_Climate_Truncated | 200 | 0.6903 | 0.6846 | 0.6956 |
-| vascular_plant | north | v2val_Full | 200 | 0.8328 | 0.8275 | 0.8378 |
-| vascular_plant | north | v2val_Full_Joint | 200 | 0.8314 | 0.8249 | 0.8370 |
-| vascular_plant | north | v2val_Full_Joint_Truncated | 200 | 0.8315 | 0.8250 | 0.8370 |
-| vascular_plant | north | v2val_Full_Truncated | 200 | 0.8329 | 0.8276 | 0.8377 |
-| vascular_plant | north | v2val_Landcover | 200 | 0.8077 | 0.8018 | 0.8141 |
-| vascular_plant | south | insample_auc | 200 | 0.8620 | 0.8175 | 0.9066 |
-| vascular_plant | south | insample_calibration_slope | 200 | 1.0058 | 0.9832 | 1.0274 |
-| vascular_plant | south | insample_deviance_explained | 200 | 0.3234 | 0.2372 | 0.4314 |
-| vascular_plant | south | insample_n | 200 | 1674.0000 | 1652.0000 | 1698.1000 |
-| vascular_plant | south | insample_prevalence | 200 | 0.2431 | 0.2173 | 0.2692 |
-| vascular_plant | south | insample_rmse | 200 | 0.3415 | 0.3018 | 0.3767 |
-| vascular_plant | south | insample_spearman | 200 | 0.5349 | 0.4834 | 0.5862 |
-| vascular_plant | south | oob_auc | 198 | 0.8543 | 0.8031 | 0.9038 |
-| vascular_plant | south | oob_calibration_slope | 198 | 0.9737 | 0.8996 | 1.0404 |
-| vascular_plant | south | oob_deviance_explained | 198 | 0.2934 | 0.2049 | 0.4160 |
-| vascular_plant | south | oob_n | 200 | 974.0000 | 949.9000 | 996.0000 |
-| vascular_plant | south | oob_prevalence | 198 | 0.2453 | 0.2136 | 0.2763 |
-| vascular_plant | south | oob_rmse | 198 | 0.3498 | 0.3057 | 0.3852 |
-| vascular_plant | south | oob_spearman | 198 | 0.5226 | 0.4606 | 0.5816 |
-| vascular_plant | south | oob_v2val_Climate | 198 | 0.6889 | 0.6788 | 0.6980 |
-| vascular_plant | south | oob_v2val_Climate_Truncated | 198 | 0.6890 | 0.6788 | 0.6980 |
-| vascular_plant | south | oob_v2val_Full | 198 | 0.8408 | 0.7938 | 0.8962 |
-| vascular_plant | south | oob_v2val_Full_Joint | 198 | 0.8371 | 0.7904 | 0.8903 |
-| vascular_plant | south | oob_v2val_Full_Joint_Truncated | 198 | 0.8371 | 0.7904 | 0.8903 |
-| vascular_plant | south | oob_v2val_Full_Truncated | 198 | 0.8408 | 0.7938 | 0.8962 |
-| vascular_plant | south | oob_v2val_Landcover | 198 | 0.7754 | 0.7521 | 0.8003 |
-| vascular_plant | south | v2val_Climate | 200 | 0.6903 | 0.6846 | 0.6956 |
-| vascular_plant | south | v2val_Climate_Truncated | 200 | 0.6903 | 0.6846 | 0.6956 |
-| vascular_plant | south | v2val_Full | 200 | 0.8496 | 0.8025 | 0.8978 |
-| vascular_plant | south | v2val_Full_Joint | 200 | 0.8441 | 0.8002 | 0.8908 |
-| vascular_plant | south | v2val_Full_Joint_Truncated | 200 | 0.8441 | 0.8001 | 0.8908 |
-| vascular_plant | south | v2val_Full_Truncated | 200 | 0.8496 | 0.8025 | 0.8978 |
-| vascular_plant | south | v2val_Landcover | 200 | 0.7822 | 0.7595 | 0.8038 |
+| taxon | region | metric | n | median | p10 | p90 | mean | sd |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| bird | north | insample_auc | 10 | 0.7522 | 0.7235 | 0.7796 | 0.7516 | 0.0288 |
+| bird | north | insample_calibration_slope | 10 | 0.7559 | 0.6982 | 0.8102 | 0.7542 | 0.0543 |
+| bird | north | insample_deviance_explained | 10 | 0.1996 | 0.1409 | 0.2605 | 0.2005 | 0.0613 |
+| bird | north | insample_n | 10 | 46747.0000 | 46744.0000 | 46750.0000 | 46747.6000 | 2.3664 |
+| bird | north | insample_prevalence | 10 | 0.1851 | 0.1178 | 0.2520 | 0.1850 | 0.0702 |
+| bird | north | insample_rmse | 10 | 0.6070 | 0.5467 | 0.6643 | 0.6056 | 0.0609 |
+| bird | north | insample_spearman | 10 | 0.3277 | 0.3148 | 0.3446 | 0.3293 | 0.0149 |
+| bird | north | oob_auc | 10 | 0.7299 | 0.7284 | 0.7308 | 0.7296 | 0.0010 |
+| bird | north | oob_calibration_slope | 10 | 0.7875 | 0.6454 | 0.8810 | 0.7730 | 0.1073 |
+| bird | north | oob_deviance_explained | 10 | 0.1647 | 0.1509 | 0.1821 | 0.1658 | 0.0150 |
+| bird | north | oob_n | 10 | 124877.0000 | 124874.0000 | 124880.0000 | 124876.4000 | 2.3664 |
+| bird | north | oob_prevalence | 10 | 0.1877 | 0.1343 | 0.2411 | 0.1877 | 0.0561 |
+| bird | north | oob_rmse | 10 | 0.6250 | 0.5831 | 0.6583 | 0.6230 | 0.0372 |
+| bird | north | oob_spearman | 10 | 0.3117 | 0.2736 | 0.3483 | 0.3110 | 0.0389 |
+| bird | south | insample_auc | 10 | 0.7052 | 0.6892 | 0.7215 | 0.7054 | 0.0153 |
+| bird | south | insample_calibration_slope | 10 | 0.8775 | 0.8649 | 0.8901 | 0.8777 | 0.0119 |
+| bird | south | insample_deviance_explained | 10 | 0.1561 | 0.0911 | 0.2337 | 0.1609 | 0.0728 |
+| bird | south | insample_n | 10 | 23639.0000 | 23636.0000 | 23640.0000 | 23638.4000 | 1.4298 |
+| bird | south | insample_prevalence | 10 | 0.2142 | 0.1711 | 0.2590 | 0.2149 | 0.0459 |
+| bird | south | insample_rmse | 10 | 0.6840 | 0.6232 | 0.7452 | 0.6839 | 0.0623 |
+| bird | south | insample_spearman | 10 | 0.2943 | 0.2880 | 0.2978 | 0.2933 | 0.0046 |
+| bird | south | oob_auc | 10 | 0.7013 | 0.6892 | 0.7156 | 0.7019 | 0.0134 |
+| bird | south | oob_calibration_slope | 10 | 0.9220 | 0.8622 | 0.9549 | 0.9086 | 0.0414 |
+| bird | south | oob_deviance_explained | 10 | 0.1483 | 0.0969 | 0.2066 | 0.1498 | 0.0555 |
+| bird | south | oob_n | 10 | 67168.0000 | 67167.0000 | 67171.0000 | 67168.6000 | 1.4298 |
+| bird | south | oob_prevalence | 10 | 0.2178 | 0.1757 | 0.2603 | 0.2180 | 0.0444 |
+| bird | south | oob_rmse | 10 | 0.6869 | 0.6369 | 0.7359 | 0.6867 | 0.0513 |
+| bird | south | oob_spearman | 10 | 0.2916 | 0.2888 | 0.2927 | 0.2913 | 0.0017 |
+| bryophyte | north | insample_auc | 10 | 0.6642 | 0.6314 | 0.7085 | 0.6676 | 0.0347 |
+| bryophyte | north | insample_calibration_slope | 10 | 0.8499 | 0.7585 | 0.8973 | 0.8326 | 0.0644 |
+| bryophyte | north | insample_deviance_explained | 10 | -0.1896 | -0.2902 | -0.0937 | -0.1928 | 0.0883 |
+| bryophyte | north | insample_n | 10 | 3091.0000 | 3041.1000 | 4852.0000 | 3429.3000 | 750.2771 |
+| bryophyte | north | insample_prevalence | 10 | 0.4175 | 0.3976 | 0.4423 | 0.4194 | 0.0223 |
+| bryophyte | north | insample_rmse | 10 | 0.4736 | 0.4634 | 0.4802 | 0.4727 | 0.0076 |
+| bryophyte | north | insample_spearman | 10 | 0.2805 | 0.2228 | 0.3578 | 0.2866 | 0.0614 |
+| bryophyte | north | oob_auc | 8 | 0.6562 | 0.6254 | 0.6808 | 0.6537 | 0.0253 |
+| bryophyte | north | oob_calibration_slope | 8 | 0.7707 | 0.6959 | 0.8841 | 0.7784 | 0.0797 |
+| bryophyte | north | oob_deviance_explained | 8 | -0.1858 | -0.2157 | -0.1326 | -0.1818 | 0.0371 |
+| bryophyte | north | oob_n | 10 | 1761.0000 | 0.0000 | 1810.9000 | 1422.7000 | 750.2771 |
+| bryophyte | north | oob_prevalence | 8 | 0.4201 | 0.4007 | 0.4503 | 0.4233 | 0.0233 |
+| bryophyte | north | oob_rmse | 8 | 0.4801 | 0.4711 | 0.4829 | 0.4781 | 0.0053 |
+| bryophyte | north | oob_spearman | 8 | 0.2675 | 0.2128 | 0.3105 | 0.2630 | 0.0449 |
+| bryophyte | north | oob_v2val_Climate | 8 | 0.6045 | 0.5487 | 0.6482 | 0.5986 | 0.0463 |
+| bryophyte | north | oob_v2val_Climate_Truncated | 8 | 0.6045 | 0.5486 | 0.6482 | 0.5986 | 0.0463 |
+| bryophyte | north | oob_v2val_Full | 8 | 0.6562 | 0.6254 | 0.6808 | 0.6537 | 0.0253 |
+| bryophyte | north | oob_v2val_Full_Joint | 8 | 0.6538 | 0.6242 | 0.6786 | 0.6519 | 0.0247 |
+| bryophyte | north | oob_v2val_Full_Joint_Truncated | 8 | 0.6546 | 0.6248 | 0.6788 | 0.6524 | 0.0246 |
+| bryophyte | north | oob_v2val_Full_Truncated | 8 | 0.6571 | 0.6259 | 0.6811 | 0.6542 | 0.0252 |
+| bryophyte | north | oob_v2val_Landcover | 8 | 0.5971 | 0.5798 | 0.6148 | 0.5974 | 0.0150 |
+| bryophyte | north | v2val_Climate | 10 | 0.6069 | 0.5555 | 0.6643 | 0.6086 | 0.0518 |
+| bryophyte | north | v2val_Climate_Truncated | 10 | 0.6069 | 0.5555 | 0.6643 | 0.6086 | 0.0518 |
+| bryophyte | north | v2val_Full | 10 | 0.6642 | 0.6314 | 0.7085 | 0.6676 | 0.0347 |
+| bryophyte | north | v2val_Full_Joint | 10 | 0.6615 | 0.6293 | 0.7047 | 0.6648 | 0.0336 |
+| bryophyte | north | v2val_Full_Joint_Truncated | 10 | 0.6621 | 0.6299 | 0.7052 | 0.6652 | 0.0334 |
+| bryophyte | north | v2val_Full_Truncated | 10 | 0.6647 | 0.6320 | 0.7089 | 0.6679 | 0.0346 |
+| bryophyte | north | v2val_Landcover | 10 | 0.6082 | 0.5829 | 0.6350 | 0.6089 | 0.0226 |
+| bryophyte | south | insample_auc | 10 | 0.6741 | 0.6221 | 0.7221 | 0.6723 | 0.0498 |
+| bryophyte | south | insample_calibration_slope | 10 | 0.8833 | 0.8604 | 0.9293 | 0.8836 | 0.0487 |
+| bryophyte | south | insample_deviance_explained | 10 | -0.0076 | -0.1062 | 0.0587 | -0.0180 | 0.0817 |
+| bryophyte | south | insample_n | 10 | 1454.5000 | 1440.8000 | 2310.0000 | 1623.0000 | 362.3789 |
+| bryophyte | south | insample_prevalence | 10 | 0.3052 | 0.2352 | 0.3713 | 0.3043 | 0.0687 |
+| bryophyte | south | insample_rmse | 10 | 0.4407 | 0.3994 | 0.4751 | 0.4384 | 0.0377 |
+| bryophyte | south | insample_spearman | 10 | 0.2678 | 0.2042 | 0.3271 | 0.2668 | 0.0610 |
+| bryophyte | south | oob_auc | 8 | 0.6737 | 0.6156 | 0.7162 | 0.6682 | 0.0497 |
+| bryophyte | south | oob_calibration_slope | 8 | 0.8626 | 0.7944 | 0.9233 | 0.8595 | 0.0569 |
+| bryophyte | south | oob_deviance_explained | 8 | 0.0177 | -0.0430 | 0.0521 | 0.0106 | 0.0409 |
+| bryophyte | south | oob_n | 10 | 855.5000 | 0.0000 | 869.2000 | 687.0000 | 362.3789 |
+| bryophyte | south | oob_prevalence | 8 | 0.3139 | 0.2297 | 0.3751 | 0.3071 | 0.0716 |
+| bryophyte | south | oob_rmse | 8 | 0.4447 | 0.3999 | 0.4766 | 0.4408 | 0.0371 |
+| bryophyte | south | oob_spearman | 8 | 0.2693 | 0.1933 | 0.3245 | 0.2610 | 0.0620 |
+| bryophyte | south | oob_v2val_Climate | 8 | 0.6045 | 0.5487 | 0.6482 | 0.5986 | 0.0463 |
+| bryophyte | south | oob_v2val_Climate_Truncated | 8 | 0.6045 | 0.5486 | 0.6482 | 0.5986 | 0.0463 |
+| bryophyte | south | oob_v2val_Full | 8 | 0.6737 | 0.6156 | 0.7162 | 0.6682 | 0.0497 |
+| bryophyte | south | oob_v2val_Full_Joint | 8 | 0.6754 | 0.6148 | 0.7178 | 0.6689 | 0.0510 |
+| bryophyte | south | oob_v2val_Full_Joint_Truncated | 8 | 0.6754 | 0.6148 | 0.7178 | 0.6689 | 0.0510 |
+| bryophyte | south | oob_v2val_Full_Truncated | 8 | 0.6737 | 0.6156 | 0.7162 | 0.6682 | 0.0497 |
+| bryophyte | south | oob_v2val_Landcover | 8 | 0.6029 | 0.5970 | 0.6332 | 0.6102 | 0.0172 |
+| bryophyte | south | v2val_Climate | 10 | 0.6069 | 0.5555 | 0.6643 | 0.6086 | 0.0518 |
+| bryophyte | south | v2val_Climate_Truncated | 10 | 0.6069 | 0.5555 | 0.6643 | 0.6086 | 0.0518 |
+| bryophyte | south | v2val_Full | 10 | 0.6741 | 0.6221 | 0.7221 | 0.6723 | 0.0498 |
+| bryophyte | south | v2val_Full_Joint | 10 | 0.6743 | 0.6214 | 0.7227 | 0.6726 | 0.0505 |
+| bryophyte | south | v2val_Full_Joint_Truncated | 10 | 0.6743 | 0.6215 | 0.7227 | 0.6726 | 0.0505 |
+| bryophyte | south | v2val_Full_Truncated | 10 | 0.6741 | 0.6221 | 0.7221 | 0.6723 | 0.0498 |
+| bryophyte | south | v2val_Landcover | 10 | 0.6137 | 0.5905 | 0.6386 | 0.6139 | 0.0223 |
+| lichen | north | insample_auc | 10 | 0.8074 | 0.7781 | 0.8388 | 0.8083 | 0.0311 |
+| lichen | north | insample_calibration_slope | 10 | 1.0001 | 0.9745 | 1.0269 | 0.9999 | 0.0221 |
+| lichen | north | insample_deviance_explained | 10 | 0.1360 | 0.1091 | 0.1649 | 0.1405 | 0.0261 |
+| lichen | north | insample_n | 10 | 3692.0000 | 3654.0000 | 5811.0000 | 4109.1000 | 897.3877 |
+| lichen | north | insample_prevalence | 10 | 0.3839 | 0.3815 | 0.3891 | 0.3840 | 0.0037 |
+| lichen | north | insample_rmse | 10 | 0.4112 | 0.3929 | 0.4298 | 0.4111 | 0.0183 |
+| lichen | north | insample_spearman | 10 | 0.5176 | 0.4685 | 0.5707 | 0.5194 | 0.0520 |
+| lichen | north | oob_auc | 8 | 0.7997 | 0.7622 | 0.8453 | 0.8016 | 0.0403 |
+| lichen | north | oob_calibration_slope | 8 | 0.9794 | 0.9485 | 1.0076 | 0.9784 | 0.0272 |
+| lichen | north | oob_deviance_explained | 8 | 0.1271 | 0.0891 | 0.1748 | 0.1334 | 0.0469 |
+| lichen | north | oob_n | 10 | 2119.0000 | 0.0000 | 2157.0000 | 1701.9000 | 897.3877 |
+| lichen | north | oob_prevalence | 8 | 0.3864 | 0.3761 | 0.3921 | 0.3853 | 0.0072 |
+| lichen | north | oob_rmse | 8 | 0.4171 | 0.3889 | 0.4363 | 0.4142 | 0.0224 |
+| lichen | north | oob_spearman | 8 | 0.5059 | 0.4420 | 0.5824 | 0.5084 | 0.0681 |
+| lichen | north | oob_v2val_Climate | 8 | 0.7041 | 0.6878 | 0.7158 | 0.7028 | 0.0127 |
+| lichen | north | oob_v2val_Climate_Truncated | 8 | 0.7041 | 0.6878 | 0.7158 | 0.7028 | 0.0127 |
+| lichen | north | oob_v2val_Full | 8 | 0.7997 | 0.7622 | 0.8453 | 0.8016 | 0.0403 |
+| lichen | north | oob_v2val_Full_Joint | 8 | 0.7969 | 0.7616 | 0.8417 | 0.7996 | 0.0394 |
+| lichen | north | oob_v2val_Full_Joint_Truncated | 8 | 0.7969 | 0.7615 | 0.8418 | 0.7996 | 0.0396 |
+| lichen | north | oob_v2val_Full_Truncated | 8 | 0.7997 | 0.7624 | 0.8453 | 0.8016 | 0.0404 |
+| lichen | north | oob_v2val_Landcover | 8 | 0.7481 | 0.6957 | 0.8186 | 0.7528 | 0.0579 |
+| lichen | north | v2val_Climate | 10 | 0.7093 | 0.6916 | 0.7289 | 0.7101 | 0.0183 |
+| lichen | north | v2val_Climate_Truncated | 10 | 0.7093 | 0.6916 | 0.7290 | 0.7101 | 0.0183 |
+| lichen | north | v2val_Full | 10 | 0.8074 | 0.7781 | 0.8388 | 0.8083 | 0.0311 |
+| lichen | north | v2val_Full_Joint | 10 | 0.8057 | 0.7771 | 0.8370 | 0.8071 | 0.0308 |
+| lichen | north | v2val_Full_Joint_Truncated | 10 | 0.8057 | 0.7770 | 0.8372 | 0.8071 | 0.0309 |
+| lichen | north | v2val_Full_Truncated | 10 | 0.8074 | 0.7780 | 0.8390 | 0.8083 | 0.0312 |
+| lichen | north | v2val_Landcover | 10 | 0.7424 | 0.7115 | 0.8121 | 0.7566 | 0.0468 |
+| lichen | south | insample_auc | 10 | 0.8021 | 0.7789 | 0.8223 | 0.8009 | 0.0226 |
+| lichen | south | insample_calibration_slope | 10 | 0.9035 | 0.8740 | 1.0439 | 0.9436 | 0.0783 |
+| lichen | south | insample_deviance_explained | 10 | 0.1705 | 0.0924 | 0.2412 | 0.1684 | 0.0753 |
+| lichen | south | insample_n | 10 | 1484.5000 | 1478.5000 | 2346.0000 | 1657.8000 | 362.9370 |
+| lichen | south | insample_prevalence | 10 | 0.1511 | 0.0868 | 0.2167 | 0.1525 | 0.0659 |
+| lichen | south | insample_rmse | 10 | 0.3163 | 0.2688 | 0.3582 | 0.3146 | 0.0440 |
+| lichen | south | insample_spearman | 10 | 0.3667 | 0.2735 | 0.4597 | 0.3676 | 0.0948 |
+| lichen | south | oob_auc | 8 | 0.7976 | 0.7632 | 0.8185 | 0.7926 | 0.0270 |
+| lichen | south | oob_calibration_slope | 8 | 0.9438 | 0.7927 | 1.1880 | 0.9710 | 0.1829 |
+| lichen | south | oob_deviance_explained | 8 | 0.1218 | -0.0135 | 0.2395 | 0.1153 | 0.1246 |
+| lichen | south | oob_n | 10 | 861.5000 | 0.0000 | 867.5000 | 688.2000 | 362.9370 |
+| lichen | south | oob_prevalence | 8 | 0.1578 | 0.0943 | 0.2207 | 0.1582 | 0.0637 |
+| lichen | south | oob_rmse | 8 | 0.3261 | 0.2806 | 0.3630 | 0.3232 | 0.0402 |
+| lichen | south | oob_spearman | 8 | 0.3688 | 0.2665 | 0.4581 | 0.3651 | 0.0946 |
+| lichen | south | oob_v2val_Climate | 8 | 0.7041 | 0.6878 | 0.7158 | 0.7028 | 0.0127 |
+| lichen | south | oob_v2val_Climate_Truncated | 8 | 0.7041 | 0.6878 | 0.7158 | 0.7028 | 0.0127 |
+| lichen | south | oob_v2val_Full | 8 | 0.7976 | 0.7632 | 0.8185 | 0.7926 | 0.0270 |
+| lichen | south | oob_v2val_Full_Joint | 8 | 0.7958 | 0.7656 | 0.8153 | 0.7914 | 0.0240 |
+| lichen | south | oob_v2val_Full_Joint_Truncated | 8 | 0.7958 | 0.7656 | 0.8153 | 0.7914 | 0.0240 |
+| lichen | south | oob_v2val_Full_Truncated | 8 | 0.7976 | 0.7632 | 0.8185 | 0.7926 | 0.0270 |
+| lichen | south | oob_v2val_Landcover | 8 | 0.7535 | 0.7464 | 0.7630 | 0.7537 | 0.0086 |
+| lichen | south | v2val_Climate | 10 | 0.7093 | 0.6916 | 0.7289 | 0.7101 | 0.0183 |
+| lichen | south | v2val_Climate_Truncated | 10 | 0.7093 | 0.6916 | 0.7290 | 0.7101 | 0.0183 |
+| lichen | south | v2val_Full | 10 | 0.8021 | 0.7789 | 0.8223 | 0.8009 | 0.0226 |
+| lichen | south | v2val_Full_Joint | 10 | 0.8018 | 0.7799 | 0.8189 | 0.8001 | 0.0202 |
+| lichen | south | v2val_Full_Joint_Truncated | 10 | 0.8018 | 0.7799 | 0.8189 | 0.8001 | 0.0202 |
+| lichen | south | v2val_Full_Truncated | 10 | 0.8021 | 0.7789 | 0.8223 | 0.8009 | 0.0226 |
+| lichen | south | v2val_Landcover | 10 | 0.7535 | 0.7435 | 0.7653 | 0.7532 | 0.0119 |
+| mammal_summer | north | insample_auc | 10 | 0.7207 | 0.6085 | 0.8216 | 0.7173 | 0.1099 |
+| mammal_summer | north | insample_calibration_slope | 10 | 0.9417 | 0.8161 | 1.0198 | 0.9320 | 0.0845 |
+| mammal_summer | north | insample_deviance_explained | 10 | 0.1542 | 0.0268 | 0.2763 | 0.1529 | 0.1296 |
+| mammal_summer | north | insample_n | 10 | 2587.5000 | 2542.1000 | 4053.0000 | 2865.2000 | 626.3850 |
+| mammal_summer | north | insample_prevalence | 10 | 0.2736 | 0.2243 | 0.3206 | 0.2726 | 0.0496 |
+| mammal_summer | north | insample_rmse | 10 | 0.3836 | 0.3234 | 0.4410 | 0.3831 | 0.0608 |
+| mammal_summer | north | insample_spearman | 10 | 0.3160 | 0.1627 | 0.4610 | 0.3131 | 0.1542 |
+| mammal_summer | north | oob_auc | 8 | 0.7007 | 0.5879 | 0.8116 | 0.7020 | 0.1114 |
+| mammal_summer | north | oob_calibration_slope | 8 | 0.8971 | 0.7046 | 0.9590 | 0.8583 | 0.1139 |
+| mammal_summer | north | oob_deviance_explained | 8 | 0.1194 | 0.0155 | 0.2466 | 0.1282 | 0.1142 |
+| mammal_summer | north | oob_n | 10 | 1465.5000 | 0.0000 | 1510.9000 | 1187.8000 | 626.3850 |
+| mammal_summer | north | oob_prevalence | 8 | 0.2774 | 0.2208 | 0.3261 | 0.2746 | 0.0539 |
+| mammal_summer | north | oob_rmse | 8 | 0.3919 | 0.3312 | 0.4445 | 0.3895 | 0.0585 |
+| mammal_summer | north | oob_spearman | 8 | 0.2911 | 0.1268 | 0.4415 | 0.2892 | 0.1555 |
+| mammal_summer | south | insample_auc | 10 | 0.7054 | 0.6336 | 0.8030 | 0.7149 | 0.0833 |
+| mammal_summer | south | insample_calibration_slope | 10 | 0.9832 | 0.8710 | 1.0087 | 0.9605 | 0.0585 |
+| mammal_summer | south | insample_deviance_explained | 10 | 0.1016 | 0.0257 | 0.2383 | 0.1233 | 0.1035 |
+| mammal_summer | south | insample_n | 10 | 676.5000 | 670.8000 | 1065.0000 | 753.7000 | 164.1402 |
+| mammal_summer | south | insample_prevalence | 10 | 0.4451 | 0.1814 | 0.7098 | 0.4419 | 0.2704 |
+| mammal_summer | south | insample_rmse | 10 | 0.3814 | 0.3405 | 0.4191 | 0.3811 | 0.0380 |
+| mammal_summer | south | insample_spearman | 10 | 0.2798 | 0.1705 | 0.4148 | 0.2864 | 0.1148 |
+| mammal_summer | south | oob_auc | 8 | 0.6568 | 0.5888 | 0.7557 | 0.6672 | 0.0845 |
+| mammal_summer | south | oob_calibration_slope | 8 | 0.6589 | 0.4354 | 1.0000 | 0.7200 | 0.2938 |
+| mammal_summer | south | oob_deviance_explained | 8 | 0.0059 | -0.0790 | 0.1356 | 0.0219 | 0.1214 |
+| mammal_summer | south | oob_n | 10 | 388.5000 | 0.0000 | 394.2000 | 311.3000 | 164.1402 |
+| mammal_summer | south | oob_prevalence | 8 | 0.4195 | 0.1726 | 0.6930 | 0.4251 | 0.2678 |
+| mammal_summer | south | oob_rmse | 8 | 0.3986 | 0.3422 | 0.4425 | 0.3948 | 0.0479 |
+| mammal_summer | south | oob_spearman | 8 | 0.2181 | 0.1135 | 0.3243 | 0.2204 | 0.1080 |
+| mammal_winter | north | insample_auc | 10 | 0.7608 | 0.6687 | 0.8445 | 0.7578 | 0.0888 |
+| mammal_winter | north | insample_calibration_slope | 10 | 0.9604 | 0.9077 | 1.0052 | 0.9518 | 0.0647 |
+| mammal_winter | north | insample_deviance_explained | 10 | 0.1877 | 0.0712 | 0.3014 | 0.1868 | 0.1161 |
+| mammal_winter | north | insample_n | 10 | 2624.5000 | 2596.8000 | 4127.0000 | 2921.0000 | 635.9504 |
+| mammal_winter | north | insample_prevalence | 10 | 0.1752 | 0.1467 | 0.2040 | 0.1753 | 0.0287 |
+| mammal_winter | north | insample_rmse | 10 | 0.3149 | 0.2994 | 0.3346 | 0.3161 | 0.0165 |
+| mammal_winter | north | insample_spearman | 10 | 0.3463 | 0.2134 | 0.4714 | 0.3427 | 0.1314 |
+| mammal_winter | north | oob_auc | 8 | 0.7383 | 0.6458 | 0.8353 | 0.7401 | 0.0953 |
+| mammal_winter | north | oob_calibration_slope | 8 | 0.8540 | 0.6612 | 0.9533 | 0.8259 | 0.1149 |
+| mammal_winter | north | oob_deviance_explained | 8 | 0.1614 | 0.0413 | 0.2853 | 0.1646 | 0.1234 |
+| mammal_winter | north | oob_n | 10 | 1502.5000 | 0.0000 | 1530.2000 | 1206.0000 | 635.9504 |
+| mammal_winter | north | oob_prevalence | 8 | 0.1756 | 0.1450 | 0.2025 | 0.1746 | 0.0269 |
+| mammal_winter | north | oob_rmse | 8 | 0.3180 | 0.3015 | 0.3423 | 0.3198 | 0.0192 |
+| mammal_winter | north | oob_spearman | 8 | 0.3198 | 0.1800 | 0.4528 | 0.3184 | 0.1382 |
+| mammal_winter | south | insample_auc | 10 | 0.7642 | 0.6906 | 0.8292 | 0.7651 | 0.0684 |
+| mammal_winter | south | insample_calibration_slope | 10 | 0.9542 | 0.8588 | 1.0389 | 0.9614 | 0.0769 |
+| mammal_winter | south | insample_deviance_explained | 10 | 0.1574 | 0.0675 | 0.2501 | 0.1637 | 0.0946 |
+| mammal_winter | south | insample_n | 10 | 694.0000 | 684.8000 | 1098.0000 | 773.7000 | 171.0842 |
+| mammal_winter | south | insample_prevalence | 10 | 0.3450 | 0.0865 | 0.6052 | 0.3446 | 0.2704 |
+| mammal_winter | south | insample_rmse | 10 | 0.3145 | 0.2215 | 0.4071 | 0.3127 | 0.0960 |
+| mammal_winter | south | insample_spearman | 10 | 0.3224 | 0.2964 | 0.3373 | 0.3206 | 0.0167 |
+| mammal_winter | south | oob_auc | 8 | 0.7095 | 0.6257 | 0.7915 | 0.7074 | 0.0854 |
+| mammal_winter | south | oob_calibration_slope | 8 | 0.7307 | 0.4495 | 0.8353 | 0.6770 | 0.1665 |
+| mammal_winter | south | oob_deviance_explained | 8 | 0.0389 | 0.0035 | 0.1901 | 0.0790 | 0.0856 |
+| mammal_winter | south | oob_n | 10 | 404.0000 | 0.0000 | 413.2000 | 324.3000 | 171.0842 |
+| mammal_winter | south | oob_prevalence | 8 | 0.3501 | 0.0777 | 0.6225 | 0.3492 | 0.2818 |
+| mammal_winter | south | oob_rmse | 8 | 0.3337 | 0.2202 | 0.4271 | 0.3264 | 0.1027 |
+| mammal_winter | south | oob_spearman | 8 | 0.2450 | 0.1833 | 0.2817 | 0.2399 | 0.0463 |
+| mite | north | insample_auc | 10 | 0.7336 | 0.6697 | 0.7962 | 0.7334 | 0.0621 |
+| mite | north | insample_calibration_slope | 10 | 1.0028 | 0.9276 | 1.0341 | 0.9867 | 0.0488 |
+| mite | north | insample_deviance_explained | 10 | 0.0502 | -0.0427 | 0.1395 | 0.0479 | 0.0867 |
+| mite | north | insample_n | 10 | 3630.0000 | 3598.5000 | 5711.0000 | 4041.0000 | 880.4163 |
+| mite | north | insample_prevalence | 10 | 0.1545 | 0.0943 | 0.2113 | 0.1531 | 0.0602 |
+| mite | north | insample_rmse | 10 | 0.3279 | 0.2873 | 0.3658 | 0.3272 | 0.0404 |
+| mite | north | insample_spearman | 10 | 0.2958 | 0.1729 | 0.4186 | 0.2953 | 0.1234 |
+| mite | north | oob_auc | 8 | 0.7189 | 0.6461 | 0.7894 | 0.7187 | 0.0708 |
+| mite | north | oob_calibration_slope | 8 | 0.9472 | 0.7462 | 1.0295 | 0.9187 | 0.1294 |
+| mite | north | oob_deviance_explained | 8 | 0.0324 | -0.0828 | 0.1165 | 0.0211 | 0.1006 |
+| mite | north | oob_n | 10 | 2081.0000 | 0.0000 | 2112.5000 | 1670.0000 | 880.4163 |
+| mite | north | oob_prevalence | 8 | 0.1509 | 0.0925 | 0.2048 | 0.1495 | 0.0588 |
+| mite | north | oob_rmse | 8 | 0.3263 | 0.2853 | 0.3680 | 0.3268 | 0.0416 |
+| mite | north | oob_spearman | 8 | 0.2764 | 0.1475 | 0.4035 | 0.2761 | 0.1298 |
+| mite | north | oob_v2val_Climate | 8 | 0.6835 | 0.6308 | 0.7383 | 0.6832 | 0.0539 |
+| mite | north | oob_v2val_Climate_Truncated | 8 | 0.6834 | 0.6308 | 0.7383 | 0.6832 | 0.0539 |
+| mite | north | oob_v2val_Full | 8 | 0.7189 | 0.6461 | 0.7894 | 0.7187 | 0.0708 |
+| mite | north | oob_v2val_Full_Joint | 8 | 0.7191 | 0.6447 | 0.7888 | 0.7183 | 0.0712 |
+| mite | north | oob_v2val_Full_Joint_Truncated | 8 | 0.7192 | 0.6448 | 0.7887 | 0.7183 | 0.0712 |
+| mite | north | oob_v2val_Full_Truncated | 8 | 0.7190 | 0.6462 | 0.7893 | 0.7188 | 0.0708 |
+| mite | north | oob_v2val_Landcover | 8 | 0.6850 | 0.6172 | 0.7620 | 0.6890 | 0.0750 |
+| mite | north | v2val_Climate | 10 | 0.6950 | 0.6449 | 0.7401 | 0.6928 | 0.0480 |
+| mite | north | v2val_Climate_Truncated | 10 | 0.6950 | 0.6449 | 0.7401 | 0.6928 | 0.0480 |
+| mite | north | v2val_Full | 10 | 0.7336 | 0.6697 | 0.7962 | 0.7334 | 0.0621 |
+| mite | north | v2val_Full_Joint | 10 | 0.7336 | 0.6692 | 0.7962 | 0.7334 | 0.0622 |
+| mite | north | v2val_Full_Joint_Truncated | 10 | 0.7336 | 0.6692 | 0.7962 | 0.7334 | 0.0621 |
+| mite | north | v2val_Full_Truncated | 10 | 0.7336 | 0.6697 | 0.7961 | 0.7334 | 0.0620 |
+| mite | north | v2val_Landcover | 10 | 0.7057 | 0.6335 | 0.7708 | 0.7020 | 0.0683 |
+| mite | south | insample_auc | 10 | 0.7997 | 0.7044 | 0.8840 | 0.7968 | 0.0893 |
+| mite | south | insample_calibration_slope | 10 | 0.7882 | 0.6097 | 0.9768 | 0.7906 | 0.1787 |
+| mite | south | insample_deviance_explained | 10 | 0.0405 | -0.0053 | 0.1740 | 0.0764 | 0.0831 |
+| mite | south | insample_n | 10 | 1493.0000 | 1480.9000 | 2363.0000 | 1665.8000 | 367.6444 |
+| mite | south | insample_prevalence | 10 | 0.0721 | 0.0556 | 0.0841 | 0.0703 | 0.0144 |
+| mite | south | insample_rmse | 10 | 0.2482 | 0.2139 | 0.2709 | 0.2446 | 0.0273 |
+| mite | south | insample_spearman | 10 | 0.2519 | 0.1954 | 0.3151 | 0.2550 | 0.0557 |
+| mite | south | oob_auc | 8 | 0.7769 | 0.6582 | 0.8839 | 0.7745 | 0.1136 |
+| mite | south | oob_calibration_slope | 8 | 0.6139 | 0.5353 | 0.8012 | 0.6444 | 0.1288 |
+| mite | south | oob_deviance_explained | 8 | 0.0535 | 0.0095 | 0.2026 | 0.0819 | 0.0851 |
+| mite | south | oob_n | 10 | 870.0000 | 0.0000 | 882.1000 | 697.2000 | 367.6444 |
+| mite | south | oob_prevalence | 8 | 0.0719 | 0.0489 | 0.0868 | 0.0689 | 0.0174 |
+| mite | south | oob_rmse | 8 | 0.2447 | 0.2147 | 0.2788 | 0.2456 | 0.0307 |
+| mite | south | oob_spearman | 8 | 0.2233 | 0.1492 | 0.3189 | 0.2298 | 0.0764 |
+| mite | south | oob_v2val_Climate | 8 | 0.6835 | 0.6308 | 0.7383 | 0.6832 | 0.0539 |
+| mite | south | oob_v2val_Climate_Truncated | 8 | 0.6834 | 0.6308 | 0.7383 | 0.6832 | 0.0539 |
+| mite | south | oob_v2val_Full | 8 | 0.7769 | 0.6582 | 0.8839 | 0.7745 | 0.1136 |
+| mite | south | oob_v2val_Full_Joint | 8 | 0.7766 | 0.6587 | 0.8846 | 0.7751 | 0.1137 |
+| mite | south | oob_v2val_Full_Joint_Truncated | 8 | 0.7766 | 0.6587 | 0.8846 | 0.7751 | 0.1137 |
+| mite | south | oob_v2val_Full_Truncated | 8 | 0.7769 | 0.6582 | 0.8839 | 0.7745 | 0.1136 |
+| mite | south | oob_v2val_Landcover | 8 | 0.6792 | 0.6125 | 0.7124 | 0.6651 | 0.0460 |
+| mite | south | v2val_Climate | 10 | 0.6950 | 0.6449 | 0.7401 | 0.6928 | 0.0480 |
+| mite | south | v2val_Climate_Truncated | 10 | 0.6950 | 0.6449 | 0.7401 | 0.6928 | 0.0480 |
+| mite | south | v2val_Full | 10 | 0.7997 | 0.7044 | 0.8840 | 0.7968 | 0.0893 |
+| mite | south | v2val_Full_Joint | 10 | 0.8014 | 0.7048 | 0.8843 | 0.7975 | 0.0894 |
+| mite | south | v2val_Full_Joint_Truncated | 10 | 0.8014 | 0.7048 | 0.8843 | 0.7975 | 0.0894 |
+| mite | south | v2val_Full_Truncated | 10 | 0.7997 | 0.7044 | 0.8840 | 0.7968 | 0.0893 |
+| mite | south | v2val_Landcover | 10 | 0.7027 | 0.6602 | 0.7282 | 0.6970 | 0.0287 |
+| vascular_plant | north | insample_auc | 10 | 0.8331 | 0.8298 | 0.8373 | 0.8332 | 0.0032 |
+| vascular_plant | north | insample_calibration_slope | 10 | 0.9949 | 0.9743 | 1.0061 | 0.9918 | 0.0148 |
+| vascular_plant | north | insample_deviance_explained | 10 | 0.1616 | 0.1396 | 0.1816 | 0.1602 | 0.0191 |
+| vascular_plant | north | insample_n | 10 | 4347.5000 | 4314.6000 | 6874.0000 | 4846.9000 | 1068.6395 |
+| vascular_plant | north | insample_prevalence | 10 | 0.3951 | 0.3770 | 0.4211 | 0.3974 | 0.0209 |
+| vascular_plant | north | insample_rmse | 10 | 0.4022 | 0.3958 | 0.4067 | 0.4017 | 0.0048 |
+| vascular_plant | north | insample_spearman | 10 | 0.5651 | 0.5611 | 0.5668 | 0.5644 | 0.0038 |
+| vascular_plant | north | oob_auc | 8 | 0.8283 | 0.8227 | 0.8329 | 0.8284 | 0.0052 |
+| vascular_plant | north | oob_calibration_slope | 8 | 0.9755 | 0.9539 | 1.0021 | 0.9776 | 0.0210 |
+| vascular_plant | north | oob_deviance_explained | 8 | 0.1803 | 0.1354 | 0.2064 | 0.1750 | 0.0321 |
+| vascular_plant | north | oob_n | 10 | 2526.5000 | 0.0000 | 2559.4000 | 2027.1000 | 1068.6395 |
+| vascular_plant | north | oob_prevalence | 8 | 0.3990 | 0.3725 | 0.4275 | 0.3991 | 0.0248 |
+| vascular_plant | north | oob_rmse | 8 | 0.4052 | 0.3988 | 0.4110 | 0.4048 | 0.0061 |
+| vascular_plant | north | oob_spearman | 8 | 0.5545 | 0.5499 | 0.5651 | 0.5564 | 0.0065 |
+| vascular_plant | north | oob_v2val_Climate | 8 | 0.6916 | 0.6808 | 0.6996 | 0.6902 | 0.0106 |
+| vascular_plant | north | oob_v2val_Climate_Truncated | 8 | 0.6916 | 0.6808 | 0.6996 | 0.6902 | 0.0106 |
+| vascular_plant | north | oob_v2val_Full | 8 | 0.8283 | 0.8227 | 0.8329 | 0.8284 | 0.0052 |
+| vascular_plant | north | oob_v2val_Full_Joint | 8 | 0.8258 | 0.8182 | 0.8325 | 0.8258 | 0.0065 |
+| vascular_plant | north | oob_v2val_Full_Joint_Truncated | 8 | 0.8258 | 0.8183 | 0.8323 | 0.8258 | 0.0064 |
+| vascular_plant | north | oob_v2val_Full_Truncated | 8 | 0.8285 | 0.8228 | 0.8328 | 0.8284 | 0.0051 |
+| vascular_plant | north | oob_v2val_Landcover | 8 | 0.8009 | 0.7954 | 0.8101 | 0.8024 | 0.0067 |
+| vascular_plant | north | v2val_Climate | 10 | 0.6886 | 0.6855 | 0.6950 | 0.6902 | 0.0048 |
+| vascular_plant | north | v2val_Climate_Truncated | 10 | 0.6886 | 0.6855 | 0.6949 | 0.6902 | 0.0048 |
+| vascular_plant | north | v2val_Full | 10 | 0.8331 | 0.8298 | 0.8373 | 0.8332 | 0.0032 |
+| vascular_plant | north | v2val_Full_Joint | 10 | 0.8318 | 0.8275 | 0.8367 | 0.8320 | 0.0039 |
+| vascular_plant | north | v2val_Full_Joint_Truncated | 10 | 0.8319 | 0.8277 | 0.8366 | 0.8321 | 0.0038 |
+| vascular_plant | north | v2val_Full_Truncated | 10 | 0.8330 | 0.8299 | 0.8373 | 0.8332 | 0.0031 |
+| vascular_plant | north | v2val_Landcover | 10 | 0.8087 | 0.8049 | 0.8130 | 0.8092 | 0.0040 |
+| vascular_plant | south | insample_auc | 10 | 0.8460 | 0.8042 | 0.8967 | 0.8490 | 0.0462 |
+| vascular_plant | south | insample_calibration_slope | 10 | 0.9608 | 0.9208 | 0.9855 | 0.9580 | 0.0297 |
+| vascular_plant | south | insample_deviance_explained | 10 | 0.2841 | 0.1600 | 0.3822 | 0.2752 | 0.1074 |
+| vascular_plant | south | insample_n | 10 | 1688.5000 | 1654.9000 | 2648.0000 | 1869.6000 | 410.6067 |
+| vascular_plant | south | insample_prevalence | 10 | 0.2438 | 0.2212 | 0.2654 | 0.2437 | 0.0227 |
+| vascular_plant | south | insample_rmse | 10 | 0.3477 | 0.3070 | 0.3827 | 0.3458 | 0.0374 |
+| vascular_plant | south | insample_spearman | 10 | 0.5180 | 0.4628 | 0.5647 | 0.5163 | 0.0529 |
+| vascular_plant | south | oob_auc | 8 | 0.8412 | 0.8038 | 0.8909 | 0.8455 | 0.0409 |
+| vascular_plant | south | oob_calibration_slope | 8 | 0.9408 | 0.9073 | 0.9701 | 0.9401 | 0.0277 |
+| vascular_plant | south | oob_deviance_explained | 8 | 0.2459 | 0.1728 | 0.3387 | 0.2532 | 0.0850 |
+| vascular_plant | south | oob_n | 10 | 959.5000 | 0.0000 | 993.1000 | 778.4000 | 410.6067 |
+| vascular_plant | south | oob_prevalence | 8 | 0.2418 | 0.2131 | 0.2706 | 0.2421 | 0.0259 |
+| vascular_plant | south | oob_rmse | 8 | 0.3513 | 0.3168 | 0.3827 | 0.3502 | 0.0336 |
+| vascular_plant | south | oob_spearman | 8 | 0.5033 | 0.4643 | 0.5589 | 0.5099 | 0.0446 |
+| vascular_plant | south | oob_v2val_Climate | 8 | 0.6916 | 0.6808 | 0.6996 | 0.6902 | 0.0106 |
+| vascular_plant | south | oob_v2val_Climate_Truncated | 8 | 0.6916 | 0.6808 | 0.6996 | 0.6902 | 0.0106 |
+| vascular_plant | south | oob_v2val_Full | 8 | 0.8412 | 0.8038 | 0.8909 | 0.8455 | 0.0409 |
+| vascular_plant | south | oob_v2val_Full_Joint | 8 | 0.8369 | 0.8023 | 0.8809 | 0.8406 | 0.0373 |
+| vascular_plant | south | oob_v2val_Full_Joint_Truncated | 8 | 0.8369 | 0.8023 | 0.8809 | 0.8406 | 0.0373 |
+| vascular_plant | south | oob_v2val_Full_Truncated | 8 | 0.8412 | 0.8038 | 0.8908 | 0.8455 | 0.0409 |
+| vascular_plant | south | oob_v2val_Landcover | 8 | 0.7762 | 0.7677 | 0.7961 | 0.7793 | 0.0125 |
+| vascular_plant | south | v2val_Climate | 10 | 0.6886 | 0.6855 | 0.6950 | 0.6902 | 0.0048 |
+| vascular_plant | south | v2val_Climate_Truncated | 10 | 0.6886 | 0.6855 | 0.6949 | 0.6902 | 0.0048 |
+| vascular_plant | south | v2val_Full | 10 | 0.8460 | 0.8042 | 0.8967 | 0.8490 | 0.0462 |
+| vascular_plant | south | v2val_Full_Joint | 10 | 0.8411 | 0.8013 | 0.8920 | 0.8446 | 0.0448 |
+| vascular_plant | south | v2val_Full_Joint_Truncated | 10 | 0.8411 | 0.8013 | 0.8920 | 0.8446 | 0.0448 |
+| vascular_plant | south | v2val_Full_Truncated | 10 | 0.8460 | 0.8042 | 0.8967 | 0.8490 | 0.0462 |
+| vascular_plant | south | v2val_Landcover | 10 | 0.7783 | 0.7609 | 0.8028 | 0.7802 | 0.0202 |
 

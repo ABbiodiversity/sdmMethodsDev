@@ -3,126 +3,58 @@
 # author: Brendan Casey
 # created: 2026-09-09
 # inputs:
-#   from run.R:
-#     - specs, run_taxa, focal_species, n_bootstraps,
-#       v2_bootstraps, boot_seed
-#   from 02_compare_to_v2.R, when it ran this session:
-#     - notes, the references it could not reach
-#   in out_dir/tables/:
-#     - coverage.csv, metric_summary.csv, parity_summary.csv
-#   in v2_reference_dir, chosen in run.R:
+#   - `config`, from run.R: id, specs, taxa, focal_species,
+#     n_bootstraps, v2_bootstraps, seed, out_dir and the v2
+#     reference settings
+#   - `results`: coverage and metric_summary (collect_results()),
+#     parity_summary and parity_notes (01_compare_to_v2.R)
+#   - in config$v2_reference_dir:
 #     - v2_results_coverage.csv
 # outputs:
 #   in out_dir/:
 #     - report.md
 # notes:
-#   - Holds no status of its own. What each spec reproduces of v2
-#     is read from the specs' `v2_coverage`, what v2 reference
-#     exists from v2_results_coverage.csv, and what the gate
-#     actually reached from the comparison step. Coverage is
-#     stated once, in the specs, so the report cannot drift from
-#     them.
-#   - States what kind of run this was first. A trial run writes
-#     the same files as a full one, and its parity numbers are
-#     not a parity read.
-#   - Written on every run, so a partial run still leaves a
-#     legible record of what it was.
-#   - Expects exp_id, data_dir, pipeline_dir, out_dir and the
-#     run settings above from run.R.
+#   - Holds no status of its own: coverage comes from the specs'
+#     `v2_coverage`, references from v2_results_coverage.csv, and
+#     results from the comparison step.
+#   - Leads with the kind of run, since a trial writes the same
+#     files as a full run. Run as a script_step().
 # ---
 
 # 1. Setup ----
 
 ## 1.1 Resolve paths ----
-tables_dir <- file.path(out_dir, "tables")
-report_file <- file.path(out_dir, "report.md")
-
-# run.R's v2_reference picks the build. Without it, the drive
-# build in 0_data/v2_results/, beside test_dataset/.
-v2_reference_dir <- get0(
-  "v2_reference_dir",
-  ifnotfound = file.path(dirname(data_dir), "v2_results")
-)
+report_file <- file.path(config$out_dir, "report.md")
 v2_coverage_path <- file.path(
-  v2_reference_dir, "v2_results_coverage.csv"
+  config$v2_reference_dir, "v2_results_coverage.csv"
 )
-
-v2_reference_builder <- if (
-  grepl("abmiexplorer", v2_reference_dir)
-) {
-  "1_code/_setup/08_harmonize_abmiexplorer_results.R"
-} else {
-  "1_code/_setup/05_harmonize_v2_results.R"
-}
-
-read_table <- function(path) {
-  if (!file.exists(path)) {
-    return(NULL)
-  }
-
-  as.data.frame(data.table::fread(path))
-}
+v2_reference_builder <- config$v2_reference_builder
 
 ## 1.2 Read the inputs ----
-coverage <- read_table(file.path(tables_dir, "coverage.csv"))
-metric_summary <- read_table(
-  file.path(tables_dir, "metric_summary.csv")
-)
-parity_summary <- read_table(
-  file.path(tables_dir, "parity_summary.csv")
-)
-v2_coverage <- read_table(v2_coverage_path)
-
-# The specs that ran, not every spec defined, so the coverage
-# table describes this run.
-run_specs <- specs[intersect(run_taxa, names(specs))]
-
-# The comparison step leaves its unreachable references in
-# `notes`. Absent when it did not run this session.
-gate_notes <- if (exists("notes") && is.list(notes)) {
-  unlist(notes, use.names = FALSE)
+coverage <- results$coverage
+metric_summary <- results$metric_summary
+parity_summary <- results$parity_summary
+v2_coverage <- if (file.exists(v2_coverage_path)) {
+  as.data.frame(data.table::fread(v2_coverage_path))
 } else {
-  character(0)
+  NULL
 }
+
+# The comparison step's unreachable references
+gate_notes <- unlist(results$parity_notes, use.names = FALSE)
 
 # 2. Assemble ----
 
 ## 2.1 Helpers ----
-
-#' Render a Data Frame as a Markdown Table
-#'
-#' @param x A data frame, or NULL.
-#' @param empty Character. What to say when there is nothing.
-#' @return A character vector of markdown lines.
-#'
-#' @example # Example usage of the function
-#' # markdown_table(coverage)
+# Tables are rendered by md_table() (harness/run_record.R), so the
+# report and the run record format numbers the same way.
 markdown_table <- function(x, empty = "_Nothing recorded._") {
-  if (is.null(x) || nrow(x) == 0) {
-    return(empty)
-  }
-
-  # A pipe inside a cell would split it into two columns.
-  cells <- as.data.frame(
-    lapply(x, function(col) gsub("|", "\\|", col, fixed = TRUE)),
-    stringsAsFactors = FALSE
-  )
-
-  header <- paste("|", paste(names(x), collapse = " | "), "|")
-  rule <- paste(
-    "|", paste(rep("---", ncol(x)), collapse = " | "), "|"
-  )
-
-  rows <- apply(cells, 1, function(row) {
-    paste("|", paste(row, collapse = " | "), "|")
-  })
-
-  c(header, rule, rows)
+  if (is.null(x) || nrow(x) == 0) empty else md_table(x, digits = 3L)
 }
 
 ## 2.2 What kind of run this was ----
-is_full_species <- is.null(focal_species)
-is_full_draws <- n_bootstraps >= v2_bootstraps
+is_full_species <- is.null(config$focal_species)
+is_full_draws <- config$n_bootstraps >= config$v2_bootstraps
 
 run_kind <- if (is_full_species && is_full_draws) {
   "**Full run.** Every species, every draw."
@@ -130,21 +62,22 @@ run_kind <- if (is_full_species && is_full_draws) {
   paste0(
     "**Trial run.** ",
     if (!is_full_species) {
-      paste0(length(focal_species), " focal species")
+      paste0(length(config$focal_species), " focal species")
     } else {
       "every species"
     },
-    ", ", n_bootstraps, " of ", v2_bootstraps, " draws. ",
+    ", ", config$n_bootstraps, " of ", config$v2_bootstraps,
+    " draws. ",
     "Its parity numbers show the pipeline ran; they are not a ",
     "parity read."
   )
 }
 
-seed_text <- if (is.null(boot_seed)) {
+seed_text <- if (is.null(config$seed)) {
   "unseeded, as in v2"
 } else {
   paste0(
-    "`boot_seed = ", boot_seed, "`, one derived seed per species"
+    "`seed = ", config$seed, "`, one derived seed per species"
   )
 }
 
@@ -164,7 +97,10 @@ reference_lines <- if (is.null(v2_coverage)) {
 }
 
 gate_lines <- if (length(gate_notes) == 0) {
-  "_Every taxon and region that ran had a reference to compare against._"
+  paste(
+    "_Every taxon and region that ran had a reference to",
+    "compare against._"
+  )
 } else {
   paste0("- ", gate_notes)
 }
@@ -173,9 +109,7 @@ gate_lines <- if (length(gate_notes) == 0) {
 fit_lines <- if (is.null(metric_summary)) {
   "_No metrics recorded._"
 } else {
-  # In-sample against held-out, and v2's own validation where
-  # the spec supplies it. Out-of-bag is the honest read;
-  # in-sample is what v2 reports.
+  # Out-of-bag is the honest read; in-sample is what v2 reports
   shown <- c(
     insample_auc = "insample_auc",
     oob_auc = "oob_auc",
@@ -199,7 +133,8 @@ fit_lines <- if (is.null(metric_summary)) {
 
         for (label in names(shown)) {
           values <- block$median[block$metric == shown[[label]]]
-          row[[paste0("median_", label)]] <- if (length(values) == 0) {
+          column <- paste0("median_", label)
+          row[[column]] <- if (length(values) == 0) {
             NA_real_
           } else {
             round(stats::median(values, na.rm = TRUE), 3)
@@ -214,7 +149,7 @@ fit_lines <- if (is.null(metric_summary)) {
 
 ## 2.5 Write the report ----
 lines <- c(
-  paste0("# ", exp_id),
+  paste0("# ", config$id),
   "",
   paste0("Generated ", format(Sys.time(), "%Y-%m-%d %H:%M:%S")),
   "",
@@ -228,14 +163,14 @@ lines <- c(
   "stated. Change it there, not here.",
   "",
   markdown_table(
-    spec_coverage(run_specs),
+    spec_coverage(config$specs),
     "_No specs ran._"
   ),
   "",
   "## v2 references",
   "",
   paste0(
-    "Scored against `", get0("v2_reference", ifnotfound = "drives"),
+    "Scored against `", config$v2_reference,
     "`, built by `", v2_reference_builder, "`. What it holds, ",
     "from `v2_results_coverage.csv`:"
   ),
@@ -287,11 +222,13 @@ lines <- c(
   "## Model fit",
   "",
   paste(
-    "Median AUC over species. `insample` scores the units each",
-    "draw fitted; `oob` the units it left out, the held-out read.",
-    "`v2val` is v2's validation, scored from the coefficients as v2",
-    "does (plants only). Iteration 1 is the full data and has no",
-    "out-of-bag units."
+    "Median AUC over species, scored on each run's final model:",
+    "for plants, v2's own prediction from its coefficient tables.",
+    "`insample` scores the units each draw fitted; `oob` the units",
+    "it left out, the held-out read. `v2val` is v2's validation,",
+    "scored from the coefficients as v2 does (plants only), so for",
+    "plants `v2val_full` equals `insample_auc`. Iteration 1 is the",
+    "full data and has no out-of-bag units."
   ),
   "",
   fit_lines,
@@ -307,5 +244,6 @@ lines <- c(
 writeLines(lines, report_file)
 
 cat("Wrote ", report_file, "\n", sep = "")
+results$report_file <- report_file
 
 # End of script ----

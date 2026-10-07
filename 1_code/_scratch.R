@@ -26,8 +26,3 @@
 # ---
 
 # End of script ----
-
-## 2026-09-09 ----
-load(
-    "\\\\abmi-data2\\science\\sc\\sdmMethodsDev\\0_data\\data_snapshots\\model_ready_v2\\mite-model-data.Rdata"
-)

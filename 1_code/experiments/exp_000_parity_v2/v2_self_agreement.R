@@ -5,8 +5,10 @@
 # inputs:
 #   - 2_pipeline/v2_reference/bryophyte-species-models.Rdata,
 #     from 1_code/_setup/03_rerun_bryophyte_v2_reference.R
-#   - 0_data/v2_results/v2_results.csv, the bryophyte climate
-#     rows, which come from v2's COEFS.RData
+#   - abmiexplorer/v2_results.csv from the published v2 results
+#     (see 1_code/harness/data_source.R), the bryophyte climate
+#     rows, from _setup/08. These are v2's original run: they
+#     match v2's COEFS.RData to ~1e-15
 # outputs:
 #   in 3_output/exp_000_parity_v2/tables/:
 #     - v2_self_agreement.csv, per species and term
@@ -19,26 +21,26 @@
 #     closely than v2 agrees with itself would fail a perfect
 #     reimplementation.
 #   - The two runs are the bryophyte climate stage: v2's original
-#     run, as published in COEFS.RData, and the rerun
-#     _setup/03 made with the frozen v2 functions. Same code, same
-#     data, different unseeded draws; 134 species by 19 terms by
-#     100 draws each.
-#   - Scored exactly as 02_compare_to_v2.R scores the harness, in
+#     run, as ABMIexploreR publishes it, and the rerun _setup/03
+#     made with the frozen v2 functions. Same code, same data,
+#     different unseeded draws; 19 terms by 100 draws for each
+#     species both hold. Bryum.All is not published, so it
+#     drops out (133 of the rerun's 134 species).
+#   - Scored exactly as 01_compare_to_v2.R scores the harness, in
 #     both directions: is one run's median inside the other's
 #     10th-to-90th percentile band, and how far apart are the
 #     medians relative to half that band. The two directions are
 #     reported separately and averaged.
-#   - Also the Spearman correlation of the medians across terms,
-#     per species, because the terms span twenty orders of
-#     magnitude and a Pearson correlation would read only the
-#     intercept. Reported, no longer gated.
+#   - Also the per-species Spearman of the medians (terms span
+#     twenty orders of magnitude, so not Pearson). Reported, not
+#     gated.
 #   - And the band-width ratio, the rerun's 10-90% band over the
 #     published run's, as a median per species. Its 5th to 95th
 #     percentile over species sets the gate's band_ratio_range.
 #   - Climate only: the regenerated reference has no habitat
 #     stage. The rate is assumed to carry to the plant habitat
 #     stage; that is an assumption, stated in the README.
-#   - Run once, from the repository root, after _setup/03 and 05.
+#   - Run once, from the repository root, after _setup/03 and 08.
 #     Not part of run.R's sequence.
 # ---
 
@@ -59,8 +61,9 @@ rerun_path <- file.path(
   project_root, "2_pipeline", "v2_reference",
   "bryophyte-species-models.Rdata"
 )
+source(file.path(project_root, "1_code/harness/data_source.R"))
 results_path <- file.path(
-  project_root, "0_data", "v2_results", "v2_results.csv"
+  v2_results_dir(), "abmiexplorer", "v2_results.csv"
 )
 tables_dir <- file.path(
   project_root, "3_output", "exp_000_parity_v2", "tables"
@@ -98,7 +101,13 @@ rerun_summary <- rbindlist(lapply(names(rerun), function(species) {
       species = species, term = term,
       rerun_median = stats::median(values),
       rerun_p10 = stats::quantile(values, 0.1, names = FALSE),
-      rerun_p90 = stats::quantile(values, 0.9, names = FALSE)
+      rerun_p90 = stats::quantile(values, 0.9, names = FALSE),
+      rerun_mean = mean(values),
+      rerun_sd = if (length(values) < 2) {
+        NA_real_
+      } else {
+        stats::sd(values)
+      }
     )
   }))
 }))

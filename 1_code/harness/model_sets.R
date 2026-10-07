@@ -5,25 +5,13 @@
 # inputs: none
 # outputs: none; returns objects in memory
 # notes:
-#   - The candidate formulas each v2 pipeline chooses among, as
-#     text, so a spec names a set rather than carrying 40 lines of
-#     formulas. Text rather than formula objects, because a
-#     formula captures the environment it was built in, and these
-#     are evaluated against whatever frame the run assembles.
-#   - Candidates are updates - `. ~ . + MAP` - applied to a base
-#     formula by the selection layer. The base supplies the
-#     response, so one set serves any taxon whose response column
-#     is named the same way.
-#   - The climate set is shared by birds and mammals. Their two v2
-#     pipelines were written separately by different authors and
-#     arrived at the same eight combinations of the same four
-#     variables; the mammal script adds an explicit null, which
-#     here is the base formula. That is why one set covers both.
-#   - The plant climate formulas are spliced verbatim from
-#     0_data/v2_scripts/plants/, not retyped.
-#   - Habitat model sets are not here. They are large, taxon
-#     specific and bound up with a prediction grid, so they belong
-#     with the taxon specs.
+#   - v2's candidate formulas, named so a spec can refer to a set.
+#     Stored as text, not formula objects, so no environment is
+#     captured. Candidates are updates (`. ~ . + MAP`) applied to a
+#     base formula that supplies the response.
+#   - Plant and mammal formulas are spliced verbatim from
+#     0_data/v2_scripts/, not retyped; long lines are kept so they
+#     match v2 line for line.
 # ---
 
 # 1. Setup ----
@@ -41,20 +29,9 @@
 #' # names(model_sets())
 #' # model_sets()$climate_bird_mammal_v2
 model_sets <- function() {
-  # The mammal climate set, which is also the climate part of the
-  # bird one. Four variables - frost free period, mean annual
-  # precipitation, climatic moisture deficit and continentality -
-  # in eight combinations.
-  #
-  # Mammals fit it in full: the camera climate the harmonizer
-  # joins carries CMD and TD. Birds in v2 also fit each of the
-  # eight with linear and with quadratic spatial terms, 25
-  # candidates in all, which this set does not include; see the
-  # bird spec's v2_coverage.
-  #
-  # The null is a candidate, not just the base: v2 averages over
-  # `climate.list` including the intercept-only model it starts
-  # from, so leaving it out would shift every weight.
+  # Shared by the v2 bird and mammal climate stages. The null is
+  # a candidate because v2 averages over it too; dropping it
+  # would shift every weight.
   climate_bird_mammal_v2 <- c(
     ". ~ .",
     ". ~ . + FFP",
@@ -67,12 +44,9 @@ model_sets <- function() {
     ". ~ . + MAP + FFP + TD + CMD"
   )
 
-  # The bird climate set as 06.ModelClimate.R assembles it: the
-  # null, the eight climate combinations, each of the eight with
-  # a linear spatial trend and interaction, and each of those
-  # again with quadratic terms. 25 candidates, averaged at once.
-  # The spatial terms are in metres, as v2 fits them, which is
-  # why their coefficients run to 1e-12.
+  # As 06.ModelClimate.R assembles it: 25 candidates (null, 8
+  # climate, 8 + linear space, 8 + quadratic space). Spatial terms
+  # are in metres, as in v2, hence coefficients near 1e-12.
   spatial_linear <- "Easting + Northing + Easting:Northing"
   spatial_quadratic <- "I(Easting^2) + I(Northing^2)"
 
@@ -85,20 +59,6 @@ model_sets <- function() {
     )
   )
 
-  # The subset of the above without CMD, five of the nine models.
-  # No spec uses it since the camera climate supplied CMD; kept
-  # for an experiment on a dataset that lacks CMD.
-  climate_mammal_available <- c(
-    ". ~ .",
-    ". ~ . + FFP",
-    ". ~ . + MAP",
-    ". ~ . + TD",
-    ". ~ . + TD + FFP"
-  )
-
-  # The plant climate set, spliced from the v2 source. Wider
-  # than the bird and mammal one, and includes interaction and
-  # squared terms the other two do not use.
   climate_plant_v2 <- c(
     ". ~ .",
     ". ~ . + PET",
@@ -116,28 +76,11 @@ model_sets <- function() {
     ". ~ . + TD + FFP + MAT"
   )
 
-  # Applied on top of a chosen climate model, not instead of it.
-  bioclim_plant_v2 <- c(
-    ".~.+ bio9 + bio15"
-  )
-
-  # Spatial trend terms, likewise applied on top.
-  space_plant_v2 <- c(
-    ".~.+ Easting + Northing",
-    ".~.+ Easting + Northing + EastingNorthing",
-    ".~.+ Easting + Northing + Easting2 + Northing2 + EastingNorthing"
-  )
-
-  # The plant climate candidate set as v2 actually assembles it.
-  # v2 does not fit these 14 alone: it appends a bioclim version
-  # of every one, then spatial versions of ten of them, and
-  # averages over all 58 at once. Fitting only the base 14 makes
-  # a different model, and its coefficients are not comparable
-  # with the published ones.
-  #
-  # The ten that take spatial terms are the models carrying
-  # neither MAT, TD nor PET - v2's `model.update.id`, which
-  # indexes the base models and their bioclim counterparts.
+  # v2 averages over 58 candidates, not the 14 above: each with
+  # and without bioclim, plus spatial versions of the ten
+  # (five base, five bioclim) without MAT, TD or PET (v2's
+  # `model.update.id`). The 14 alone give coefficients not
+  # comparable with the published ones.
   spatial_targets <- c(1, 3, 5, 6, 7)
 
   bioclim_plant <- paste0(
@@ -167,14 +110,10 @@ model_sets <- function() {
     ))
   )
 
-  # The v2 plant habitat sets, spliced from the source. These
-  # are fitted with the ivw_grid rule, which predicts each
-  # candidate onto the prediction matrix and combines those
-  # predictions by precision - so a "coefficient" here is an
-  # effect per habitat type, not a regression coefficient.
-  #
-  # Protocol appears in the bryophyte and lichen variants
-  # only; plant_group_spec() adds it, matching v2.
+  # Fitted with ivw_grid, so a "coefficient" is an effect per
+  # habitat type, not a regression coefficient. Protocol (in the
+  # bryophyte and lichen variants only) is added by
+  # plant_group_spec().
   habitat_veg_plant_v2 <- c(
     ". ~ . + Climate + WhiteSpruce + Pine + Deciduous + Mixedwood + BlackSpruce + TreedFen + TreedSwamp + GraminoidFen + ShrubbyFen + ShrubbyBog + ShrubbySwamp + Marsh + Grass + Shrub + CCWhiteSpruceR + CCWhiteSpruce1 + CCWhiteSpruce234 + CCPineR + CCPine1234 + CCDecidMixedR + CCDecidMixed1 + CCDecidMixed234 + HardLin + EnSeismic + EnSoftLin + TrSoftLin + UrbInd + Wellsites + Crop + RoughP + TameP",
     ". ~ . + Climate + WhiteSpruce + Pine + Deciduous + Mixedwood + Peatland + Mineral + Grass + Shrub + CCWhiteSpruceR + CCWhiteSpruce1 + CCWhiteSpruce234 + CCPineR + CCPine1234 + CCDecidMixedR + CCDecidMixed1 + CCDecidMixed234 + HardLin + EnSeismic + EnSoftLin + TrSoftLin + UrbInd + Wellsites + Crop + RoughP + TameP",
@@ -211,14 +150,10 @@ model_sets <- function() {
     ". ~ . + Climate + Productive + Nonproductive + Other + Alien + SoftLin + paspen"
   )
 
-  # The bird landcover sets, as groups. staged_bic walks them in
-  # order, fitting each group as an update to the previous
-  # group's winner, so the groups are a claim about the order the
-  # questions are asked in: habitat type first, then stand age,
-  # then cutblocks, then contrasts, then survey method and water.
-  #
-  # Terms name the source columns; the harness rewrites them to
-  # the block-suffixed names the dataset uses. See term_map().
+  # staged_bic walks the groups in order, each updating the
+  # previous group's winner, so group order is part of the model.
+  # Terms are source names; term_map() rewrites them to the
+  # dataset's block-suffixed names.
   landcover_bird_north_v2 <- list(
     Hab = c(
       ". ~ . + vegc"
@@ -276,19 +211,11 @@ model_sets <- function() {
     )
   )
 
-  # The mammal north presence/absence set. Seventeen candidates
-  # running from fine vegetation and footprint resolution to
-  # coarse aggregation, selected on AICc.
-  #
-  # Each carries a reference category rather than a factor: the
-  # land cover type left out of the formula, whose effect the
-  # intercept absorbs. Models 1, 2 and 10 omit Crop, the rest
-  # omit Alien, and a coefficient table has to name it to be
-  # read. The two vectors are parallel and must stay so.
-  #
-  # This is the presence half of a hurdle model; v2 fits a Gamma
-  # abundance-given-presence part alongside it and multiplies
-  # the two. Only the presence half is reproduced here.
+  # Presence half of the v2 mammal hurdle (see
+  # modules/mammals/hurdle.R), 17 candidates selected on AICc.
+  # intercept_mammal_north_pa_v2 names each model's omitted
+  # reference category, which the intercept absorbs; the two
+  # vectors are parallel and must stay so.
   habitat_mammal_north_pa_v2 <- c(
     ". ~ . + Decid + Mixedwood + Pine + Spruce + TreedBog + TreedFen + TreedSwamp + GrassHerb + Shrub + Marsh + ShrubbySwamp + ShrubbyBogFen + CCDecidR + CCDecid1 + CCDecid2 + CCMixedwoodR + CCMixedwood1 + CCMixedwood2 + CCPineR + CCPine1 + CCSpruceR + CCSpruce1 + CCSpruce2 + EnSoftLin + EnSeismic + TrSoftLin + TameP + RoughP + Well + RurUrbInd + seas_days + Climate",
     ". ~ . + Decid + Mixedwood + Pine + Spruce + TreedBog + TreedFen + TreedSwamp + GrassHerb + Shrub + Marsh + ShrubbySwamp + ShrubbyBogFen + CCDecidMixed + CCPine + CCSpruce + EnSoftLin + EnSeismic + TrSoftLin + TameP + RoughP + Well + RurUrbInd + seas_days + Climate",
@@ -353,7 +280,6 @@ model_sets <- function() {
     climate_bird_mammal_v2 = climate_bird_mammal_v2,
     climate_bird_v2 = climate_bird_v2,
     climate_plant_v2_full = climate_plant_v2_full,
-    climate_mammal_available = climate_mammal_available,
     climate_plant_v2 = climate_plant_v2,
     habitat_mammal_north_pa_v2 = habitat_mammal_north_pa_v2,
     intercept_mammal_north_pa_v2 =
@@ -364,27 +290,21 @@ model_sets <- function() {
     landcover_bird_north_v2 = landcover_bird_north_v2,
     landcover_bird_south_v2 = landcover_bird_south_v2,
     habitat_veg_plant_v2 = habitat_veg_plant_v2,
-    habitat_soil_plant_v2 = habitat_soil_plant_v2,
-    bioclim_plant_v2 = bioclim_plant_v2,
-    space_plant_v2 = space_plant_v2
+    habitat_soil_plant_v2 = habitat_soil_plant_v2
   )
 }
 
 # 3. Building model sets ----
-# A stage's `models` may be a name in model_sets() or a character
-# vector of formulas given directly, so an experiment defines its
-# own candidate set without editing a spec. The covariates a run
-# loads are read off whatever formulas it ends up with, so a set
-# defined here needs no matching covariate declaration - naming a
-# term is what loads it.
+# A stage's `models` is a model_sets() name or a vector of
+# formulas. Covariates are loaded from the terms the formulas
+# name, so no separate declaration is needed.
 
 ## 3.1 extend_models() ----
 
 #' Add Terms to Every Candidate in a Set
 #'
-#' The include/exclude comparison: take a v2 candidate set and
-#' put the same extra terms in all of it, so the only difference
-#' between two runs is those terms.
+#' For include/exclude comparisons: two runs then differ only by
+#' these terms.
 #'
 #' @param models Character vector of formulas, or a name in
 #'   model_sets().
@@ -409,20 +329,13 @@ extend_models <- function(models, terms, sets = model_sets()) {
 
 #' Build a Candidate Set from a List of Covariates
 #'
-#' For an experiment asking which covariates matter rather than
-#' reproducing a v2 set. `form` decides the shape of the
-#' comparison, and the choice is a modelling decision rather than
-#' a convenience:
+#' `form` is a modelling choice:
 #'
-#' - `single` fits one model holding every covariate. Use when
-#'   the question is about the whole set, not its members.
-#' - `each` fits one model per covariate, so they compete singly.
-#' - `ladder` adds them cumulatively in the order given, which
-#'   asks whether each one earns its place given the ones before
-#'   it. Order therefore matters and is the user's claim.
-#' - `all_subsets` fits every combination. Honest but explosive:
-#'   ten covariates is 1,023 models per species per draw, so it
-#'   is capped rather than left to run away.
+#' - `single`: one model with every covariate.
+#' - `each`: one model per covariate.
+#' - `ladder`: cumulative, in the order given (order matters).
+#' - `all_subsets`: every combination, capped by `max_subsets`
+#'   (ten covariates is 1,023 models per species per draw).
 #'
 #' @param covariates Character vector of covariate names.
 #' @param form Character. One of the shapes above.
@@ -489,6 +402,36 @@ models_from_covariates <- function(
   unique(models)
 }
 
+## 3.3 models_union() ----
+
+#' One Formula Holding Every Covariate a Candidate Set Uses
+#'
+#' For engines that find their own variables, curvature and
+#' interactions (e.g. boosted trees). `I(x^2)` and `a:b`
+#' contribute x, a and b as main effects.
+#'
+#' @param models Character vector of formulas, a list of groups of
+#'   them (a staged set), or a name in model_sets().
+#' @param sets Named list of model sets.
+#' @return One formula, as text, in update form (". ~ . + ...").
+#'
+#' @example # Example usage of the function
+#' # models_union("climate_bird_v2")
+models_union <- function(models, sets = model_sets()) {
+  formulas <- unlist(get_model_set(models, sets), use.names = FALSE)
+
+  terms <- unique(unlist(lapply(formulas, function(one) {
+    all.vars(stats::as.formula(one))
+  })))
+  terms <- setdiff(terms, c(".", "response", "offset", "weight"))
+
+  if (length(terms) == 0) {
+    return(". ~ .")
+  }
+
+  paste0(". ~ . + ", paste(terms, collapse = " + "))
+}
+
 # 4. get_model_set() ----
 
 #' Look Up One Model Set
@@ -501,9 +444,7 @@ models_from_covariates <- function(
 #' @example # Example usage of the function
 #' # get_model_set("climate_bird_mammal_v2")
 get_model_set <- function(name, sets = model_sets()) {
-  # A stage that declares no set at all - most stages have no
-  # intercept categories - asks for nothing rather than for a
-  # set called NULL.
+  # Most stages declare no intercept-category set
   if (is.null(name) || length(name) == 0) {
     return(NULL)
   }

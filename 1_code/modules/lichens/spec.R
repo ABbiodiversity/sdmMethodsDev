@@ -7,14 +7,10 @@
 # outputs: none; returns objects in memory
 # notes:
 #   - Data slug: "lichen". Response file lichen.csv.
-#   - v2 fits Protocol for this taxon. Only bryophytes and
-#     lichens get it; soil mites and vascular plants do not. The
-#     asymmetry is v2's and is preserved here for parity, with
-#     `use_protocol` exposed so an experiment can equalize it.
+#   - v2 fits Protocol for this taxon (bryophytes and lichens
+#     only); `use_protocol` can equalize it across taxa.
 #   - The v2 reference is the published file on ABMI-DATA2 and is
 #     intact, unlike the bryophyte one.
-#   - Anything true of every plant-group taxon belongs in
-#     _shared/plant_group.R, not here.
 # ---
 
 # 1. Setup ----
