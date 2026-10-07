@@ -162,56 +162,12 @@ taxon-specific v2 behaviour is in
 
 ## Getting started
 
-New to the repository? Read
-[`docs/getting_started.md`](docs/getting_started.md) first: vocabulary,
-running the baseline, reading the outputs, and testing a change.
-
-### Prerequisites
-
-R 4.4 or later, and these packages:
-
-```r
-install.packages(c(
-  "data.table", "arm", "mgcv", "MuMIn", "pROC", # harness, methods
-  "jsonlite", "ggplot2",                        # summaries, figures
-  "xgboost",                                    # xgboost engine
-  "testthat", "withr"                           # 1_code/tests/
-))
-```
-
-`_setup/03` also needs `foreach`, `AICcmodavg`, `binom`, `mapproj` and
-`RcmdrMisc` (v2's functions). `exp_002_soilgrids` also needs `sf`,
-`terra` and [sciSpatialR](https://github.com/ABbiodiversity/sciSpatialR).
-
-Runs need read access to `//ABMI-DATA2/science/sdmMethodsDev/` (ABMI
-network or VPN). They read the published test dataset and v2 results
-from there, at the versions pinned in
-[`1_code/harness/data_source.R`](1_code/harness/data_source.R); nothing
-in `_setup/` has to be run. To read another copy, such as a local one,
-set `SDM_TEST_DATASET` and `SDM_V2_RESULTS` to its folders.
-
-### Run the v2 baseline (exp_000)
-
-From the repository root:
-
-```r
-source("1_code/harness/harness.R")
-load_framework()          # the harness, every method, every taxon module
-list_methods()            # engines, selection rules, resampling, metrics
-names(standard_specs())   # the runs an experiment can choose
-
-# Check species, n_bootstraps and workers in run.R first
-source("1_code/experiments/exp_000_parity_v2/run.R")
-```
-
-### Check that a change broke nothing
-
-```sh
-Rscript 1_code/tests/run_tests.R
-```
-
-Then compare stores at 5 draws with `1_code/tests/compare_stores.R`, as
-in [`docs/getting_started.md`](docs/getting_started.md#check-that-nothing-broke).
+New to the repository? Work through the
+[getting-started guide](https://abbiodiversity.github.io/sdmMethodsDev/getting_started.html):
+prerequisites and data access, running the v2 baseline (exp_000),
+starting an experiment, adding a taxon module, and checking that a
+change broke nothing. Its source is
+[`docs/getting_started.md`](docs/getting_started.md).
 
 ## Outputs: `2_pipeline/` and `3_output/`
 
