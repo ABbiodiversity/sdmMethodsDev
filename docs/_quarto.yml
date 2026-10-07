@@ -1,0 +1,37 @@
+# Docs site for sdmMethodsDev, published to GitHub Pages by
+# .github/workflows/docs.yaml on every push to main that touches
+# docs/. Preview locally from this folder: quarto preview
+# Only the pages listed under `render` are built; the other
+# docs stay repository-only.
+project:
+  type: website
+  output-dir: _site
+  render:
+    - index.md
+    - getting_started.md
+
+website:
+  title: "sdmMethodsDev"
+  site-url: "https://abbiodiversity.github.io/sdmMethodsDev/"
+  repo-url: "https://github.com/ABbiodiversity/sdmMethodsDev"
+  navbar:
+    logo: images/abmi_logo.png
+    left:
+      - href: index.md
+        text: Home
+      - href: getting_started.md
+        text: Getting started
+    right:
+      - icon: github
+        href: https://github.com/ABbiodiversity/sdmMethodsDev
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    code-copy: true
+
+# Renders ```mermaid blocks as diagrams, as GitHub does
+filters:
+  - mermaid.lua
