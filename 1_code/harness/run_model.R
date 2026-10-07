@@ -9,32 +9,13 @@
 #   in each run directory, one result store per region; see
 #   result.R
 # notes:
-#   - The loop a spec drives. Everything it does is taken from
-#     the spec, so this file names no taxon. In order:
-#     1. prepare_spec(): check the spec, decide the species, and
-#        load each region's data and grid once.
-#     2. fit_species(): for one species, every region, draw and
-#        stage. This is the unit of work, run in parallel when
-#        `workers` is above 1.
-#     3. merge_spec_shards(): each species wrote to a shard of its
-#        own; the shards are joined, in queue order, into one
-#        store per region, with its meta.json.
-#   - Stages run in order and each may carry the previous one
-#     forward. v2's habitat models take the fitted climate
-#     prediction as a term called `Climate`; here that is
-#     `carry_as` on a stage, and dropping it is how an experiment
-#     asks whether staging helps at all.
-#   - Seeds are derived per species (species_seed()), so results
-#     do not depend on how many workers ran or in what order: a
-#     parallel run writes the same stores as a serial one.
-#   - Metrics and grid predictions come from each stage's final
-#     model - the averaged or combined one where the rule
-#     combines candidates - or from the spec's `final_prediction`
-#     where it states its own, as the plant specs do with v2's.
-#   - A species or draw that fails is recorded and the run
-#     continues. Across 172 species and 100 draws something always
-#     fails, and losing the whole run to it would be worse than
-#     losing the cell.
+#   - The spec-driven loop; names no taxon. prepare_spec() loads
+#     each region once; fit_species() is the unit of (parallel)
+#     work; merge_spec_shards() joins shards in queue order.
+#   - Stages run in order; `carry_as` passes a stage's prediction
+#     forward (v2's `Climate` term).
+#   - Per-species seeds make parallel and serial runs identical.
+#   - A failed species or draw is logged and the run continues.
 # ---
 
 # 1. Setup ----
@@ -48,9 +29,8 @@
 
 #' Run Several Specs Through One Pool of Workers
 #'
-#' What an experiment calls. Every species of every spec is one
-#' job, so a run with few species per taxon still keeps every
-#' worker busy.
+#' Every species of every spec is one job, so few species per
+#' taxon still keeps every worker busy.
 #'
 #' @param specs A named list of taxon specs. The names name the
 #'   runs, and so the folders under `pipeline_dir`.
@@ -67,10 +47,8 @@
 #'   or NULL; see apply_stage_models().
 #' @param metrics Character vector of metric names, or NULL for
 #'   default_metrics().
-#' @param boot_seed Integer or NULL. The base seed. Each species
-#'   resamples under its own seed derived from it. NULL falls back
-#'   to the spec's `resample$seed`, and when that is NULL too the
-#'   draws are unseeded, as in v2.
+#' @param boot_seed Integer or NULL. The base seed; NULL falls
+#'   back to `spec$resample$seed`, then to unseeded (as v2).
 #' @param workers Integer. Species fitted at once. 1 runs in this
 #'   session; more start background R sessions.
 #' @param unit_predictions Character. "none", "oob" or "all"; see
@@ -103,8 +81,7 @@ run_specs <- function(
          call. = FALSE)
   }
 
-  # Step 1: Prepare every spec before fitting any, so a problem in
-  # the last spec stops the run before hours are spent on the first
+  # Step 1: Prepare every spec first, so a bad spec fails early
   prepared <- lapply(stats::setNames(names(specs), names(specs)),
                      function(key) {
     prepare_spec(
@@ -193,23 +170,17 @@ prepare_spec <- function(
   iterations = 1:100, stage_models = NULL, metrics = NULL,
   boot_seed = NULL, unit_predictions = "none"
 ) {
-  # An experiment's own candidate sets replace the spec's before
-  # anything is read, so the covariates follow from them.
+  # Before any read, so covariates follow the replacement sets
   spec <- apply_stage_models(spec, stage_models)
 
-  # Checked before any data is read, so a misspelt field or an
-  # unregistered method stops the run here with a sentence.
   validate_spec(spec)
 
-  # One base seed governs the run; the experiment's wins over the
-  # spec's, so a run can seed every taxon from one setting.
+  # The experiment's seed wins over the spec's
   base_seed <- boot_seed %||% spec$resample$seed
 
-  # Step 1: The species. A named species is validated once
-  # against the whole taxon, so a typo stops the run here. Per
-  # region it is then intersected rather than re-validated: a
-  # species modelled in the north and not the south is a fact
-  # about the species, not a mistake by the caller.
+  # Step 1: The species. Named species are validated against the
+  # whole taxon, then intersected per region (a species may be
+  # modelled in one region only).
   species <- taxon_values(species, spec$taxon) %||% species
 
   if (!is.null(species)) {
@@ -272,13 +243,9 @@ prepare_spec <- function(
 
 #' Resolve One Region's Stages and Load Its Data and Grid
 #'
-#' A stage with no models of its own takes the region's, which is
-#' how one spec fits vegetation types in the north and soil types
-#' in the south. The v2 formulas name columns as the source files
-#' did; any column in more than one block was suffixed by the
-#' harmonizer, so the names are rewritten here (see term_map()).
-#' Without it a habitat model asks for HardLin, gets a column
-#' belonging to another taxon, and reads NA.
+#' A stage with no models takes the region's (veg in the north,
+#' soil in the south). Formula terms are rewritten to the
+#' dataset's block-suffixed names (see term_map()).
 #'
 #' @param spec A taxon spec.
 #' @param region Character.
@@ -301,9 +268,8 @@ prepare_region <- function(spec, region, species, data_dir) {
   # takes them, and every formula in the dataset's names
   spec$stages <- lapply(spec$stages, function(stage) {
     if (is.null(stage$models)) {
-      # A region that supplies the models also supplies what goes
-      # with them: the mammal one-hot rule's reference categories,
-      # constants, and the columns its age splines read.
+      # Plus what goes with them: reference categories,
+      # constants, and columns the age splines read
       stage$models <- region_spec$habitat_models
       stage$intercept_cats <- region_spec$intercept_cats %||%
         stage$intercept_cats
@@ -329,8 +295,7 @@ prepare_region <- function(spec, region, species, data_dir) {
     stage
   })
 
-  # Step 2: The columns to load. Read off the formulas, plus the
-  # weight, the stored-draw key and any filter column.
+  # Step 2: The columns to load
   weight_column <- region_spec$weight_column %||% spec$weight_column
   covariates <- covariate_request(
     spec, spec_covariates(spec), region_spec$filter
@@ -349,11 +314,9 @@ prepare_region <- function(spec, region, species, data_dir) {
     covariate_files = spec$covariate_files
   )
 
-  # Step 4: The grid. A spec may name its own; otherwise the
-  # dataset manifest's grid for the taxon and region is used. Its
-  # columns are renamed to match the data, but its row names - the
-  # habitat types effects are reported under - are left as v2
-  # wrote them.
+  # Step 4: The grid (the spec's, else the manifest's). Columns
+  # are renamed to the data's names; row names stay as v2 wrote
+  # them.
   grid_name <- region_spec$grid %||%
     manifest_entry(data_dir, spec$taxon, region)$grid
   grid <- load_prediction_grid(data_dir, grid_name)
@@ -361,8 +324,7 @@ prepare_region <- function(spec, region, species, data_dir) {
   if (!is.null(grid)) {
     names(grid) <- apply_term_map(names(grid), rename)
 
-    # A region may leave rows or columns out, as v2 drops the
-    # mammal north's WetlandMargin and Climate rows.
+    # e.g. v2 drops the mammal north's WetlandMargin and Climate
     grid <- grid[
       !rownames(grid) %in% region_spec$grid_drop_rows,
       !names(grid) %in% region_spec$grid_drop_cols,
@@ -386,12 +348,10 @@ prepare_region <- function(spec, region, species, data_dir) {
 
 #' Assemble the Province-Wide Data a Spec's Province Scope Needs
 #'
-#' v2 fits the plant and bird climate stages once, on every unit
-#' in the draw, and draws the plant bootstrap once per species
-#' across the province; only the habitat stage is fitted per
-#' region. A spec says so with `scope = "province"` on a stage
-#' and on `resample`. This loads the unfiltered data those need,
-#' once per spec.
+#' v2 fits plant and bird climate stages, and draws the plant
+#' bootstrap, province-wide; only habitat is per region. Specs
+#' declare this with `scope = "province"`. Loads the unfiltered
+#' data once per spec.
 #'
 #' @param spec A taxon spec, with stage models already resolved.
 #' @param data_dir Character.
@@ -412,8 +372,7 @@ province_context <- function(spec, data_dir, species) {
     return(NULL)
   }
 
-  # A province stage is fitted before any region exists, so it
-  # can take nothing from a region-scope stage.
+  # Province stages run first, so cannot carry from region stages
   for (stage in province_stages) {
     if (!is.null(stage$carry_from) || is.null(stage$models)) {
       stop(
@@ -431,8 +390,7 @@ province_context <- function(spec, data_dir, species) {
     character(0)
   }
 
-  # The region filters are evaluated on the province frame for
-  # v2's redraw rule, so their columns are loaded too.
+  # v2's redraw rule evaluates region filters on this frame
   filters <- lapply(spec$regions, `[[`, "filter")
   covariates <- covariate_request(spec, covariates, filters)
 
@@ -457,10 +415,9 @@ province_context <- function(spec, data_dir, species) {
 
 #' The Columns to Load, Given the Covariates the Formulas Name
 #'
-#' Adds what no formula names but a run still needs - the column
-#' stored draws are keyed on, and any column a region filter reads
-#' - and drops what is not read from covariates.csv: aliases,
-#' which are made from columns already loaded, and site fields.
+#' Adds the stored-draw key and region-filter columns; drops
+#' aliases and site fields, which do not come from
+#' covariates.csv.
 #'
 #' @param spec A taxon spec.
 #' @param covariates Character vector from spec_covariates().
@@ -495,10 +452,8 @@ covariate_request <- function(spec, covariates, filters = NULL) {
 
 #' Fit Every Job, in This Session or in Parallel
 #'
-#' Parallel runs start a cluster of background R sessions with the
-#' base `parallel` package, load the framework on every one of
-#' them at once, then hand out jobs one at a time as workers come
-#' free, so a slow species (a bird) does not hold up the rest.
+#' In parallel, jobs are handed out as workers free up, so a
+#' slow species does not hold up the rest.
 #'
 #' @param jobs List of `key` and `species` pairs.
 #' @param prepared Named list of prepare_spec() results.
@@ -524,15 +479,13 @@ run_jobs <- function(jobs, prepared, workers = 1L, verbose = TRUE) {
          "called, so workers can load it too.", call. = FALSE)
   }
 
-  # Step 1: Start the workers and load the framework on all of
-  # them at once
+  # Step 1: Start the workers and load the framework
   cluster <- parallel::makePSOCKcluster(min(workers, length(jobs)))
   on.exit(parallel::stopCluster(cluster), add = TRUE)
 
   parallel::clusterCall(cluster, load_worker, project_root)
 
-  # Step 2: One job at a time per worker. Each carries only its
-  # own spec's prepared data.
+  # Step 2: Each job carries only its own spec's prepared data
   tasks <- lapply(jobs, function(job) {
     list(species = job$species, prepared = prepared[[job$key]])
   })
@@ -566,9 +519,7 @@ load_worker <- function(project_root) {
 
 #' Fit One Job in a Background Session
 #'
-#' What a worker runs. It refers to nothing in the calling
-#' session, so the worker needs only the job, and finds
-#' fit_species() in the framework load_worker() loaded.
+#' Self-contained, so a worker needs only the job.
 #'
 #' @param task List of `species` and `prepared`.
 #' @return The job's log data frame.
@@ -583,9 +534,8 @@ fit_species_worker <- function(task) {
 
 #' Fit One Species in Every Region of a Spec
 #'
-#' The unit of work. Writes a shard store per region and returns
-#' the log. Province-wide draws and stage fits are made once and
-#' shared by the species' regions.
+#' Writes a shard store per region. Province-wide draws and
+#' stage fits are made once and shared by the regions.
 #'
 #' @param species Character.
 #' @param p A prepare_spec() result.
@@ -606,9 +556,8 @@ fit_species <- function(species, p) {
     )
   }
 
-  # Step 1: The province-wide frame and draws, when the spec has
-  # province scope. A species whose draws cannot be made is
-  # logged and skipped, not fatal.
+  # Step 1: Province-wide frame and draws, if any. A species
+  # whose draws cannot be made is logged and skipped.
   province <- NULL
   province_fits <- list()
 
@@ -645,15 +594,13 @@ fit_species <- function(species, p) {
       weight_column = region$weight_column
     )
 
-    # A spec may attach per-species columns, and drop rows,
-    # before fitting: the mammal precomputed climate.
+    # Per-species columns (e.g. mammal precomputed climate)
     if (is.function(spec$species_frame)) {
       frame <- spec$species_frame(frame, species, p$data_dir, spec)
     }
 
-    # Step 2: The draws. Province-wide ones are shared by every
-    # region and filtered to the region's units when fitted, which
-    # is how v2 subsets its draws.
+    # Step 2: The draws. Province-wide draws are filtered to the
+    # region's units when fitted, as v2 subsets them.
     draws <- if (!is.null(province$draws)) {
       province$draws
     } else {
@@ -696,8 +643,6 @@ fit_species <- function(species, p) {
         store = shard, species = species, region = region$name,
         boot = boot, grid = region$grid, metrics = p$metrics,
         fixed = fixed,
-        # The province-wide frame, for validation that scores
-        # climate over every unit
         validation_frame = province$frame
       )
     })
@@ -762,8 +707,7 @@ run_stage <- function(
   models <- get_model_set(stage$models)
   response <- spec$response_name %||% "response"
 
-  # A staged rule takes groups of formulas; the others take a
-  # flat list. Both arrive here as text and become formulas now.
+  # Text to formulas; staged rules take groups
   as_formulas <- function(x) {
     if (is.list(x)) {
       return(lapply(x, as_formulas))
@@ -772,23 +716,16 @@ run_stage <- function(
     lapply(x, stats::as.formula)
   }
 
-  # The offset goes in the formula, not in an argument. An offset
-  # supplied as an argument is not carried by predict() onto new
-  # data: R silently recycles the fitted offset against the new
-  # rows, which for birds would make every prediction outside the
-  # draw wrong. v2 writes `offset(offset)` for the same reason.
-  #
-  # A stage may start every candidate from terms of its own. v2's
-  # bird landcover selection starts from `count ~ climate`, so
-  # each group updates a model that already carries the climate
-  # stage.
+  # The offset goes in the formula: an offset argument is not
+  # applied by predict() to new data (R recycles the fitted one).
+  # `base_terms` start every candidate from given terms, as v2's
+  # bird landcover selection starts from `count ~ climate`.
   base <- stats::as.formula(paste(
     response, "~", paste(c("1", stage$base_terms), collapse = " + "),
     if (is.null(offset)) "" else "+ offset(offset)"
   ))
 
-  # Every stage field the rule declares as an argument is passed
-  # to it by name, so a new rule's settings need no change here.
+  # Stage fields the rule declares are passed by name
   rule <- if (is.function(stage$selection)) {
     stage$selection
   } else {
@@ -821,8 +758,7 @@ run_stage <- function(
       control = stage$control %||% list()
     ),
     settings,
-    # Supplied by the harness rather than the stage, and passed
-    # only to a rule that declares them
+    # Harness-supplied, only to rules that declare them
     list(
       grid = grid,
       species = species,
@@ -840,8 +776,7 @@ run_stage <- function(
 
 #' Prepare One Stage's Data and Fit It
 #'
-#' Shared by the per-region loop and by stages fitted once for
-#' the whole province, so both prepare a stage the same way.
+#' Shared by region-scope and province-scope stages.
 #'
 #' @param stage A stage definition.
 #' @param fitting The draw's rows, with any carried stage added.
@@ -862,8 +797,7 @@ fit_one_stage <- function(stage, fitting, spec, grid = NULL,
   response_name <- spec$response_name %||% "response"
   stage_data <- fitting
 
-  # A stage may read the response differently from the spec's
-  # default; recomputed from the retained raw values.
+  # Stage-specific response transform, from the raw values
   raw_name <- paste0(response_name, "_raw")
 
   if (!is.null(stage$response_transform) &&
@@ -873,9 +807,8 @@ fit_one_stage <- function(stage, fitting, spec, grid = NULL,
     )
   }
 
-  # A stage may fit on a subset: the mammal abundance half is
-  # estimated from the units where the species was seen, because
-  # abundance given presence is not defined where there was none.
+  # Row subset, e.g. the mammal abundance half fits only units
+  # where the species was seen
   if (!is.null(stage$row_filter)) {
     keep <- stage$row_filter(stage_data)
     keep[is.na(keep)] <- FALSE
@@ -886,8 +819,8 @@ fit_one_stage <- function(stage, fitting, spec, grid = NULL,
     }
   }
 
-  # v2 skips a plant habitat model outright when the draw, after
-  # the region filter, holds fewer than 20 detections.
+  # v2 skips a plant habitat model with fewer than 20
+  # detections in the filtered draw
   if (!is.null(stage$min_detections)) {
     detections <- sum(stage_data[[response_name]] > 0, na.rm = TRUE)
 
@@ -920,12 +853,9 @@ fit_one_stage <- function(stage, fitting, spec, grid = NULL,
     return(failed("stage_failed"))
   }
 
-  # A stage may reshape its result after selection with steps its
-  # spec supplies, applied in order: the plant stand-age splines,
-  # cutblock convergence and footprint pooling. Each takes and
-  # returns the selection result, and sees the stage's data. A
-  # step that declares `grid`, `species` or `stage` is given them,
-  # as a rule is: the mammal v2 tables read all three.
+  # Spec-supplied post-processing, in order (e.g. plant stand-age
+  # splines, cutblock convergence, footprint pooling). Steps that
+  # declare `grid`, `species` or `stage` are given them.
   for (step in stage$post_process) {
     context <- list(grid = grid, species = species, stage = stage)
     context <- context[names(context) %in% names(formals(step))]
@@ -939,12 +869,10 @@ fit_one_stage <- function(stage, fitting, spec, grid = NULL,
 
 #' The Value a Stage Hands the Next One
 #'
-#' Computed from the stage's final model, not from its best
-#' single candidate: the averaging is the point of the stage.
-#' Where the stage has coefficients that is the averaged
-#' coefficients applied to the data, exactly as v2 computes it;
-#' an engine without coefficients carries its final model's
-#' prediction instead.
+#' From the stage's final (averaged) model, not its best
+#' candidate: averaged coefficients applied to the data, as v2
+#' does, or the final model's prediction for engines without
+#' coefficients.
 #'
 #' @param selected A selection result.
 #' @param data The rows to compute it for.
@@ -986,9 +914,8 @@ carry_values <- function(selected, data, stage) {
 #' @param spec A taxon spec, with the region's stages.
 #' @param frame The full one-species frame for the region.
 #' @param draw Character vector of survey unit ids in the draw.
-#'   Ids not in the frame are dropped, so a province-wide draw
-#'   passed to one region keeps only that region's units, with
-#'   their repeats, as v2 filters its draws.
+#'   Ids not in the frame are dropped (repeats kept), as v2
+#'   filters province-wide draws per region.
 #' @param store A result_store().
 #' @param species,region Character.
 #' @param boot Integer.
@@ -997,8 +924,7 @@ carry_values <- function(selected, data, stage) {
 #' @param fixed Named list of fit_one_stage() results for stages
 #'   already fitted at province scope, or NULL.
 #' @param validation_frame The province-wide frame, or NULL;
-#'   passed to the spec's `validate` function, which scores
-#'   climate over every unit.
+#'   passed to the spec's `validate` function.
 #' @return A one-row data frame recording the outcome.
 #'
 #' @example # Example usage of the function
@@ -1033,16 +959,14 @@ run_one_draw <- function(
     stage_coefficients <- list()
 
     for (stage in spec$stages) {
-      # A stage that carries the previous one forward gets it as
-      # a column, which is how v2's habitat models take Climate
+      # Carried stage as a column (v2's `Climate` term)
       if (!is.null(stage$carry_from) && !is.null(carried)) {
         column <- stage$carry_from_as %||% "Climate"
         fitting[[column]] <- carried$fitting
         frame[[column]] <- carried$full
       }
 
-      # A province-scope stage was fitted once for the species
-      # and draw, and is shared by every region.
+      # Province-scope stages were fitted once per draw
       fitted <- if (stage$name %in% names(fixed)) {
         fixed[[stage$name]]
       } else {
@@ -1062,11 +986,9 @@ run_one_draw <- function(
         )
       }
 
-      # Every stage's coefficients are kept, not only the last,
-      # so each stage can be compared against its own v2
-      # reference. A rule with several outputs - the mammal
-      # hurdle's presence, abundance and total tables - writes
-      # each as its own stage, `<stage>_<output>`.
+      # Every stage's coefficients are kept, for per-stage v2
+      # comparison. Multi-output rules (the mammal hurdle) write
+      # `<stage>_<output>`.
       if (!is.null(selected$outputs)) {
         for (output in names(selected$outputs)) {
           key <- paste(stage$name, output, sep = "_")
@@ -1093,8 +1015,8 @@ run_one_draw <- function(
 
   frame <- result$frame
 
-  # Step 2: The final model's prediction at every unit. A spec
-  # may state its own final model, as the plant specs state v2's.
+  # Step 2: The final model's prediction at every unit (or the
+  # spec's `final_prediction`, as the plant specs give v2's)
   predicted <- tryCatch(
     if (is.function(spec$final_prediction)) {
       spec$final_prediction(result$stage_coefficients, frame)
@@ -1108,8 +1030,7 @@ run_one_draw <- function(
     return(outcome("predict_failed", result$stage$name))
   }
 
-  # Written only once the whole draw succeeded, so a store never
-  # holds half a draw
+  # Written only once the whole draw succeeded
   for (stage_name in names(result$stage_coefficients)) {
     write_coefficients(
       store, species, region, boot,
@@ -1125,10 +1046,8 @@ run_one_draw <- function(
     predicted, frame[[response_name]], in_bag = in_bag
   )
 
-  # Step 3: Score twice: on the units the draw fitted (in-sample)
-  # and on the units it left out (out-of-bag), the held-out read.
-  # Iteration 1 is the full data and has no out-of-bag units, so
-  # its out-of-bag metrics are NA.
+  # Step 3: Score in-sample and out-of-bag. A full-data draw
+  # (bootstrap iteration 1) has no out-of-bag units, so NA.
   scored <- function(keep, prefix) {
     out <- compute_metrics(
       frame[[response_name]][keep], predicted[keep], metrics
@@ -1142,8 +1061,7 @@ run_one_draw <- function(
     scored(!in_bag, "oob_")
   )
 
-  # A spec may add its own validation: the plant specs add v2's
-  # seven validation AUCs, in-bag and out-of-bag.
+  # Spec validation, e.g. the plant specs' v2 validation AUCs
   if (is.function(spec$validate)) {
     extra <- tryCatch(
       spec$validate(
@@ -1158,8 +1076,7 @@ run_one_draw <- function(
 
   write_metrics(store, species, region, boot, metric_rows)
 
-  # Step 4: Project the final model onto the prediction grid, the
-  # quantity that makes engines comparable
+  # Step 4: Project the final model onto the prediction grid
   if (!is.null(grid)) {
     grid_prediction <- predict_grid(
       result$selected, grid,
@@ -1186,9 +1103,8 @@ run_one_draw <- function(
 
 #' Join a Spec's Shards into One Store per Region
 #'
-#' Shards are joined in the region's queue order, so each store
-#' holds its rows in the order a serial run writes them. The
-#' store's meta.json is written here, and the shards removed.
+#' Joins shards in queue order (matching a serial run), writes
+#' meta.json, and removes the shards.
 #'
 #' @param p A prepare_spec() result.
 #' @return NULL, invisibly.
@@ -1232,9 +1148,7 @@ run_meta <- function(p, region) {
   list(
     taxon = spec$taxon,
     region = region$name,
-    # Mammal specs are fitted per season, as a hurdle, and the
-    # comparison needs both to find the right reference. NA for
-    # every other taxon.
+    # Mammals only: needed to find the right v2 reference
     season = spec$season %||% NA_character_,
     part = if (any(vapply(
       stages, function(s) identical(s$selection, "hurdle"), logical(1)

@@ -5,20 +5,10 @@
 # inputs: none
 # outputs: none; defines functions in memory
 # notes:
-#   - An engine is a fitting method behind one interface, so that
-#     swapping a GLM for a boosted tree is a one-word change in a
-#     spec rather than a rewrite. The engines themselves live in
-#     1_code/methods/engines/, one file each; this file is how the
-#     harness talks to them.
-#   - The contract, in full, is in 1_code/methods/README.md:
-#     `fit(formula, data, family, weights, offset, control)`
-#     returns list(fit, ok, message) and never raises;
-#     `predict(fit, newdata, type, se)` returns a numeric vector
-#     (or list(fit, se.fit) when se = TRUE), or NULL on failure;
-#     `coef(fit)` and `ic(fit, type)` exist when the engine
-#     declares the `coefficients` and `ic` capabilities.
-#   - check_engine() runs that contract on small synthetic data,
-#     so a new engine can be tested before it meets the dataset.
+#   - The harness's interface to the engines in
+#     1_code/methods/engines/, so swapping engines is a one-word
+#     spec change. The contract is in 1_code/methods/README.md;
+#     check_engine() tests an engine against it on synthetic data.
 # ---
 
 # 1. Setup ----
@@ -59,9 +49,7 @@ engine_has <- function(engine, capability) {
 
 #' Coefficients from a Fit, Where the Engine Has Them
 #'
-#' A fit made through fit_with() carries its coefficients
-#' already, so they are computed once per fit however many times
-#' a rule reads them.
+#' Reuses coefficients cached on the fit by fit_with().
 #'
 #' @param engine An engine definition.
 #' @param fit A fit from engine$fit().
@@ -140,9 +128,8 @@ engine_nobs <- function(engine, fit) {
 
 #' Fit One Formula Through an Engine
 #'
-#' The one place a candidate is fitted, so every rule gets the
-#' same thing back: the engine's fit, with its coefficients
-#' computed once and kept on it.
+#' The one place a candidate is fitted. Coefficients are computed
+#' once and cached on the fit (bayesglm's summary() is slow).
 #'
 #' @param engine An engine definition.
 #' @param formula A model formula.
@@ -172,10 +159,9 @@ fit_with <- function(
 
 #' Test an Engine Against the Contract
 #'
-#' Fits small synthetic binomial and Poisson data - with weights,
-#' an offset in the formula, and a factor - and checks each part
-#' of the contract the engine claims. Run it on a new engine
-#' before using it in a spec.
+#' Fits synthetic binomial and Poisson data (weights, a formula
+#' offset, a factor) and checks each part of the contract the
+#' engine declares.
 #'
 #' @param engine An engine definition, or a registered name.
 #' @param n Integer. Rows of synthetic data.
@@ -192,8 +178,7 @@ check_engine <- function(engine, n = 400L, seed = 1L, quiet = FALSE) {
     engine <- get_engine(engine)
   }
 
-  # Step 1: Synthetic data with a known signal, built under its
-  # own seed so the session's random state is left alone.
+  # Step 1: Synthetic data with a known signal
   data <- with_seed(seed, {
     x1 <- stats::rnorm(n)
     x2 <- stats::runif(n)
@@ -273,8 +258,7 @@ check_engine <- function(engine, n = 400L, seed = 1L, quiet = FALSE) {
         }
     )
 
-    # The offset is part of a survey, not of the model: changing
-    # it on new data must change a Poisson prediction.
+    # Doubling effort on new data must double a Poisson prediction
     if (family == "poisson") {
       shifted <- newdata
       shifted$offset <- shifted$offset + log(2)

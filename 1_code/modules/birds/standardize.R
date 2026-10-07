@@ -10,13 +10,10 @@
 #     - lookup/covariate_columns.csv, lookup/bird_factor_levels.csv
 # outputs: none; returns objects in memory
 # notes:
-#   - A port of the translation in v2's 08.PackageCoefficients.R
-#     (kept in 0_data/v2_scripts/birds/).
-#     v2 publishes bird landcover effects on the standardized
-#     cross-taxa habitat types - WhiteSpruceR to WhiteSpruce8,
-#     Loamy, EnSoftLin and so on - not as raw glm coefficients,
-#     so the harness's raw coefficients have to be translated
-#     the same way before they can be compared.
+#   - Port of v2's 08.PackageCoefficients.R translation. v2
+#     publishes bird landcover effects on the standardized
+#     cross-taxa habitat types, not raw glm coefficients, so the
+#     harness's coefficients are translated the same way.
 #   - North: the raw coefficients are multiplied by v2's `age`
 #     matrix, one row per standardized type. Linear features and
 #     wellsites are re-expressed as the mean predicted abundance
@@ -30,8 +27,7 @@
 #     reads -10,000 rather than -Inf.
 #   - Standard errors are not translated. The gate compares
 #     estimates only.
-#   - Two v2 quirks are reproduced rather than corrected, because
-#     the point is to match v2:
+#   - v2 quirks reproduced for parity:
 #     - The mSoft substitution tests for zero after the
 #       coefficients are exponentiated, so it never fires.
 #     - The NESP north Climate effect is multiplied by 0.1 twice,
@@ -337,9 +333,8 @@ standardize_bird_draw <- function(raw, context, species) {
     # Step 1: Standardized habitat types from the age matrix
     lam <- exp(drop(age %*% value(colnames(age))))
 
-    # Step 2: Linear features. v2 exponentiates, then tests for
-    # zero, so the mSoft substitution below never fires; kept
-    # so the code reads as v2's does.
+    # Step 2: Linear features. The mSoft substitution never fires
+    # (v2 tests for zero after exponentiating); kept as in v2.
     hf <- exp(value(c("mWell", "mSoft", "mEnSft", "mTrSft",
                       "mSeism")))
 

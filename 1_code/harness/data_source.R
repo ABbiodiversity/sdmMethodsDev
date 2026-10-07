@@ -12,20 +12,14 @@
 #     read instead
 # outputs: none; returns the folder to read
 # notes:
-#   - Both datasets are built once by 1_code/_setup/ and
-#     published to ABMI-DATA2 by _setup/10_publish_datasets.R.
-#     Experiments, tests and downstream scripts read the
-#     published copies, so nobody else has to run _setup/.
-#   - sdm_published$versions pins the version every run reads.
-#     A published version is a folder that is never overwritten;
-#     moving to a rebuilt dataset is a one-line change here.
-#   - The environment variables point runs at another folder - a
-#     local copy for working off the network, or the _setup/
-#     output in 0_data/ straight after a rebuild.
-#   - Every call checks that each file in checksums.csv is
-#     present at its published size. That catches a missing or
-#     half-copied file in a second; a full md5 check is left to
-#     verify_published().
+#   - Runs read the copies published by
+#     _setup/10_publish_datasets.R, so only maintainers run
+#     _setup/. sdm_published$versions pins the version read;
+#     published versions are never overwritten.
+#   - The environment variables redirect to a local copy or to
+#     fresh _setup/ output in 0_data/.
+#   - Each call checks presence and size against checksums.csv
+#     (fast); verify_published() does the full md5 check.
 # ---
 
 # 1. Setup ----
@@ -56,9 +50,8 @@ sdm_published <- list(
 
 #' Resolve a Published Dataset Folder
 #'
-#' Returns, in order of preference, `dir`, the folder named by
-#' the dataset's environment variable, or its pinned published
-#' version.
+#' Precedence: `dir`, then the dataset's environment variable,
+#' then the pinned published version.
 #'
 #' @param name Character. "test_dataset" or "v2_results".
 #' @param dir Character or NULL. A folder to use as is.
@@ -135,10 +128,9 @@ v2_results_dir <- function(dir = NULL, check = TRUE) {
 
 #' Check a Dataset Folder Is Complete
 #'
-#' Checks the folder exists and, when it carries a
-#' checksums.csv (every published version does), that each file
-#' listed is present at its listed size. A local copy without
-#' checksums.csv is only checked for the dataset's marker file.
+#' Published copies are checked file by file against
+#' checksums.csv (presence and size); a local copy without one is
+#' only checked for the dataset's marker file.
 #'
 #' @param dir Character. The folder.
 #' @param name Character. The dataset, for its marker file.

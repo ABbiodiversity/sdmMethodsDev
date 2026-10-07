@@ -18,43 +18,19 @@
 #     - bird_north_prediction_matrix.csv
 #     - bird_south_prediction_matrix.csv
 # notes:
-#   - The response tables were harmonized to one shape by 01; the
-#     lookups were not. Each taxon lead's species queue arrived in
-#     its own schema, factor levels were per taxon, and which file
-#     belongs to which taxon was known only to the harness code.
-#     This writes one form of each, so a method or a new taxon
-#     never needs taxon-specific file logic.
-#   - Offline. It reads only 0_data/test_dataset/, so it can be
-#     re-run at any time. Run it after 01 and 06, whenever either
-#     rebuilds lookup/. The source files are left in place.
-#   - species_queue.csv: one row per taxon, region, season, tier
-#     and species, with `order` the source list's own order, so a
-#     narrowed run visits species in the order v2 would, and
-#     `source_name` the name the source pipeline used. `tier`
-#     separates mammals' full habitat models (20+ detections) from
-#     their use-availability models (3+); it is "modelled"
-#     elsewhere. `season` is empty for all but mammals.
-#   - dataset_manifest.csv: one row per taxon and region, naming
-#     the response file, the offset file, the key the taxon's rows
-#     carry in covariates.csv, the habitat prediction grid, and
-#     where any stored bootstrap draws are. The harness reads file
-#     locations from here and nowhere else.
-#   - The bird prediction grids. Every other taxon predicts onto a
-#     grid with one row per habitat type; birds had none, because
-#     v2 translates bird coefficients onto habitat types with a
-#     model matrix (bird_veg_age_matrix.csv) rather than predicting
-#     a grid. The north grid is that matrix rebuilt in covariate
-#     space - each row's vegetation class from its dummy column,
-#     its stand age and type flags from the age terms - and is
-#     checked to reproduce the matrix exactly before it is
-#     written. The south grid is one row per soil class. Terms the
-#     matrix does not carry - roads, wells, water, survey method -
-#     are at zero, or at the reference level for a factor, which
-#     is what v2's translation assumes.
-#   - The stored bootstrap draws keep their two layouts (one
-#     table per taxon for birds, one file per species for the
-#     plant-group taxa), because v2 drew them that way. The
-#     manifest records which layout each taxon has.
+#   - Writes one cross-taxon form of each lookup, so no method or
+#     new taxon needs taxon-specific file logic. Reads only
+#     0_data/test_dataset/; run after 01 and 06.
+#   - species_queue.csv: `order` is the source list's order;
+#     `tier` separates mammals' full habitat models (20+
+#     detections) from use-availability models (3+).
+#   - dataset_manifest.csv: the only place the harness learns file
+#     locations, covariate keys, grids and stored-draw layouts.
+#   - Bird grids: v2 translates bird coefficients with a model
+#     matrix, not a grid. The north grid rebuilds that matrix in
+#     covariate space and is checked to reproduce it exactly; the
+#     south grid is one row per soil class. Terms the matrix lacks
+#     are zero or the factor reference level, as v2 assumes.
 # ---
 
 # 1. Setup ----
@@ -95,8 +71,7 @@ write_lookup <- function(frame, name) {
 }
 
 # 2. Species queue ----
-# Three schemas become one. The logic is the one species.R used to
-# apply on every read; it now runs once, here.
+# Three source schemas become one
 
 ## 2.1 queue_rows() ----
 
@@ -193,8 +168,6 @@ if (any(duplicated_rows)) {
 write_lookup(species_queue, "species_queue.csv")
 
 # 3. Factor levels ----
-# One table with a taxon column, so any taxon can record the
-# level order of its categorical covariates the same way.
 factor_files <- list.files(
   lookup_dir, pattern = "_factor_levels\\.csv$"
 )
@@ -247,10 +220,9 @@ vegc <- vapply(seq_len(nrow(age)), function(i) {
   if (length(hit) == 0) vegc_levels[1] else sub("^vegc", "", hit)
 }, character(1))
 
-# A type flag enters only through its interactions with age, so
-# it is read back from them: the interaction divided by the age
-# term, wherever age is non-zero. Where every age term is zero the
-# flag cannot affect a prediction and is left at zero.
+# Type flags enter only via age interactions, so are recovered as
+# interaction / age where age is non-zero; else left at zero (no
+# effect on predictions)
 flags <- c("isCon", "isUpCon", "isBogFen", "isMix", "isPine",
            "isWSpruce")
 age_terms <- c("wtAge", "wtAge2", "wtAge05")
@@ -281,8 +253,7 @@ bird_north <- data.frame(
 )
 
 ### 4.1.1 Check the rebuild ----
-# The grid must reproduce v2's matrix column for column, or the
-# grid predictions would not be the quantity v2 translates to.
+# Must reproduce v2's matrix column for column
 rebuilt <- stats::model.matrix(
   ~ vegc + wtAge + wtAge2 + wtAge05 + fcc2 +
     (wtAge + wtAge2 + wtAge05):(isCon + isUpCon + isBogFen +
@@ -331,8 +302,7 @@ bird_south <- data.frame(
 write_lookup(bird_south, "bird_south_prediction_matrix.csv")
 
 # 5. Dataset manifest ----
-# Where each taxon's files are. A new taxon is added here, with
-# its files, and needs no harness change.
+# A new taxon is added here and needs no harness change
 plant_taxa <- c("vascular_plant", "bryophyte", "lichen", "mite")
 
 manifest <- rbind(

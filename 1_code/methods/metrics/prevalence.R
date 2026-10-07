@@ -5,9 +5,7 @@
 # inputs: none
 # outputs: registers the `prevalence` metric
 # notes:
-#   - Takes observed and predicted vectors on the response scale
-#     and returns one number. Computed from predictions only, so
-#     every engine is scored the same way.
+#   - Metric contract: see register_metric() (harness/registry.R).
 # ---
 
 # 1. Setup ----
@@ -19,9 +17,8 @@
 
 #' Proportion of Survey Units with a Detection
 #'
-#' Carried alongside the scores because most of them are only
-#' interpretable against it: an AUC of 0.9 means something
-#' different at 2 per cent prevalence than at 40.
+#' Reported because most scores are only interpretable against
+#' it.
 #'
 #' @param observed,predicted Numeric vectors.
 #' @return A number between 0 and 1.

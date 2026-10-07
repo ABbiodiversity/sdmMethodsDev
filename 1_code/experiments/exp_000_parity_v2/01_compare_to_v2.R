@@ -14,16 +14,12 @@
 #   - `results$parity`, `results$parity_summary` and
 #     `results$parity_notes`, for the later steps
 # notes:
-#   - The gate itself. Compares this run's coefficients against
-#     the published v2 ones, per stage, species and term.
-#   - Reads only the one v2_results.csv, so it runs with the
-#     network drives unmounted.
+#   - The gate: this run's coefficients against v2's, per stage,
+#     species and term. Reads only v2_results.csv.
 #   - What is joined to what:
-#     - Climate is fitted once, province-wide, in v2, so its
-#       reference rows carry region "all". A run's north and
-#       south climate results are both scored against them.
-#       The harness fits climate per region, so expect a gap
-#       until it does not.
+#     - v2 climate reference rows carry region "all"; a run's
+#       north and south climate results are both scored against
+#       them.
 #     - Habitat is joined on region. Plant terms are relabelled
 #       as v2's 04a standardization does; bird terms are the
 #       translated ones collect_results() adds (stage "habitat",
@@ -32,21 +28,13 @@
 #     - Mammals are joined on the hurdle part, and their two
 #       season runs are averaged first, because v2's `.all`
 #       references average summer and winter.
-#   - Parity is distributional where v2 bootstraps: the v2
-#     median is scored on whether it falls inside this run's
-#     10th-to-90th percentile band. Where v2 fits once (v2_n of
-#     1: mammal climate and habitat), the like-for-like run value
-#     is iteration 1, the full-data fit, and the absolute
-#     difference is the number to read.
-#   - Terms v2 overwrites with machinery the harness does not
-#     have, or fixes at a placeholder, are flagged from
-#     v2_unreachable_terms() and left out of the reachable
-#     scores.
-#   - Whatever cannot be compared is left in
-#     `results$parity_notes`, which the report prints.
-#   - Run by run_experiment() as a step, in an environment of its
-#     own holding only `config` and `results`; see
-#     script_step().
+#   - Where v2 bootstraps, the v2 median is scored against this
+#     run's 10-90% band. Where v2 fits once (mammals, v2_n = 1),
+#     iteration 1 is compared and the absolute difference read.
+#   - Terms from v2_unreachable_terms() are left out of the
+#     reachable scores. What cannot be compared goes to
+#     `results$parity_notes`.
+#   - Run as a script_step().
 # ---
 
 # 1. Setup ----
@@ -141,9 +129,8 @@ if (!is.null(run_coefficients)) {
     !(run_rows$taxon == "bird" & run_rows$stage == "landcover"),
   ]
 
-  # glm names terms as the formula writes them; v2's published
-  # tables use plain names. The spatial ones are the bird climate
-  # terms; the plant ones are stored columns already.
+  # glm names terms as the formula writes them (e.g. the bird
+  # spatial terms); v2's tables use plain names
   v2_names <- c(
     "(Intercept)" = "Intercept",
     "I(Easting^2)" = "Easting2",
@@ -153,9 +140,7 @@ if (!is.null(run_coefficients)) {
   renamed <- run_rows$term %in% names(v2_names)
   run_rows$term[renamed] <- v2_names[run_rows$term[renamed]]
 
-  # The mammal hurdle writes one stage per v2 table,
-  # habitat_presence, habitat_abundance and habitat_total; each
-  # is v2's habitat stage for that part.
+  # The hurdle's habitat_<part> stages map to v2's habitat stage
   hurdle <- grepl(
     "^habitat_(presence|abundance|total)$", run_rows$stage
   )
@@ -206,17 +191,14 @@ if (!is.null(run_coefficients)) {
   }
 
   ## 3.3 Average the mammal seasons ----
-  # v2's `.all` references are the mean of the summer and winter
-  # fits where both exist. The season is part of the harness's
-  # species name, so it is stripped and the runs averaged.
+  # v2's `.all` references average summer and winter
   is_mammal <- run_rows$group == "mammal"
 
   if (any(is_mammal)) {
     mammals <- run_rows[is_mammal, ]
 
-    # Stores written before meta.json recorded the season and
-    # part lack them. The season is in the species name, and
-    # those runs fitted presence, the spec's default.
+    # Older stores lack season and part in meta.json: take the
+    # season from the species name; those runs fitted presence
     no_season <- is.na(mammals$season) | mammals$season == ""
     mammals$season[no_season] <- tolower(
       sub("^.*_(Summer|Winter)$", "\\1", mammals$species[no_season])
@@ -285,8 +267,7 @@ if (!is.null(run_rows) && !is.null(reference) &&
   )
 
   ## 4.1 The run value to compare ----
-  # Where v2 fits once, its value is a full-data fit, and the
-  # like-for-like run value is iteration 1.
+  # Where v2 fits once, compare iteration 1
   parity$comparison <- ifelse(
     !is.na(parity$v2_n) & parity$v2_n == 1,
     "iteration 1", "median"
@@ -318,10 +299,8 @@ if (!is.null(run_rows) && !is.null(reference) &&
   parity$reachable <- is.na(parity$unreachable_reason)
 
   ## 4.2a Flag negligible terms ----
-  # Terms model averaging has shrunk to nothing in both runs. They
-  # stay in the in-band scores, which the numerical tolerance
-  # already handles, but not in the band ratio or the Spearman,
-  # where their noise would decide the row.
+  # Kept in the in-band scores (the tolerance handles them), not
+  # in the band ratio or Spearman, where their noise would decide
   term_scales <- term_scale(reference, c("taxon", "stage"))
   parity <- merge(
     parity, term_scales,
@@ -339,11 +318,8 @@ if (!is.null(run_rows) && !is.null(reference) &&
     matched, abs(parity$run_value - parity$v2_median), NA_real_
   )
 
-  # A term agrees when the v2 median is inside this run's band,
-  # or when the two are within numerical tolerance. The second
-  # matters for averaged terms carrying almost no model weight:
-  # their values run to 1e-20 or 1e-137, and banding numerical
-  # noise is meaningless.
+  # In band, or within numerical tolerance (near-zero averaged
+  # terms run to 1e-20 or 1e-137)
   parity$in_band <- matched & (
     (is.finite(parity$p10) & is.finite(parity$p90) &
        parity$v2_median >= parity$p10 &
@@ -418,9 +394,7 @@ if (!is.null(parity) && nrow(parity) > 0) {
                            collapse = "+"),
         species = length(unique(compared$species)),
         terms_compared = nrow(compared),
-        # The draws the store actually holds, which the verdict
-        # checks: a store overwritten by a shorter run still reads
-        # the configured draw count.
+        # Draws actually stored, not configured
         min_draws = if (nrow(compared) == 0) {
           NA_integer_
         } else {
@@ -441,9 +415,8 @@ if (!is.null(parity) && nrow(parity) > 0) {
           signif(max(reachable$absolute_difference, na.rm = TRUE), 3)
         },
         negligible_terms = sum(reachable$negligible),
-        # Per species, then the median: the terms span twenty
-        # orders of magnitude, so a rank correlation, as the v2
-        # self-agreement calibration uses. Reported, not gated.
+        # Per species, then the median (as the v2 calibration).
+        # Reported, not gated.
         median_spearman = med(vapply(
           split(substantive, substantive$species),
           function(one) {
@@ -456,11 +429,8 @@ if (!is.null(parity) && nrow(parity) > 0) {
           },
           numeric(1)
         )),
-        # This run's 10-90% band over v2's, per term; the median
-        # per species, then over species, as the v2 calibration
-        # takes it. Single terms vary threefold between two v2
-        # runs, a species' median does not. NA where v2 has no
-        # band: the iteration-1 rows.
+        # Band ratio: median per species, then over species (as
+        # the calibration). NA for iteration-1 rows.
         median_band_ratio = med(vapply(
           split(substantive, substantive$species),
           function(one) {
@@ -496,18 +466,14 @@ if (!is.null(parity) && nrow(parity) > 0) {
 
   parity_summary$verdict <- verdict_of(gated)
 
-  # A run with v2's full draw count on a species subset is not the
-  # gate, but its rows can still be read against the targets. Said
-  # separately, so it is never mistaken for the verdict.
+  # Full draws on a species subset: readable, but not the gate
   parity_summary$indicative_verdict <- if (!gated && full_length) {
     verdict_of(TRUE)
   } else {
     NA_character_
   }
 
-  # A distributional row read from fewer stored draws than v2 has
-  # no verdict, whatever the run was configured for: a band from
-  # five draws is narrower than one from a hundred.
+  # Fewer stored draws than v2: no verdict
   short <- grepl("median", parity_summary$comparison) &
     !is.na(parity_summary$min_draws) &
     parity_summary$min_draws < config$v2_bootstraps

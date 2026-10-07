@@ -5,29 +5,13 @@
 # inputs: none
 # outputs: none; returns objects in memory
 # notes:
-#   - Holds the species vectors an experiment's run.R chooses
-#     between, so run.R stays a page of decisions rather than a
-#     page of names. Shared, so a later experiment can run exactly
-#     the species exp_000 ran and compare against it like for
-#     like. Loaded by load_framework().
-#   - Every set uses the named-vector convention the harness
-#     expects: names are taxa, values are species, names may
-#     repeat, and an unnamed entry applies to every taxon. NULL
-#     means every species the spec's queue declares, which is the
-#     full parity run.
-#   - Names are data slugs, not directory names. Soil mites key
-#     on "mite". See 1_code/modules/soil_mites/spec.R.
-#   - Species names must match the response columns exactly. The
-#     loader stops and lists any name it cannot find, so a typo
-#     fails before modelling starts rather than part-way through.
-#   - To see what is available for a taxon:
-#       head(list_species(data_dir, "mite", "north"), 20)
-#   - A taxon a set does not name is unrestricted, not excluded.
-#     Narrow the run's taxa alongside a partial set;
-#     experiment_config() warns if a taxon would silently run its
-#     full species list.
-#   - This mirrors model_sets() and get_model_set() in the
-#     harness, so the two registries read the same way.
+#   - Named species sets shared by experiments, so a later
+#     experiment can run exactly exp_000's species. Sets follow
+#     taxon_values() (names are data slugs, e.g. "mite"); NULL
+#     means every species.
+#   - A taxon a set does not name is unrestricted, not excluded;
+#     narrow `taxa` alongside a partial set.
+#   - Available species: list_species(data_dir, "mite", "north").
 # ---
 
 # 1. Setup ----
@@ -49,28 +33,15 @@ focal_species_sets <- function() {
   list(
 
     ## 2.1 full ----
-    # Every species each spec declares. The parity run.
+    # The full parity run
     full = NULL,
 
     ## 2.2 parity_check ----
-    # Two per taxon, for a first run that is meant to be read
-    # rather than merely survived.
-    #
-    # These were not picked for being familiar. A rare species
-    # has a wide bootstrap band, so the v2 value falls inside it
-    # whatever the harness does and the parity test passes
-    # without discriminating. These are the species whose bands
-    # are tight enough for an in-band result to mean something.
-    #
-    # Each was chosen on four criteria: present in both regions
-    # well above the 20-detection bootstrap threshold;
-    # prevalence between roughly 5 and 45 per cent, so neither
-    # floor nor ceiling; present in the v2 reference with all
-    # 100 draws usable; and, across the pair, one balanced
-    # between north and south so the southern model is genuinely
-    # exercised.
-    #
-    # Birds use v2's stored draws, so their bands are v2's own.
+    # Two per taxon, chosen so the parity test discriminates: rare
+    # species have bands wide enough to pass anything. Criteria:
+    # well above 20 detections in both regions; prevalence ~5-45%;
+    # all 100 v2 draws usable; and one of each pair balanced
+    # between north and south.
     #
     # Detections north / south, and prevalence north / south:
     #   Ceratodon.purpureus       2140 /  554   44.1 / 24.0
@@ -125,14 +96,8 @@ focal_species_sets <- function() {
     ),
 
     ## 2.3 plants_only ----
-    # The four plant-group taxa, for a run that skips the two
-    # taxa with the slowest stages.
-    #
-    # Pair this with a narrowed run_taxa. A taxon that a set does
-    # not name is unrestricted rather than excluded, so leaving
-    # mammals and birds in run_taxa would run every species of
-    # each and make this the longest run in the file. run.R warns
-    # when that happens.
+    # Pair with a narrowed `taxa`, or mammals and birds run every
+    # species (experiment_config() warns)
     plants_only = c(
       bryophyte      = "Ceratodon.purpureus",
       bryophyte      = "Bryum.All",
@@ -145,8 +110,7 @@ focal_species_sets <- function() {
     ),
 
     ## 2.4 one_each ----
-    # One species per taxon. The shortest run that still touches
-    # every module, for checking plumbing after a change.
+    # Shortest run touching every module, for plumbing checks
     one_each = c(
       bryophyte      = "Ceratodon.purpureus",
       lichen         = "Physcia.adscendens",
@@ -163,9 +127,8 @@ focal_species_sets <- function() {
 
 #' Look Up One Focal-Species Set by Name
 #'
-#' An unrecognized value is returned unchanged, so run.R can
-#' hand this either a set name or a species vector written
-#' inline and get the right thing back either way.
+#' An unrecognized value (e.g. an inline species vector) is
+#' returned unchanged.
 #'
 #' @param name Character. A name from focal_species_sets(), or
 #'   a species vector to pass through, or NULL for all species.

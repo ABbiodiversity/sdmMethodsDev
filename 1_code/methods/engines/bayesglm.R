@@ -5,23 +5,14 @@
 # inputs: none
 # outputs: registers the `bayesglm` engine
 # notes:
-#   - arm::bayesglm with its default Cauchy priors, which is what
-#     the v2 plant models use.
-#   - bayesglm and glm sit on different axes and should not be
-#     read as "frequentist versus Bayesian". bayesglm is
-#     penalized maximum likelihood - augmented IRLS under weakly
-#     informative Cauchy priors - giving a point estimate and a
-#     standard error, with no posterior. It belongs on a
-#     regularization axis. A Bayesian framework comparison needs
-#     brms or rstanarm.
-#   - The plant v2 models use it because rare species fitted
-#     against 30-term habitat formulas separate completely, and
-#     plain glm then returns infinite coefficients. The
-#     regularization is load-bearing, so swapping plants to glm as
-#     a control will fail outright for the rare end of the species
-#     list rather than give a clean comparison.
-#   - arm is loaded lazily, so a run that never uses this engine
-#     does not need it installed.
+#   - arm::bayesglm with default Cauchy priors, as the v2 plant
+#     models use. It is penalized maximum likelihood (point
+#     estimate and SE, no posterior), so glm vs bayesglm is a
+#     regularization contrast, not frequentist vs Bayesian.
+#   - Rare plant species separate completely under 30-term habitat
+#     formulas, so plain glm fails for them; the penalty is
+#     load-bearing.
+#   - arm is loaded lazily, only when this engine is used.
 # ---
 
 # 1. Setup ----

@@ -9,18 +9,12 @@
 #     - species_queue.csv (each species' v2 name)
 # outputs: none; returns objects in memory
 # notes:
-#   - The hurdle itself - presence, then abundance given presence -
-#     is fitted by the generic `hurdle` rule
-#     (methods/selection/hurdle.R), through whatever engine the
-#     stage names. This file holds what is v2's own: how v2 turns
-#     the two fitted GLMs into its published tables. It is a port
-#     of the per-species, per-season body of v2's 03_basic-models.R
-#     after the fits, north (sections 6.3 to 6.6 and 6.11) and
-#     south (6.3 to 6.6).
-#   - mammal_v2_habitat_tables() runs as the habitat stage's
-#     post_process step, so replace_stage_method() removes it with
-#     the GLMs: an engine experiment reports the hurdle rule's own
-#     grid tables instead. It stops if either half is not a GLM.
+#   - Ports how v2 turns the two hurdle GLMs into its published
+#     tables: 03_basic-models.R after the fits, north sections
+#     6.3-6.6 and 6.11, south 6.3-6.6. The hurdle itself is fitted
+#     by methods/selection/hurdle.R.
+#   - mammal_v2_habitat_tables() is a post_process step, removed
+#     by replace_stage_method(); it stops if a half is not a GLM.
 #   - Effects are reported on v2's full habitat set, not the
 #     winning model's categories: each category is spread over
 #     the fine types the prediction matrix assigns to it.
@@ -49,11 +43,9 @@
 
 #' Attach v2's Precomputed Climate Prediction to a Mammal Frame
 #'
-#' v2's habitat models do not fit climate; they read a
-#' per-species prediction from a separate climate pipeline, and
-#' drop the deployments that have none. This does the same, then
-#' recomputes the response on the remaining rows, because the lure
-#' correction and scaling depend on which rows are in.
+#' As v2: drops deployments without a prediction, then recomputes
+#' the response, since lure correction and scaling depend on the
+#' rows kept.
 #'
 #' @param frame A one-species frame from model_frame().
 #' @param species Character. The harness species name, e.g.
@@ -154,9 +146,8 @@ mammal_held_constants <- function(has_aspen) {
 
 #' Turn the Fitted Hurdle into v2's Three Habitat Tables
 #'
-#' The habitat stage's post_process step. Reads the two GLMs the
-#' `hurdle` rule chose and replaces its outputs with v2's
-#' presence, abundance and total tables.
+#' Replaces the `hurdle` rule's outputs with v2's presence,
+#' abundance and total tables.
 #'
 #' @param selected The `hurdle` rule's selection result.
 #' @param data The stage's data: `response` is the lure-scaled
@@ -182,9 +173,7 @@ mammal_v2_habitat_tables <- function(selected, data, grid,
   pa <- selected$parts$presence$fit$fit
   agp <- selected$parts$abundance$fit$fit
 
-  # v2's tables are read from GLM coefficients. A stage fitted
-  # with another engine should have had this step removed by
-  # replace_stage_method(); say so rather than mix the two.
+  # Needs GLM coefficients; other engines should not reach here
   if (!inherits(pa, "glm") || !inherits(agp, "glm")) {
     stop(
       "The mammal v2 tables read GLM fits, but this hurdle was ",

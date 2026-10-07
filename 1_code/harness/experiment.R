@@ -9,24 +9,12 @@
 #   in 3_output/<id>/: tables/, run_record.md, and whatever the
 #   experiment's own steps write
 # notes:
-#   - An experiment is a configuration plus a few steps. This
-#     holds the part every experiment shares, so each run.R is a
-#     short list of decisions:
-#     - experiment_config() states and checks the decisions -
-#       which runs, species, draws, seed, candidate models and
-#       workers - before anything is fitted. Every check that used
-#       to sit in run.R lives here.
-#     - run_experiment() fits (optionally), collects the stores
-#       into summary tables, compares them with the baseline
-#       experiment (exp_000, the v2 configuration), runs the
-#       experiment's own steps in order, and writes the run
-#       record.
-#   - Every experiment is compared with the baseline without
-#     asking, because that comparison is the point of an
-#     experiment here: a result is read as a difference from v2.
-#   - Everything the steps need travels in the config and the
-#     results passed to them; nothing is read from the global
-#     environment, so a step can be run on its own.
+#   - The part every experiment shares, so each run.R is a short
+#     list of decisions. experiment_config() checks them before
+#     anything is fitted; run_experiment() fits, summarizes,
+#     compares with the baseline (exp_000, v2), runs the
+#     experiment's own steps and writes the run record.
+#   - Steps receive everything through `config` and `results`.
 # ---
 
 # 1. Setup ----
@@ -170,8 +158,7 @@ experiment_config <- function(
   }
 
   # Step 4: The species. A taxon the set does not name runs every
-  # species, because an absent taxon means "no restriction". Said
-  # out loud, because it makes a partial set the longest run.
+  # species, so say so: it makes a partial set the longest run.
   focal <- get_focal_species(species)
 
   if (!is.null(focal)) {
@@ -356,9 +343,7 @@ run_experiment <- function(
 
 #' The Settings a Run Record States
 #'
-#' Settings rather than paths: an absolute directory differs
-#' between machines and would diff on every line without meaning
-#' anything.
+#' Settings, not absolute paths, which differ between machines.
 #'
 #' @param config An experiment_config().
 #' @param run_log The run log, or NULL when nothing was fitted.
@@ -413,9 +398,7 @@ record_config <- function(config, run_log = NULL) {
     data_dir = published_label(config$data_dir)
   )
 
-  # Failures belong in the record. Without them, a run that lost
-  # half its jobs and one that lost none look alike wherever the
-  # survivors agree.
+  # Record failures, or a run that lost jobs looks complete
   if (!is.null(run_log)) {
     ok <- sum(run_log$status == "ok", na.rm = TRUE)
     out$jobs_total <- nrow(run_log)
@@ -464,11 +447,9 @@ experiment_changes <- function(config) {
 
 #' Compare an Experiment's Summaries with the Baseline's
 #'
-#' Run by run_experiment() for every experiment but the baseline.
-#' Writes tables/comparison_metrics.csv and prints the per-taxon
-#' headline; see compare_experiments(). A baseline
-#' that has not been run is reported and skipped rather than
-#' stopping the experiment.
+#' Writes tables/comparison_metrics.csv and prints the headline
+#' (see compare_experiments()). A baseline not yet run is
+#' reported and skipped, not an error.
 #'
 #' @param config An experiment_config().
 #' @param results The results so far.
@@ -528,11 +509,9 @@ compare_to_baseline <- function(
 
 #' Turn an Experiment Script into a Step
 #'
-#' An experiment's own scripts - a comparison, a figure, a
-#' report - are written top to bottom and read `config` and
-#' `results`. This runs one in an environment of its own holding
-#' only those two, so it cannot depend on, or leave behind, any
-#' other variable, and hands back the `results` it updated.
+#' Runs the script in a fresh environment (parent: global)
+#' holding `config` and `results`, so it leaves nothing behind,
+#' and returns the updated `results`.
 #'
 #' @param path Character. The script.
 #' @return A function(config, results) for run_experiment()'s

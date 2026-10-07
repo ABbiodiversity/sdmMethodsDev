@@ -5,18 +5,13 @@
 # inputs: none
 # outputs: none; returns objects in memory
 # notes:
-#   - Metrics are what experiments are compared on, so a change
-#     affects every past and future experiment and should be
-#     reviewed on that basis.
-#   - The metrics themselves live in 1_code/methods/metrics/, one
-#     file each, registered by name. Every metric takes observed
-#     and predicted vectors on the response scale and returns one
-#     number.
-#   - Metrics are computed from predictions, never from a fitted
-#     object, so a GLM and a boosted tree are scored the same way.
-#   - A metric that cannot be computed returns NA rather than
-#     stopping. A bootstrap where a species was never detected
-#     has no AUC, and that is a fact about the draw, not an error.
+#   - Experiments are compared on these metrics, so a change here
+#     affects every experiment. Metrics live in
+#     1_code/methods/metrics/ and score response-scale
+#     predictions, never a fitted object, so all engines are
+#     scored alike.
+#   - An uncomputable metric returns NA rather than stopping (e.g.
+#     no AUC for a draw with no detections).
 # ---
 
 # 1. Setup ----
@@ -28,9 +23,9 @@
 
 #' The Metrics Scored When a Run Names None
 #'
-#' Every registered metric. The seven original ones come first in
-#' their original order, so a metrics table lists them the same
-#' way it always has; any added later follow alphabetically.
+#' Every registered metric: the seven original ones first, in
+#' their original order, so tables stay stable; later additions
+#' follow alphabetically.
 #'
 #' @return A character vector of metric names.
 #'
@@ -70,7 +65,7 @@ compute_metrics <- function(observed, predicted, metrics = NULL) {
     function(name) get_method("metric", name)
   )
 
-  # Step 1: Drop pairs where either side is missing, so every
+  # Step 1: Drop pairs where either side is non-finite, so every
   # metric sees the same rows
   keep <- is.finite(observed) & is.finite(predicted)
   observed <- observed[keep]

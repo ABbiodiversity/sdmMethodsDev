@@ -13,30 +13,15 @@
 #       (small; committed)
 #     - coefficient_summary.csv (large; gitignored)
 # notes:
-#   - Reduces the per-draw result stores to per-species summaries,
-#     which is what every experiment compares. The same for any
-#     experiment, so it lives in the harness: an experiment's own
-#     scripts start from these tables.
-#   - Draws are summarized by median and the 10th and 90th
-#     percentiles, which is what comparisons read. A
-#     coefficient's distribution over draws is routinely skewed,
-#     and a rare species can produce an extreme draw that would
-#     drag a mean somewhere no draw actually is. The mean and
-#     standard deviation are added to every summary for readers
-#     and tools that expect them.
-#   - `boot1` is the iteration-1 value, the full-data fit. It is
-#     the like-for-like quantity where a reference fits once
-#     rather than bootstrapping, as the v2 mammal models do.
-#   - `run` is the folder a store sits in, which run.R names; the
-#     taxon, season and part come from the store's meta.json, so
-#     the two mammal season runs share the taxon "mammal".
-#   - A taxon whose coefficients need translating before they can
-#     be compared (birds, onto v2's habitat template) is handled
-#     by a function the experiment passes in `translate`, so the
-#     harness stays taxon-agnostic.
-#   - Each store is read once. The row counts and pooled metrics
-#     the run record needs are kept from that read and handed to
-#     run_record(), rather than read again.
+#   - Reduces per-draw result stores to the per-species summaries
+#     experiments compare. `boot1` is the full-data fit, the
+#     like-for-like value where a reference fits once (v2
+#     mammals).
+#   - `run` is the store's folder; taxon, season and part come
+#     from meta.json, so both mammal season runs share "mammal".
+#   - Taxa whose coefficients need translating (birds, onto v2's
+#     habitat template) pass a function in `translate`, keeping
+#     the harness taxon-agnostic.
 # ---
 
 # 1. Setup ----
@@ -75,9 +60,7 @@ find_stores <- function(pipeline_dir) {
   rows <- lapply(dirs, function(dir) {
     meta <- store_meta(dir)
 
-    # The run is read off the folder; the rest from meta.json,
-    # rather than parsed out of a path that may not use forward
-    # slashes.
+    # Only the run comes from the path; the rest from meta.json
     data.frame(
       dir = dir,
       run = basename(dirname(dir)),
@@ -168,11 +151,9 @@ summarise_draws <- function(rows, value, keys) {
 
 #' Summarize One Value over Its Draws
 #'
-#' The median and 10-90% band are the summary every comparison
-#' reads, because a distribution over draws is often skewed. The
-#' mean and standard deviation are there for readers and tools
-#' that expect them; with a skewed distribution they describe it
-#' less well.
+#' Comparisons read the median and 10-90% band because draw
+#' distributions are often skewed; mean and sd are added for
+#' tools that expect them.
 #'
 #' @param x Numeric vector, one value per draw.
 #' @param boot Integer vector of the draw each value came from.

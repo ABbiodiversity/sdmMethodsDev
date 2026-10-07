@@ -7,28 +7,13 @@
 #     - covariate_columns.csv
 # outputs: none; returns objects in memory
 # notes:
-#   - Turns a named covariate set into the master column names a
-#     taxon actually has. This is what lets an experiment ask for
-#     "climate_v2_topography" instead of editing a formula list,
-#     which is the mechanism behind the include/exclude
-#     covariate questions this repository exists to ask.
-#   - covariate_columns.csv maps taxon and block to master column,
-#     so the same set resolves to different columns per taxon
-#     where the source data differ, and fails loudly where a
-#     taxon simply does not have a covariate.
-#   - Requires covariate_key() from data_load.R, which is the one
-#     place a taxon's covariate key is derived; source that file
-#     first.
-#   - Sets are defined here rather than in a spec because they
-#     cross taxa: the point of a named set is that the same
-#     request means the same thing for plants, mammals and birds.
-#   - A set may name another set, so sets compose. Recursion is
-#     depth-limited rather than trusted, because a typo that
-#     makes a set reference itself would otherwise hang.
-#   - Future improvement - topography and remote-sensing sets are
-#     declared below but resolve to nothing until a _setup script
-#     adds those columns to covariates.csv. They are listed so
-#     the gap is visible rather than discovered mid-experiment.
+#   - Resolves named, cross-taxa covariate sets to the master
+#     columns each taxon has (via covariate_columns.csv), failing
+#     loudly where a taxon lacks one. Sets may name other sets.
+#   - Needs covariate_key() from data_load.R.
+#   - The topography and remote_sensing sets are not in the frozen
+#     dataset and resolve to nothing; they are listed so the gap
+#     is visible.
 # ---
 
 # 1. Setup ----
@@ -42,10 +27,9 @@ library(data.table) # lookup table reading (version: 1.16.4)
 
 #' Named Covariate Bundles
 #'
-#' Each entry is a character vector of master column names, of
-#' block names, or of other set names. Blocks are taken from
-#' covariate_columns.csv, so `block:veg` means whatever the veg
-#' block holds for the taxon being resolved.
+#' Entries hold master column names, other set names, or
+#' `block:<name>`, which means whatever that block holds for the
+#' taxon being resolved.
 #'
 #' @return A named list of character vectors.
 #'
@@ -54,34 +38,22 @@ library(data.table) # lookup table reading (version: 1.16.4)
 #' # covariate_sets()$climate_v2
 covariate_sets <- function() {
   list(
-    # The whole of a block, as the source file defines it. These
-    # are what a parity run uses.
+    # Whole blocks, as parity runs use
     climate_all = "block:climate",
     veg_all = "block:veg",
     soil_all = "block:soil",
     design_all = "block:design",
 
-    # The climate terms the v2 plant model sets draw on. Named
-    # explicitly rather than as the block, because the block
-    # carries derived and design columns too.
-    #
-    # This is a plant-scale set. Birds carry only five climate
-    # columns, so asking for it on birds fails; use
-    # climate_common for an experiment spanning both.
+    # The climate terms v2 plant model sets draw on (the block
+    # also holds derived and design columns). Fails on birds; use
+    # climate_common across taxa.
     climate_v2 = c(
       "MAT", "MAP", "MWMT", "MCMT", "TD", "MSP", "AHM", "SHM",
       "PET", "CMD", "FFP", "EMT", "EXT", "MTD", "PS"
     ),
 
-    # The climate columns every taxon has, and so the widest set
-    # a cross-taxa experiment can use without the taxa silently
-    # fitting different models.
-    #
-    # Five columns. Birds have no MAT or PET, which is what keeps
-    # the shared set at five rather than more.
-    #
-    # Re-derive with common_covariates() after any dataset
-    # version change rather than trusting this list.
+    # Climate columns every taxon has (birds lack MAT and PET).
+    # Re-derive with common_covariates() after a dataset change.
     climate_common = c("MAP", "FFP", "TD", "CMD", "EMT"),
 
     # The wider set birds and the plant groups share, for an
@@ -90,15 +62,12 @@ covariate_sets <- function() {
       "MAP", "TD", "CMD", "FFP", "EMT"
     ),
 
-    # Topography. Not in the dataset yet; see the header.
     topography = c("elevation", "slope", "aspect", "TRI", "TPI"),
 
-    # Remote sensing. Not in the dataset yet; see the header.
     remote_sensing = c(
       "canopy_height", "canopy_cover", "ndvi", "lai"
     ),
 
-    # Compositions, which is the point of naming sets at all.
     climate_v2_topography = c("climate_v2", "topography"),
     climate_v2_remote = c("climate_v2", "remote_sensing")
   )
@@ -110,16 +79,9 @@ covariate_sets <- function() {
 
 #' Covariates Computed from Other Stored Columns
 #'
-#' Some taxa lack a covariate that their own model set needs, but
-#' hold the columns it is defined from. Deriving it lets that
-#' taxon join an experiment it would otherwise be excluded from.
-#'
-#' Derivation is only sound where the definition is exact. Each
-#' entry records how it was checked against a taxon that carries
-#' both the inputs and the answer, so a derivation is a verified
-#' claim rather than an assumption. A quantity that only
-#' correlates with its supposed formula does not belong here -
-#' see the note on CMD below.
+#' Only exact definitions belong here; each entry's `note` says
+#' how it was verified. A quantity that merely correlates with a
+#' formula does not (see CMD below).
 #'
 #' @return A named list, each entry with `inputs`, `fn` and
 #'   `note`.
@@ -129,10 +91,6 @@ covariate_sets <- function() {
 #' # derived_covariates()$TD$note
 derived_covariates <- function() {
   list(
-    # Continentality: the summer-winter temperature range.
-    # Checked against the vascular plant table, which carries
-    # TD, MWMT and MCMT: agrees to 0.1 degrees, which is the
-    # precision the normals are stored at.
     TD = list(
       inputs = c("MWMT", "MCMT"),
       fn = function(d) d$MWMT - d$MCMT,
@@ -142,20 +100,14 @@ derived_covariates <- function() {
       )
     )
 
-    # CMD is deliberately absent. The mammal climate script
-    # glosses it as "PET - MAP, >= 0", but checked against the
-    # vascular plant table that formula is off by up to 195 mm
-    # (r = 0.975). Climatic moisture deficit is a monthly sum,
-    # not an annual difference, so it cannot be recovered from
-    # the stored annual columns and has to be sourced.
+    # CMD is deliberately absent: "PET - MAP, >= 0" (the mammal
+    # script's gloss) is off by up to 195 mm against
+    # vascular_plant, because CMD is a monthly sum.
     ,
 
-    # The products the harmonizer deliberately does not store,
-    # because a separately stored square would not equal the
-    # square of the stored column at CSV precision. The plant
-    # climate model set fits all four, so a plant run needs them
-    # derived. Each was checked against the frozen v2 source and
-    # agrees exactly.
+    # Products are not stored: a stored square would not equal
+    # the square of the stored column at CSV precision. The plant
+    # climate set fits all four.
     MAPPET = list(
       inputs = c("MAP", "PET"),
       fn = function(d) d$MAP * d$PET,
@@ -177,11 +129,8 @@ derived_covariates <- function() {
       note = "MWMT squared. Exact against the v2 source."
     ),
 
-    # The spatial trend terms, likewise. Easting and Northing are
-    # UTMX and UTMY under another name - identical in the v2
-    # source - and sites.csv carries them too, but the model set
-    # names them, so they are reachable from the covariate table
-    # alone rather than only through a join.
+    # Spatial trend terms, named as the v2 model sets name them,
+    # so they come from the covariate table without a join
     Easting = list(
       inputs = "UTMX",
       fn = function(d) d$UTMX,
@@ -301,8 +250,7 @@ covariate_catalogue <- function(data_dir, taxon = NULL) {
   catalogue <- cached_read(path, function(p) as.data.frame(fread(p)))
 
   if (!is.null(taxon)) {
-    # The catalogue is keyed the way covariates.csv is, so a
-    # split taxon has one row set per region.
+    # A taxon split by region has keys like `<taxon>_<region>`
     keys <- unique(catalogue$taxon)
     matching <- keys[
       keys == taxon | startsWith(keys, paste0(taxon, "_"))
@@ -332,10 +280,8 @@ covariate_catalogue <- function(data_dir, taxon = NULL) {
 #' @param taxon Character. Taxon slug.
 #' @param region Character. Region name, or NULL.
 #' @param block Character. Restrict to one block, or NULL.
-#' @param include_derived Logical. Count covariates that are not
-#'   stored but can be computed from stored ones. TRUE by
-#'   default, because a derived column is as usable as a stored
-#'   one; FALSE answers what the dataset literally holds.
+#' @param include_derived Logical. Also count covariates
+#'   derivable from stored ones (see derived_covariates()).
 #' @return A character vector of master column names.
 #'
 #' @example # Example usage of the function
@@ -368,8 +314,7 @@ available_covariates <- function(
     return(stored)
   }
 
-  # A derived column counts as available wherever its inputs are,
-  # which is what lets mammals reach TD without it being stored.
+  # e.g. mammals reach TD without it being stored
   derived <- derived_covariates()
   reachable <- names(derived)[vapply(
     names(derived),
@@ -384,10 +329,8 @@ available_covariates <- function(
 
 #' Find the Covariates Several Taxa Share
 #'
-#' A cross-taxa experiment can only compare taxa on covariates
-#' they all have. Asking for more means each taxon quietly fits a
-#' different model, which is the one thing a comparison must not
-#' do.
+#' Cross-taxa comparisons must use only shared covariates, or
+#' each taxon fits a different model.
 #'
 #' @param data_dir Character. The test dataset folder.
 #' @param taxa Character vector of taxon slugs.
@@ -420,8 +363,7 @@ common_covariates <- function(data_dir, taxa, block = NULL) {
       rows <- rows[rows$block %in% block, ]
     }
 
-    # A split taxon must have the column in every region, or it
-    # is not usable for that taxon as a whole.
+    # A split taxon must have the column in every region
     per_key <- split(rows$master_column, rows$taxon)
 
     Reduce(intersect, lapply(per_key, unique))
@@ -434,18 +376,11 @@ common_covariates <- function(data_dir, taxa, block = NULL) {
 
 #' Map v2 Term Names onto Harmonized Column Names
 #'
-#' The v2 model formulas name columns as the source files did.
-#' The harmonizer suffixed any column that appears in more than
-#' one block with the block it came from, because the north and
-#' south files carry columns of the same name holding different
-#' values - `HardLin` means the hard linear cover measured for
-#' the vegetation model in one and for the soil model in the
-#' other. 84 plant columns and 6 bird columns are affected.
-#'
-#' Without this mapping a v2 formula asks for `HardLin`, which
-#' exists in the wide table for some other taxon and reads back
-#' as NA, so the map is what keeps a habitat model from silently
-#' losing its footprint terms.
+#' The harmonizer suffixed columns found in more than one block
+#' with their block, because same-named columns hold different
+#' values (e.g. `HardLin` in the veg and soil blocks). 84 plant
+#' and 6 bird columns are affected. Unmapped, a v2 formula would
+#' read another taxon's column as NA and silently lose terms.
 #'
 #' @param data_dir Character. The test dataset folder.
 #' @param taxon Character. Taxon slug.
@@ -484,9 +419,8 @@ term_map <- function(
 
 #' Rewrite Source Names to Master Names
 #'
-#' Applied to model formula text and to prediction grid column
-#' names, so both speak the dataset's names while the v2 sets and
-#' the grids keep the names they were written with.
+#' Applied to formula text and prediction grid column names, so
+#' v2 sets and grids keep their original names.
 #'
 #' @param x Character vector of formula text, or of column names.
 #' @param map A named vector from term_map().
@@ -499,16 +433,13 @@ apply_term_map <- function(x, map) {
     return(x)
   }
 
-  # A staged model set is a list of groups, so the rewrite
-  # recurses rather than assuming a flat vector.
+  # Staged model sets are lists of groups
   if (is.list(x)) {
     return(lapply(x, apply_term_map, map = map))
   }
 
   # Longest names first, so `SurrHardLin` is not half-rewritten
-  # by the rule for `HardLin`. Word boundaries alone would not
-  # settle it, because the shorter name is a suffix of the
-  # longer one rather than a separate word.
+  # by the rule for `HardLin`
   order_by_length <- order(nchar(names(map)), decreasing = TRUE)
 
   for (i in order_by_length) {
@@ -524,11 +455,8 @@ apply_term_map <- function(x, map) {
 
 #' Resolve Covariate Set Names to Master Columns
 #'
-#' Expands set names, block references and bare column names into
-#' the master columns a taxon and region actually have. A name
-#' that resolves to nothing is an error, not an empty result:
-#' silently dropping a covariate would make an experiment look
-#' like it tested something it did not.
+#' An unavailable covariate is an error by default: dropping it
+#' silently would misreport what an experiment tested.
 #'
 #' @param requested Character vector of set names, `block:<name>`
 #'   references, or master column names.
@@ -536,12 +464,9 @@ apply_term_map <- function(x, map) {
 #' @param taxon Character. Taxon slug.
 #' @param region Character. Region name, or NULL.
 #' @param sets Named list of covariate sets.
-#' @param strict Logical. TRUE stops when a requested covariate
-#'   is unavailable. FALSE drops it with a warning, which is a
-#'   deliberate research choice - each taxon then fits its own
-#'   best available set - and is never the default, because a
-#'   silently different model per taxon would invalidate a
-#'   cross-taxa comparison.
+#' @param strict Logical. FALSE drops unavailable covariates with
+#'   a warning, so each taxon fits a different set; never use it
+#'   for cross-taxa comparisons.
 #' @param max_depth Integer. How far a set may reference another
 #'   set before the nesting is treated as circular.
 #' @return A character vector of master column names, in the
@@ -561,9 +486,8 @@ resolve_covariates <- function(
 ) {
   available <- available_covariates(data_dir, taxon, region)
 
-  # Step 1: Expand set names and block references until only
-  # column names are left. Depth-limited, so a set that names
-  # itself fails rather than hanging.
+  # Step 1: Expand sets and blocks to columns. Depth-limited, so
+  # a self-referencing set fails rather than hanging.
   expand <- function(names_in, depth) {
     if (depth > max_depth) {
       stop(
@@ -594,10 +518,8 @@ resolve_covariates <- function(
 
   columns <- unique(expand(requested, 1L))
 
-  # Step 2: Report what this taxon does not have. Set names are
-  # reported separately from bare columns, because an empty set
-  # usually means a covariate has not been added to the dataset
-  # yet, while an unknown column usually means a typo.
+  # Step 2: Report what this taxon lacks. Empty sets are named
+  # separately: they usually mean missing data, not a typo.
   missing_columns <- setdiff(columns, available)
 
   if (length(missing_columns) > 0 && !strict) {

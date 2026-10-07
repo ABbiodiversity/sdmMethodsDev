@@ -27,14 +27,11 @@
 #     - 10 publishes a new version. Run it deliberately, after
 #       checking 02's tally, then move the pin in
 #       1_code/harness/data_source.R.
-#   - Each script runs in an environment of its own, so one
-#     cannot pick up another's objects. A step that errors stops
-#     the rebuild; the log says which.
-#   - 02 prints a pass / fail tally rather than stopping. Read it
-#     before using or publishing the rebuilt data.
-#   - Experiments read the published copies. To run one against
-#     this rebuild, set SDM_TEST_DATASET and SDM_V2_RESULTS to the
-#     local folders (section 3 prints the lines).
+#   - Each script runs in its own environment; an error stops
+#     the rebuild and is logged.
+#   - 02 prints a pass / fail tally rather than stopping; read it
+#     before using or publishing.
+#   - Section 3 prints how to point experiments at this rebuild.
 #   - Run from the repository root.
 # ---
 
@@ -88,9 +85,6 @@ dir.create(log_dir, recursive = TRUE, showWarnings = FALSE)
 log_path <- file.path(log_dir, "run_log.csv")
 
 # 2. Run the steps ----
-# Each step is sourced into a fresh environment and timed. The
-# log row is written before an error is re-raised, so a failed
-# rebuild still records where it stopped.
 
 ## 2.1 run_step() ----
 

@@ -5,23 +5,12 @@
 # inputs: none
 # outputs: none; holds the registered methods in memory
 # notes:
-#   - Every method a spec can name - a fitting engine, a selection
-#     rule, a resampling scheme or a metric - is registered here
-#     under a name. A spec names it; the harness looks it up. Adding
-#     a method is therefore one new file in 1_code/methods/ that
-#     calls a register_*() function, and no harness file changes.
-#   - The registry is one environment, created when this file is
-#     sourced and filled as 1_code/methods/ is sourced after it.
-#     Re-sourcing a method file replaces its entry, so a method can
-#     be edited and reloaded during development.
-#   - Each entry carries a one-line description, which
-#     list_methods() prints, so a user can see what is available
-#     without reading code.
-#   - Requirements are explicit. A selection rule names the engine
-#     capabilities it needs, and validate_spec() (spec.R) checks
-#     them before any data is read, so an engine that cannot
-#     supply standard errors fails with a sentence rather than
-#     silently returning no predictions hours into a run.
+#   - Engines, selection rules, resamplers and metrics register
+#     here by name, so adding a method is one new file in
+#     1_code/methods/ with no harness change. Re-sourcing a method
+#     file replaces its entry.
+#   - Selection rules declare the engine capabilities they need;
+#     validate_spec() (spec.R) checks them before any data is read.
 # ---
 
 # 1. Setup ----
@@ -30,9 +19,8 @@
 # Base R only.
 
 ## 1.2 The registry ----
-# One environment per kind of method. Created only if absent, so
-# re-sourcing this file does not empty a registry that the method
-# files have already filled.
+# Created only if absent, so re-sourcing this file keeps
+# registered methods
 if (!exists(".sdm_registry", inherits = FALSE)) {
   .sdm_registry <- new.env(parent = emptyenv())
 }
@@ -88,8 +76,6 @@ engine_capabilities <- function() {
 ## 2.3 register_method() ----
 
 #' Add One Method to the Registry
-#'
-#' The general form behind the four register_*() functions.
 #'
 #' @param kind Character. One of names(method_kinds()).
 #' @param name Character. The name a spec uses.
@@ -154,13 +140,11 @@ register_method <- function(
 
 #' Register a Fitting Engine
 #'
-#' An engine is a list with `name`, `description`, `capabilities`
-#' and the functions `fit`, `predict`, and - where its
-#' capabilities include them - `coef` and `ic`. See
-#' 1_code/methods/README.md for the contract, and check_engine()
-#' to test one.
+#' See 1_code/methods/README.md for the contract.
 #'
-#' @param engine A list, as described above.
+#' @param engine A list with `name`, `description`,
+#'   `capabilities`, `fit`, `predict`, and `coef`/`ic` where
+#'   declared.
 #' @return The engine name, invisibly.
 #'
 #' @example # Example usage of the function
@@ -203,10 +187,10 @@ register_engine <- function(engine) {
 
 #' Register a Selection Rule
 #'
-#' A rule is a function taking at least `models`, `base`, `data`,
-#' `engine`, `family`, `weights`, `offset`, `ic` and `control`,
-#' and returning selection_result(). Any further argument it
-#' declares is filled from the stage field of the same name.
+#' Rules take `models`, `base`, `data`, `engine`, `family`,
+#' `weights`, `offset`, `ic` and `control` and return
+#' selection_result(). Further arguments are filled from the
+#' stage field of the same name.
 #'
 #' @param name Character. The name a spec uses.
 #' @param fn The rule function.
@@ -237,11 +221,10 @@ register_selection <- function(name, fn, description,
 
 #' Register a Resampling Scheme
 #'
-#' A resampler is a function of `frame`, `iterations`, `seed` and
-#' `context`, plus any settings it declares, which come from the
-#' spec's `resample` list. It returns a list of character vectors
-#' of survey unit ids, one per iteration: the units that draw is
-#' fitted on. Units left out are scored as out-of-bag.
+#' Resamplers take `frame`, `iterations`, `seed`, `context` and
+#' any settings from `spec$resample`, and return one vector of
+#' survey unit ids per iteration. Units left out are scored
+#' out-of-bag.
 #'
 #' @param name Character. The name a spec's `resample$scheme`
 #'   uses.
@@ -271,8 +254,8 @@ register_resampler <- function(name, fn, description) {
 
 #' Register a Metric
 #'
-#' A metric is a function of `observed` and `predicted`, both on
-#' the response scale, returning one number.
+#' Metrics take response-scale `observed` and `predicted` and
+#' return one number.
 #'
 #' @param name Character. The name metrics are reported under.
 #' @param fn The metric function.
@@ -362,9 +345,6 @@ registered_names <- function(kind) {
 ## 3.3 list_methods() ----
 
 #' Show Every Registered Method
-#'
-#' What a spec can name, with a line on each. The quickest answer
-#' to "which engines are there?".
 #'
 #' @param kind Character, or NULL for every kind.
 #' @return A data frame of kind, name, requires and description,

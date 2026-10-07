@@ -6,35 +6,19 @@
 # inputs: none
 # outputs: registers the `hurdle` rule
 # notes:
-#   - A two-part model for a response that is zero at most units
-#     and a right-skewed amount where it is not. Presence is fitted
-#     on every unit; abundance given presence on the units where
-#     the species was found. Their product is total abundance.
-#     v2's mammal habitat models are this shape.
-#   - Engine-agnostic. Both halves are fitted with the stage's
-#     engine through an inner rule, `part_selection`: `aic_best`
-#     for v2's GLMs, `single` for an engine with no information
-#     criterion. replace_stage_method() swaps the inner rule and
-#     the engine, so a boosted tree fits both halves.
-#   - What the rule reports works for any engine: each half and
-#     their product predicted onto the prediction grid, one value
-#     per habitat type, as three outputs (`presence`, `abundance`,
-#     `total`). The harness writes them as the stages
-#     `<stage>_presence`, `<stage>_abundance` and `<stage>_total`.
-#     v2's own post-processing (modules/mammals/hurdle.R) replaces
-#     them with v2's tables when the stage keeps v2's GLMs.
-#   - The final model the harness scores and projects is the
-#     presence half, so metrics compare like with like across
-#     engines and with the presence response.
-#   - The abundance candidates are the presence candidates with
-#     `abundance_drop` removed - v2 notes that climate effects on
-#     abundance given presence are minimal - plus a null carrying
-#     sampling effort. For an engine with coefficients, a
-#     candidate whose cover terms account for all the cover at
-#     every present unit is left out, as v2 leaves it out: with an
-#     intercept as well it cannot be estimated. Terms the stage
-#     holds constant (Climate, sampling effort, pAspen) are not
-#     cover.
+#   - v2's mammal habitat shape: presence on every unit, abundance
+#     given presence where detected; their product is total
+#     abundance. Both halves use the stage's engine via the inner
+#     `part_selection` rule, so any engine works.
+#   - Outputs are each half and the product on the grid, written
+#     as `<stage>_presence`, `_abundance` and `_total`
+#     (modules/mammals/hurdle.R swaps in v2's tables for v2 GLMs).
+#     The scored final model is the presence half.
+#   - Abundance candidates are the presence ones minus
+#     `abundance_drop` (v2: climate effects on abundance are
+#     minimal) plus a null. With coefficients, a candidate whose
+#     cover terms sum to all the cover is dropped, as in v2: it is
+#     not identifiable with an intercept.
 # ---
 
 # 1. Setup ----
@@ -197,9 +181,8 @@ hurdle_abundance_models <- function(presence, models, base, d_p,
   base_text <- paste(deparse(base[[3]]), collapse = " ")
   has_offset <- grepl("offset(offset)", base_text, fixed = TRUE)
 
-  # A presence candidate that could not be fitted has no abundance
-  # counterpart, as in v2. A rule that fits only some candidates
-  # (single) reports only those.
+  # Only fitted presence candidates get an abundance counterpart,
+  # as in v2; `single` fits only the first
   table <- presence$ic_table
   formulas <- lapply(models, resolve_formula, base = base)
 

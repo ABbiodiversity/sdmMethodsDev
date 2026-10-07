@@ -5,14 +5,11 @@
 # inputs: none
 # outputs: registers the `spatial_cv` scheme
 # notes:
-#   - Holds out whole spatial blocks rather than random units, so
-#     a held-out score is not inflated by a training unit sitting
-#     beside its own test unit. This is the scheme a spatial
-#     autocorrelation experiment needs; v2 has no equivalent.
-#   - One "iteration" per fold. Each draw is that fold's training
-#     units, so the fold's test units are exactly what the harness
-#     scores as out-of-bag (`oob_` metrics). Set `n_bootstraps` to
-#     the number of folds wanted.
+#   - Holds out whole spatial blocks, so held-out scores are not
+#     inflated by spatial autocorrelation. No v2 equivalent.
+#   - One iteration per fold; each draw is the fold's training
+#     units, so `oob_` metrics score its test units. Set
+#     `n_bootstraps` to the number of folds.
 # ---
 
 # 1. Setup ----
@@ -57,8 +54,7 @@ resample_spatial_cv <- function(
     )
   }
 
-  # Step 1: Deal whole blocks into folds, so no fold shares a
-  # block with another
+  # Step 1: Deal whole blocks into folds
   assignment <- with_seed(
     seed, sample(rep_len(seq_len(folds), length(present)))
   )

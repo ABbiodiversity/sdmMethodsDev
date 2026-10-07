@@ -11,36 +11,16 @@
 #     - metrics.csv
 #     - meta.json
 # notes:
-#   - Every run writes the same five files whatever the engine,
-#     which is what makes a GLM run and a boosted-tree run
-#     comparable. Comparison code reads this contract and nothing
-#     else.
-#   - grid_predictions.csv is the common currency. Coefficients
-#     cannot compare a GLM to a tree - a tree has no Peatland
-#     coefficient - but every engine can predict onto the rows of
-#     a prediction matrix, which is also the quantity v2 reports.
-#   - coefficients.csv is still written when the engine has
-#     coefficients, because parity against v2 is checked there.
-#     Its absence is recorded in meta.json rather than being
-#     silently empty.
-#   - Writing is append-per-draw rather than one object at the
-#     end. A bird run is 172 species by 100 bootstraps, and
-#     holding all of it before the first write would risk losing
-#     a long run to a failure in its last species.
-#   - Species are fitted in parallel, so each writes to a shard
-#     store of its own, without headers. merge_result_shards()
-#     then writes each file's header once and appends the shards
-#     in queue order, so the merged store is byte for byte what a
-#     serial run writes.
-#   - unit_predictions.csv is optional. It holds every survey unit
-#     for every draw - gigabytes for birds - and nothing
-#     downstream reads it, because metrics are scored in memory.
-#     A run writes it only when asked.
-#   - meta.json records the configuration a run cannot be
-#     reproduced without: engine, selection rule, covariates,
-#     seed, and the resampling scheme. The seed matters most - v2
-#     set none, so a v2-configured run is not reproducible even
-#     against itself.
+#   - Every engine writes the same files, so comparison code reads
+#     only this contract. grid_predictions.csv compares any
+#     engines; coefficients.csv is written only when the engine
+#     has coefficients (v2 parity is checked there).
+#   - Rows are appended per draw, so a failure late in a long run
+#     loses little. Parallel species write headerless shards;
+#     merge_result_shards() appends them in queue order, matching
+#     a serial run byte for byte.
+#   - unit_predictions.csv is opt-in: it can reach gigabytes
+#     (birds) and nothing downstream reads it.
 # ---
 
 # 1. Setup ----
@@ -53,9 +33,6 @@ library(data.table) # fast appending writes (version: 1.16.4)
 ## 2.1 result_columns() ----
 
 #' The Columns of Each Result File
-#'
-#' Fixed per file, so a comparison can rely on them and a shard
-#' written without a header can be given one when merged.
 #'
 #' @return A named list of character vectors.
 #'
@@ -83,8 +60,7 @@ result_columns <- function() {
 #'
 #' @param dir Character. Directory to write into.
 #' @param overwrite Logical. Remove existing result files first.
-#'   FALSE lets a run add to a store, which is how a run that
-#'   stopped part way is continued.
+#'   FALSE continues a run that stopped part way.
 #' @param header Logical. Write a header line when a file is
 #'   started. FALSE for a shard, which is merged under one header.
 #' @param unit_predictions Character. "none" writes no unit
@@ -183,8 +159,7 @@ result_append <- function(store, what, rows) {
   path <- file.path(store$dir, paste0(what, ".csv"))
   started <- file.exists(path)
 
-  # The header is written once, on the first call, so the file
-  # stays a single valid CSV across appends. A shard has none.
+  # Header on first write only; shards have none
   fwrite(
     rows, path, append = started,
     col.names = store$header && !started, na = ""
@@ -194,8 +169,6 @@ result_append <- function(store, what, rows) {
 }
 
 # 4. Writers ----
-# One per file, each fixing the column set so that a downstream
-# comparison can rely on it.
 
 ## 4.1 write_grid_predictions() ----
 
@@ -278,9 +251,8 @@ write_unit_predictions <- function(
 #' @param boot Integer.
 #' @param coefficients A data frame of term, estimate and se, or
 #'   NULL for an engine that has none.
-#' @param stage Character. The stage the coefficients came from.
-#'   Every stage is recorded, not only the last, so a staged
-#'   model can be compared stage by stage.
+#' @param stage Character. The stage the coefficients came from;
+#'   every stage is recorded, not only the last.
 #' @return NULL, invisibly.
 #'
 #' @example # Example usage of the function
@@ -337,9 +309,8 @@ write_metrics <- function(store, species, region, boot, metrics) {
 
 #' Record What a Run Was
 #'
-#' Everything needed to say what produced the other four files.
-#' Written as JSON by hand rather than through jsonlite, so the
-#' harness keeps its base-R-plus-data.table dependency.
+#' Hand-written JSON, not jsonlite, to keep the harness to base R
+#' plus data.table.
 #'
 #' @param store A result_store().
 #' @param meta A named list of scalars and character vectors.
@@ -397,9 +368,8 @@ write_meta <- function(store, meta) {
 
 #' Read a Result Store Back
 #'
-#' What comparison scripts use. A missing file returns NULL
-#' rather than stopping, because an engine without coefficients
-#' legitimately writes none.
+#' A missing file returns NULL: an engine without coefficients
+#' writes none.
 #'
 #' @param dir Character. A store directory.
 #' @param what Character. Which file, without the extension.

@@ -13,42 +13,30 @@
 #   in 3_output/exp_000_parity_v2/:
 #     - tables/, figures/, report.md, run_record.md
 # notes:
-#   - The validation gate, and the baseline every later
-#     experiment is compared against. Runs each taxon's v2 spec
-#     through the framework and compares the result with the
-#     published v2 output.
-#   - The only file to edit. Section 1.2 is the whole
-#     configuration; experiment_config() checks it before
-#     anything is fitted.
-#   - Parity here is distributional, not numerical: v2 seeds
-#     nothing, so two v2 runs give different coefficients, and
-#     the comparison is between bootstrap distributions. See the
+#   - The validation gate and the baseline for every experiment:
+#     each taxon's v2 spec against the published v2 output.
+#   - Section 1.2 is the whole configuration.
+#   - Parity is mostly distributional (v2 seeds nothing); see the
 #     parity ledger in docs/framework_design.md.
-#   - What each taxon reproduces of v2 is stated once, in its
-#     spec's `v2_coverage`, and the report prints it from there.
 # ---
 
 # 1. Setup ----
 
 ## 1.1 Load the framework ----
-# Run from the repository root. In RStudio or Positron, the
-# project file sets it.
+# Run from the repository root
 source("1_code/harness/harness.R")
 load_framework()
 
 exp_dir <- "1_code/experiments/exp_000_parity_v2"
 
-# The parity targets the comparison reads its verdict against
 source(file.path(exp_dir, "utils", "parity_targets.R"))
 
 ## 1.2 Configure the run ----
-# Every decision is here. See experiment_config() for each
-# argument, and docs/getting_started.md for what they mean.
+# See experiment_config() and docs/getting_started.md
 config <- experiment_config(
   id = "exp_000_parity_v2",
 
-  # Runs, from names(standard_specs()). Mammals run once per
-  # season, because v2's mammal references average the two.
+  # Runs, from names(standard_specs())
   taxa = c(
     "bryophyte",
     "lichen",
@@ -59,45 +47,35 @@ config <- experiment_config(
     "bird"
   ),
 
-  # A named set from focal_species_sets(), a vector named by
-  # taxon, or NULL for every species (the full parity run).
-  # "parity_check" is two species per taxon with tight bands.
-  # Shortening the species list is the right way to shorten a
-  # trial: it keeps every draw, so the parity bands stay honest.
+  # A focal_species_sets() name, a vector named by taxon, or NULL
+  # for every species. Shorten trials by species, not draws, so
+  # the bands stay honest.
   species = "parity_check",
 
-  # Draws per species. 100 is v2's, and the only setting the gate
-  # reads. Below about 20 the 10-90% bands are too unstable for
-  # the parity numbers to mean anything; 5 checks the plumbing.
+  # 100 is v2's and the only count the gate reads; below ~20 the
+  # 10-90% bands are unstable. 5 checks the plumbing.
   n_bootstraps = 5,
 
-  # One number governs every random draw; each species draws
-  # under its own seed derived from it. NULL leaves the draws
-  # unseeded, as v2 did. Birds replay v2's stored draws.
+  # Base seed; NULL is unseeded, as v2. Birds replay v2's draws.
   seed = 20260909,
 
   # "spatial_block" draws v2's plant bootstrap afresh;
   # "v2_ids" replays v2's stored draws (needs _setup/07).
   plant_bootstrap = "spatial_block",
 
-  # NULL fits each spec's v2 candidate sets, which is what a
-  # parity run does. See extend_models() and
-  # models_from_covariates() to fit others.
+  # NULL fits each spec's v2 candidate sets
   stage_models = NULL,
 
-  # Species fitted at once. Each worker is a separate R session.
+  # Species fitted at once, one R session each
   workers = 12,
 
-  # "none" writes no per-unit predictions (metrics are scored in
-  # memory); "oob" or "all" write them, at several GB for birds.
+  # "oob" or "all" write per-unit predictions (GBs for birds)
   unit_predictions = "none"
 )
 
 ## 1.3 The v2 reference ----
-# The published v2 coefficients the run is scored against: ABMI's
-# ABMIexploreR package, pinned to a commit and harmonized by
-# _setup/08. It holds the published species of every taxon. The
-# report prints the label and builder.
+# ABMIexploreR's published coefficients, pinned to a commit and
+# harmonized by _setup/08
 config$v2_reference <- "abmiexplorer"
 config$v2_reference_dir <- file.path(
   v2_results_dir(), "abmiexplorer"
@@ -106,14 +84,11 @@ config$v2_reference_builder <-
   "1_code/_setup/08_harmonize_abmiexplorer_results.R"
 
 # 2. Run ----
-# Fits every species, collects the stores into summary tables,
-# then compares with v2, plots and reports. Set `fit = FALSE` to
-# re-summarize the stores already in 2_pipeline/ without fitting.
+# `fit = FALSE` re-summarizes existing stores without fitting
 results <- run_experiment(
   config,
   fit = TRUE,
-  # Bird landcover is translated onto v2's habitat template so it
-  # can be compared; see modules/birds/standardize.R.
+  # Bird landcover onto v2's habitat template
   translate = list(bird = bird_habitat_translation),
   steps = list(
     compare = script_step(file.path(exp_dir, "01_compare_to_v2.R")),

@@ -5,21 +5,13 @@
 # inputs: none
 # outputs: none; defines functions in memory
 # notes:
-#   - A spec is a list that states one taxon's configuration as
-#     data: response, family, regions, stages, resampling. It holds
-#     no modelling code; every method it names is looked up in the
-#     registry (registry.R). The fields are documented in
-#     docs/getting_started.md.
-#   - validate_spec() checks a spec before any data is read, and
-#     reports every problem at once in plain language: a misspelt
-#     field, an engine or rule that is not registered, a rule that
-#     needs a capability the engine lacks. Without it those surface
-#     as a failed species hours into a run, or not at all.
-#   - Unknown fields are errors rather than warnings, because a
-#     misspelt field is silently ignored by everything downstream.
-#     A field a selection rule or resampler declares as an
-#     argument is known, so a new method's settings need no
-#     change here.
+#   - A spec states one taxon's configuration as data; methods it
+#     names are looked up in the registry. Fields are documented
+#     in docs/getting_started.md.
+#   - validate_spec() reports every problem at once, before any
+#     data is read. Unknown fields are errors, because a misspelt
+#     field is otherwise silently ignored; arguments of the named
+#     rule or resampler count as known fields.
 # ---
 
 # 1. Setup ----
@@ -33,10 +25,8 @@
 
 #' The Fields a Spec, Region or Stage May Carry
 #'
-#' Each entry is what the harness itself reads. Settings for a
-#' particular selection rule or resampling scheme are known
-#' through that method's arguments instead, so they are not
-#' listed.
+#' Fields the harness itself reads; method-specific settings are
+#' known through the method's arguments.
 #'
 #' @return A named list of character vectors: `spec`, `region`,
 #'   `stage` and `resample`.
@@ -219,9 +209,8 @@ validate_spec <- function(spec, stop_on_error = TRUE) {
       problem(where, ": `ic` must be \"AIC\", \"AICc\" or \"BIC\".")
     }
 
-    # A carried column may instead be attached per species, as
-    # the mammal precomputed climate is, through
-    # `supplied_columns`; then no earlier stage is needed.
+    # Or the carried column is attached per species via
+    # `supplied_columns` (mammal precomputed climate)
     carried_column <- stage$carry_from_as %||% "Climate"
 
     if (!is.null(stage$carry_from) &&
@@ -296,9 +285,8 @@ validate_spec <- function(spec, stop_on_error = TRUE) {
 
 #' Check a Stage's Models Name Something Real
 #'
-#' A single string that is neither a registered set nor a
-#' formula is almost always a misspelt set name. Without this it
-#' would be fitted as a one-formula candidate and fail later.
+#' A lone string that is neither a set nor a formula is almost
+#' always a misspelt set name.
 #'
 #' @param models A set name, or formulas as text.
 #' @param where Character. Prefix for the message.
@@ -330,10 +318,9 @@ check_model_set <- function(models, where) {
 
 #' Read the Covariates a Spec's Model Sets Name
 #'
-#' Taken from the formulas rather than declared separately, so a
-#' spec cannot name a term it forgot to load. Terms the harness
-#' supplies itself - the response, the offset, and any stage
-#' carried forward - are excluded.
+#' Read from the formulas, so a spec cannot name a term it forgot
+#' to load. Excludes harness-supplied terms (response, offset,
+#' weight, carried stages, `supplied_columns`).
 #'
 #' @param spec A taxon spec.
 #' @param stage_names Character vector of stages to read, or NULL
@@ -355,14 +342,10 @@ spec_covariates <- function(spec, stage_names = NULL) {
     spec$response_name %||% "response",
     "offset", "weight",
     vapply(spec$stages, function(s) s$carry_as %||% "", character(1)),
-    # Columns a spec attaches per species rather than reads from
-    # the dataset: the mammal precomputed Climate.
     spec$supplied_columns
   )
 
   terms <- unlist(lapply(stages, function(stage) {
-    # A staged set is a list of groups; flatten before reading
-    # terms off the formulas.
     models <- unlist(get_model_set(stage$models), use.names = FALSE)
 
     unlist(lapply(models, function(one) {
@@ -372,11 +355,10 @@ spec_covariates <- function(spec, stage_names = NULL) {
 
   covariates <- setdiff(unique(terms), c(supplied, "."))
 
-  # A stage may need columns no formula names: the plant age
-  # splines read the aged stand-cover columns.
+  # Columns no formula names, e.g. the plant age splines' aged
+  # stand-cover columns
   extra <- unlist(lapply(stages, `[[`, "extra_covariates"))
 
-  # The weight is a covariate too, and is loaded with the rest
   unique(c(covariates, extra, spec$weight_column))
 }
 
@@ -384,15 +366,10 @@ spec_covariates <- function(spec, stage_names = NULL) {
 
 #' Swap a Spec's Candidate Sets for an Experiment's Own
 #'
-#' Lets an experiment define the models a stage fits without
-#' editing the taxon spec, which keeps the spec as the record of
-#' what v2 did and the experiment as the record of what was
-#' changed.
-#'
-#' Entries are named `taxon.stage`, or `stage` to apply to every
-#' taxon. Each value is either a name in model_sets() or a
-#' character vector of formulas, so an experiment can hand over a
-#' set built by extend_models() or models_from_covariates().
+#' Keeps the spec as the record of v2 and the experiment as the
+#' record of what changed. Entries are named `taxon.stage`, or
+#' `stage` for every taxon; values are a model_sets() name or
+#' formulas.
 #'
 #' \preformatted{
 #' stage_models <- list(
@@ -421,8 +398,7 @@ apply_stage_models <- function(spec, stage_models) {
   for (i in seq_along(spec$stages)) {
     stage <- spec$stages[[i]]
 
-    # The taxon-specific key wins over the bare stage name, so a
-    # run can set a default and then override one taxon.
+    # `taxon.stage` wins over a bare `stage`
     keys <- c(paste(spec$taxon, stage$name, sep = "."), stage$name)
     hit <- keys[keys %in% names(stage_models)][1]
 
@@ -434,9 +410,7 @@ apply_stage_models <- function(spec, stage_models) {
     changed <- c(changed, paste0(stage$name, " <- ", hit))
   }
 
-  # Recorded so meta.json shows a run that did not fit the v2
-  # candidate sets, which otherwise looks identical to one that
-  # did.
+  # Recorded in meta.json; otherwise indistinguishable from v2
   spec$models_overridden <- if (length(changed) > 0) {
     changed
   } else {
@@ -450,36 +424,17 @@ apply_stage_models <- function(spec, stage_models) {
 
 #' Fit One Stage of a v2 Spec with a Different Method
 #'
-#' The lever for a methods experiment: the rest of the spec stays
-#' v2's, so a difference in the result is the method's. Sets the
-#' stage's engine, selection rule and settings, and gives it one
-#' formula holding every covariate its v2 candidates use (see
-#' models_union()), per region where the region supplies the
-#' models.
+#' The rest of the spec stays v2's, so a difference in results is
+#' the method's. By default the candidates become one formula of
+#' all their covariates (models_union()). A composite rule (e.g.
+#' the mammal `hurdle`) keeps its structure and runs the new rule
+#' in each part.
 #'
-#' The stage defaults to the spec's `habitat_stage`, so one call
-#' serves every taxon:
-#' `lapply(standard_specs(), replace_stage_method, engine = "x")`.
-#'
-#' A stage whose rule is composite - it declares
-#' `part_selection`, as the mammal `hurdle` does - keeps its rule,
-#' and the new rule becomes the one each part runs. The hurdle's
-#' structure (presence, then abundance given presence) is a
-#' property of the data, not of the method, so it stays.
-#'
-#' Removed, because they read v2 coefficient tables a different
-#' engine may not produce:
-#'
-#' - the stage's `post_process` steps (the plant stand-age
-#'   splines, cutblock convergence, pAspen and footprint pooling;
-#'   the mammal v2 habitat tables);
-#' - stage fields only the old rule took (`head_terms`, say);
-#' - when the stage is the last, the spec's `final_prediction` and
-#'   `validate` (v2's plant prediction and validation AUCs), so the
-#'   harness scores the new method's own prediction.
-#'
-#' The stage's `v2_coverage` and the run's `models_overridden`
-#' record the change.
+#' Removes what reads v2 coefficient tables a new engine may not
+#' produce: the stage's `post_process`, fields only the old rule
+#' took, and (for the last stage) `final_prediction` and
+#' `validate`. The change is recorded in `v2_coverage` and
+#' `models_overridden`.
 #'
 #' @param spec A taxon spec.
 #' @param stage Character. The stage's name; the spec's
@@ -600,9 +555,8 @@ replace_stage_method <- function(
 
 #' State How Much of One v2 Stage a Spec Reproduces
 #'
-#' The entries of a spec's `v2_coverage`. The status vocabulary
-#' is fixed, so a typo fails when the spec is built rather than
-#' reading as a fourth category in the report.
+#' The status vocabulary is fixed, so a typo fails when the spec
+#' is built.
 #'
 #' @param status Character. "reproduced", "partial" or
 #'   "not reproduced".
@@ -635,9 +589,6 @@ v2_status <- function(status, note) {
 
 #' Tabulate What a Set of Specs Reproduces of v2
 #'
-#' Flattens each spec's `v2_coverage` into one table, which is
-#' what the report prints. Coverage is stated once, in the specs,
-#' and read from there.
 #'
 #' @param specs A named list of specs.
 #' @return A data frame of taxon, stage, status and note.

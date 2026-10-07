@@ -31,10 +31,9 @@
 #     10th-to-90th percentile band, and how far apart are the
 #     medians relative to half that band. The two directions are
 #     reported separately and averaged.
-#   - Also the Spearman correlation of the medians across terms,
-#     per species, because the terms span twenty orders of
-#     magnitude and a Pearson correlation would read only the
-#     intercept. Reported, no longer gated.
+#   - Also the per-species Spearman of the medians (terms span
+#     twenty orders of magnitude, so not Pearson). Reported, not
+#     gated.
 #   - And the band-width ratio, the rerun's 10-90% band over the
 #     published run's, as a median per species. Its 5th to 95th
 #     percentile over species sets the gate's band_ratio_range.

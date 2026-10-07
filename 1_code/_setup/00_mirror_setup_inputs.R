@@ -21,18 +21,11 @@
 #       the date it was copied
 #     - README.md: what the folder is and the rules for it
 # notes:
-#   - Makes _setup/ runnable by anyone with access to ABMI-DATA2.
-#     The _setup/ scripts read the mirror by default (through
-#     utils/input_paths.R); their SDM_* variables still point
-#     them back at the originals.
-#   - Read-only with respect to the originals: nothing is moved,
-#     renamed or deleted at the source.
-#   - Never overwrites the mirror. A file already mirrored is
-#     checked by md5 and skipped; if its source has changed since,
-#     the script stops and says so. Re-mirroring a changed source
-#     is a deliberate step: move the old copy aside first.
-#   - Each file is copied to a .partial name, checked by md5, and
-#     only then renamed, so a reader never sees a half copy.
+#   - Makes _setup/ runnable by anyone with ABMI-DATA2 access.
+#     Originals are never modified.
+#   - Never overwrites the mirror: mirrored files are md5-checked
+#     and skipped, and a changed source stops the script (move the
+#     old copy aside to re-mirror). Copies go via a .partial name.
 #   - Not mirrored, deliberately:
 #     - the v2 coefficient outputs on the drives (the bird
 #       coefficient CSVs, COEFS.RData, the mammal coefficient
@@ -41,8 +34,8 @@
 #     - _setup/08's species-coefs.RData, which 08 downloads from
 #       the public ABMIexploreR repository at a pinned commit.
 #     - 0_data/v2_scripts/, which is tracked in git.
-#   - Run from the repository root, once, by someone who can
-#     reach every source. Google Drive reads are serial: its
+#   - Run once, from the repository root, by someone who can
+#     reach every source. Reads are serial: the Google Drive
 #     mount refuses concurrent reads.
 # ---
 
@@ -124,9 +117,7 @@ sources <- list(
 )
 
 # 2. List the files ----
-# Expands folders into their files, and stops before copying
-# anything if a source cannot be reached, so a partial mirror is
-# never mistaken for a complete one.
+# Stops before copying if any source is unreachable
 
 ## 2.1 Expand each source ----
 files <- rbindlist(lapply(names(sources), function(name) {
@@ -169,8 +160,6 @@ cat(
 )
 
 # 3. Copy ----
-# Serial, one file at a time. Each is hashed at the source,
-# copied to a .partial name, re-hashed, and renamed into place.
 
 ## 3.1 The previous manifest, to keep first-copy dates ----
 previous <- if (file.exists(manifest_path)) {
@@ -244,8 +233,8 @@ for (i in seq_len(nrow(files))) {
 # 4. Record ----
 
 ## 4.1 The manifest ----
-# Rows for files no longer in the inventory are kept: the copies
-# are still in the mirror, and the manifest is their provenance.
+# Rows for files dropped from the inventory are kept as
+# provenance for copies still in the mirror
 manifest <- rbindlist(rows)
 
 if (!is.null(previous)) {

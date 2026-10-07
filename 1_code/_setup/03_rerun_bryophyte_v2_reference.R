@@ -3,10 +3,8 @@
 # author: Brendan Casey
 # created: 2026-09-10
 # inputs:
-#   Read from the input mirror on ABMI-DATA2 (utils/
-#   input_paths.R; 00_mirror_setup_inputs.R made it). The
-#   locations below are the originals, which the SDM_* variables
-#   can point back to.
+#   Read via setup_input() (utils/input_paths.R); the original
+#   locations are listed, and SDM_* variables can point back.
 #   in the v2 project (SDM_V2_PROJECT):
 #     - 0_data/species/processed/bryophyte-model-data.Rdata
 #     - 0_data/bootstrap/bryophyte-bootstrap-ids.Rdata
@@ -17,31 +15,15 @@
 #   in 2_pipeline/v2_reference/:
 #     - bryophyte-species-models.Rdata
 # notes:
-#   The published bryophyte reference is unusable. Every species
-#   and every bootstrap in the copy on ABMI-DATA2 is an error
-#   object reading `could not find function "model.avg"` - MuMIn
-#   was not on the library path of the cluster workers that
-#   produced it. The other three plant taxa came through intact.
-#
-#   This regenerates it by running the frozen v2 functions,
-#   unmodified, against the v2 project's own data. It reproduces
-#   what 02a_hierarchical-models-bryophytes.R does rather than
-#   improving on it: the point is a reference to measure the new
-#   framework against, so any change would defeat it.
-#
-#   It writes to 2_pipeline/, never to the v2 project. The
-#   network copy is someone else's artefact and is left alone;
-#   whoever owns that pipeline can decide whether to replace it.
-#
-#   The run is large - 134 species by 100 bootstraps by 58
-#   climate models, then the habitat sets - so `species_n` and
-#   `boot_n` are here to make a partial reference deliberately.
-#   A partial one is still useful: the gate compares per species,
-#   so any species present can be gated.
-#
-#   MuMIn must be installed, and must be loadable by the cluster
-#   workers, which is exactly what failed before. Section 2.3
-#   checks that on a worker rather than trusting it.
+#   - The published bryophyte reference is unusable: every entry
+#     is a `could not find function "model.avg"` error (MuMIn was
+#     missing on the cluster workers).
+#   - Regenerates the climate stage with the frozen v2 functions,
+#     unmodified, writing to 2_pipeline/ only.
+#   - 134 species x 100 draws x 58 models is large;
+#     `species_n` and `boot_n` build a partial reference, which
+#     the per-species gate can still use.
+#   - Section 3.3 checks MuMIn loads on a worker before fitting.
 # ---
 
 # 1. Setup ----
@@ -70,16 +52,14 @@ boot_n <- NULL
 n_clusters <- 14
 
 ## 1.3 Load the frozen v2 functions ----
-# From this repository's snapshot, which is byte-identical to the
-# originals and has recorded provenance.
+# From the byte-identical snapshot in 0_data/v2_scripts/
 source(file.path(
   project_root,
   "0_data/v2_scripts/plants/hierarchical-model_functions.R"
 ))
 
 ## 1.4 Set the seed ----
-# v2 seeds nothing. A reference that cannot reproduce itself
-# is hard to argue from, so this one is seeded.
+# Seeded, unlike v2, so this reference reproduces itself
 boot_seed <- 20260910L
 
 ## 1.5 Load the v2 data ----
@@ -124,9 +104,7 @@ cat(
 )
 
 # 2. Bootstrap ids ----
-# The stored ids are checked rather than trusted. The bryophyte
-# file holds only 3 draws where every other plant taxon holds
-# 100, and that is invisible until draw 4 fails hours into a run.
+# Checked, not trusted: the bryophyte file holds 3 draws, not 100
 
 ## 2.1 Check what the stored ids carry ----
 stored_draws <- min(vapply(bootstrap.ids, ncol, integer(1)))
@@ -134,10 +112,8 @@ stored_draws <- min(vapply(bootstrap.ids, ncol, integer(1)))
 cat("Stored bootstrap draws: ", stored_draws, "\n", sep = "")
 
 ## 2.2 Regenerate when they fall short ----
-# A regenerated set is a fresh draw, not the missing part of the
-# stored one: v2's bootstrap is unseeded and a partial set cannot
-# be extended. The seed is saved beside the ids so this reference
-# reproduces itself, which the published one never could.
+# A fresh, seeded draw (an unseeded partial set cannot be
+# extended); the seed is saved beside the ids
 if (stored_draws < max(boot.iter)) {
   cat(
     "Regenerating: ", max(boot.iter), " draws needed, ",
@@ -224,8 +200,7 @@ if (stored_draws < max(boot.iter)) {
 }
 
 # 3. Climate models ----
-# The candidate set and its assembly are v2's: 14 base models,
-# a bioclim version of each, and spatial versions of ten of them.
+# v2's 58 candidates: 14 base, 14 bioclim, 30 spatial
 
 ## 3.1 Define the model sets ----
 climate.models <- list(
@@ -277,9 +252,7 @@ invisible(clusterEvalQ(core.input, {
 }))
 
 ## 3.3 Confirm MuMIn is loadable on a worker ----
-# The failure that produced the unusable reference was exactly
-# this: model.avg missing on the workers, caught only after the
-# whole run. Checking here costs nothing.
+# The failure behind the unusable published reference
 worker_has_mumin <- unlist(clusterEvalQ(
   core.input, exists("model.avg")
 ))
@@ -322,9 +295,7 @@ climate.coef <- foreach(species = species.list) %dopar%
 names(climate.coef) <- species.list
 stopCluster(core.input)
 
-# A species is counted on its draws, not all-or-nothing. One bad
-# draw in a hundred still leaves a usable distribution, and the
-# earlier version of this check called such a species a failure.
+# Counted per draw: one bad draw in 100 leaves a usable species
 usable_species <- sum(
   vapply(climate.coef, is.numeric, logical(1))
 )
@@ -370,9 +341,8 @@ if (usable_species == 0 && failed_draws > 0) {
 }
 
 # 4. Save ----
-# Only the climate object is regenerated here. The habitat sets
-# take the climate coefficients as an input, so they can only be
-# rebuilt once this one is sound; that is a separate run.
+# Climate only; the habitat sets depend on it and are a separate
+# run
 save(
   climate.coef,
   file = file.path(out_dir, "bryophyte-species-models.Rdata")

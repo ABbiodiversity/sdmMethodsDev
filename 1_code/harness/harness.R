@@ -8,25 +8,12 @@
 #   - the files in 1_code/modules/
 # outputs: none; defines the framework in the calling environment
 # notes:
-#   - One entry point. An experiment sources this file and calls
-#     load_framework(), rather than sourcing thirty files in the
-#     right order.
-#   - Four layers, loaded in this order:
-#     1. harness/ - the taxon-agnostic machinery, including the
-#        method registry the next layer fills.
-#     2. methods/ - engines, selection rules, resampling schemes
-#        and metrics, one file each. Every file registers itself,
-#        so adding a method is adding a file; nothing here lists
-#        them.
-#     3. modules/ - one folder per taxon, holding its spec, after
-#        _shared/, which the plant-group taxa build on.
-#     4. experiments/_shared/ - settings every experiment can
-#        use, such as the named focal-species sets.
-#   - Within a methods folder, files whose names start with an
-#     underscore are shared helpers and are loaded first.
-#   - harness/new_experiment.R, which scaffolds a new
-#     experiment's folders, is loaded too, but also works sourced
-#     on its own, before an experiment exists.
+#   - Single entry point: experiments source this file and call
+#     load_framework().
+#   - Load order: harness/ (including the method registry),
+#     methods/ (each file registers itself), modules/, then
+#     experiments/_shared/. Files or folders starting with "_"
+#     are shared helpers and load first.
 # ---
 
 # 1. Setup ----

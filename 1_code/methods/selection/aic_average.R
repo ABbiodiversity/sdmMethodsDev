@@ -5,13 +5,10 @@
 # inputs: none
 # outputs: registers the `aic_average` rule
 # notes:
-#   - The v2 climate rule for plants and birds. Coefficients are
-#     averaged across candidates with Akaike weights, treating a
-#     term absent from a candidate as zero - that model's statement
-#     that the effect is nil, and MuMIn's "full" average.
-#   - The final model's predictor is the weighted average of the
-#     candidates' link predictions, which for a linear predictor is
-#     the averaged coefficients applied to the data.
+#   - The v2 plant and bird climate rule: Akaike-weighted
+#     coefficients, absent terms counting as zero (MuMIn's "full"
+#     average). The predictor averages link predictions, which
+#     equals applying the averaged coefficients.
 # ---
 
 # 1. Setup ----
@@ -63,8 +60,7 @@ select_aic_average <- function(
         next
       }
 
-      # A term the candidate lacks, or estimated as NA because it
-      # is aliased, counts as zero, as in MuMIn's full average.
+      # Absent or aliased (NA) terms count as zero
       row <- match(term, cf$term)
       absent <- is.na(row) || is.na(cf$estimate[row])
       value <- if (absent) 0 else cf$estimate[row]

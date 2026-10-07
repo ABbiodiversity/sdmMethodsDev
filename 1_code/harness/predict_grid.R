@@ -7,28 +7,13 @@
 #     - <name>_prediction_matrix.csv
 # outputs: none; returns objects in memory
 # notes:
-#   - A prediction grid has one row per habitat type and one
-#     column per model term, holding the cover composition of a
-#     stand made entirely of that type. Predicting onto it turns
-#     a fitted model into an effect per habitat type, which is
-#     the quantity v2 reports and the Biodiversity Browser shows.
-#   - This is the comparison currency. Coefficients cannot compare
-#     a GLM against a boosted tree, because a tree has none, but
-#     every engine can predict onto these rows. Every taxon has a
-#     grid; the bird ones are rebuilt by _setup/09 from v2's
-#     coefficient translation matrix.
-#   - The grid prediction is the stage's final model - the
-#     averaged or combined one where the rule combines candidates.
-#     v2's later coefficient adjustments (the plant stand-age
-#     splines, say) are in the coefficients, not the grid.
-#   - Terms the grid does not carry are set to zero, not dropped.
-#     A grid row describes a pure stand, so a human footprint term
-#     is genuinely absent from it rather than unknown. Terms the
-#     stage holds fixed - Climate, Protocol, sampling effort - are
-#     set to the stage's constants.
-#   - A grid whose VegType column is missing is an error rather
-#     than a silent positional fallback, because the row order of
-#     a prediction matrix is not something to guess at.
+#   - A grid row is a pure stand of one habitat type, so
+#     predicting onto it gives the per-habitat effect v2 reports.
+#     Every engine can predict (a tree has no coefficients), so
+#     grids are how engines are compared. Bird grids are rebuilt
+#     by _setup/09 from v2's coefficient translation matrix.
+#   - v2's later coefficient adjustments (e.g. plant stand-age
+#     splines) are in the coefficients, not the grid.
 # ---
 
 # 1. Setup ----
@@ -83,12 +68,10 @@ load_prediction_grid <- function(data_dir, name) {
 
 #' Predict a Selection's Final Model onto a Grid
 #'
-#' Builds a prediction frame carrying every column the model
-#' reads: the grid's own where it has them, the stage's constants
-#' (v2 holds Climate at zero, and Protocol at the new protocol),
-#' and zero for anything else. Predicts with the selection's own
-#' predictor, so an averaged or combined model is projected as a
-#' whole, whatever the engine.
+#' Columns come from the grid, then the stage's constants (v2
+#' holds Climate at zero and Protocol at the new protocol), then
+#' zero. Uses the selection's own predictor, so an averaged or
+#' combined model is projected as a whole.
 #'
 #' @param selected A selection result, carrying `predict`.
 #' @param grid A prediction grid, from load_prediction_grid().
@@ -151,16 +134,11 @@ predict_grid <- function(
 
 #' Predict from a Coefficient Vector Rather Than a Fit
 #'
-#' A stage carried forward is not the best single candidate's
-#' prediction: it is the averaged coefficient vector applied to
-#' the data. v2 computes the climate term as
-#' `plogis(X %*% averaged_coefficients)`, so the habitat models
-#' see a probability between 0 and 1, and their coefficient on it
-#' is correspondingly large.
-#'
-#' Carrying a single model's prediction instead would discard the
-#' averaging the stage just did, and carrying it on the link
-#' scale would change what the next stage's coefficient means.
+#' Carries a stage forward as v2 does: the averaged coefficients
+#' applied to the data, `plogis(X %*% b)`, so the next stage sees
+#' a probability. A single candidate's prediction would discard
+#' the averaging; the link scale would change what the next
+#' stage's coefficient means.
 #'
 #' @param coefficients A data frame of term and estimate.
 #' @param data A data frame carrying those terms.

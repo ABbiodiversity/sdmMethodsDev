@@ -8,42 +8,14 @@
 # outputs:
 #   - one Markdown or plain-text file per run
 # notes:
-#   - The result stores are large and gitignored. This writes the
-#     one committed artefact of a run: what it was configured to
-#     do, what it produced, and what it scored. When the stores
-#     are gone, this is what is left.
-#   - The format is built to be diffed. Two runs of the same
-#     configuration should produce byte-identical bodies, so any
-#     difference in a diff is a real difference in the run.
-#     Three things follow from that and are not style choices:
-#
-#     1. Everything that changes between identical runs - the
-#        timestamp, the host, the elapsed time - is confined to
-#        one Provenance section at the top, and can be dropped
-#        with `provenance = FALSE`. Interleaved, it would make
-#        every diff non-empty and therefore useless.
-#     2. Numbers are formatted to a fixed number of decimals.
-#        Unformatted doubles differ in the last place between
-#        runs that agree, which reads as a difference.
-#     3. Rows and columns are ordered deterministically, and a
-#        missing value is written as "-" rather than dropped, so
-#        tables stay aligned and a diff points at the value that
-#        changed rather than at a row that moved.
-#   - What the format guarantees is that identical results
-#     render identically. It cannot make an unseeded run
-#     reproduce: with `seed = NULL` (v2's behaviour) two runs of
-#     the same configuration draw different bootstrap samples
-#     and their Metrics sections genuinely differ. With a seed -
-#     the default - and with the birds' stored draws, every
-#     section is exact.
-#   - File sizes are deliberately not recorded. They vary by a
-#     few bytes between runs that agree, which is noise in a
-#     document whose purpose is comparison. Row counts carry the
-#     same information and are stable.
-#   - "Record" rather than "manifest": a manifest is an inventory
-#     of contents, and this leads with results. The inventory is
-#     one section of it. See the repository discussion in
-#     docs/framework_design.md.
+#   - The committed record of a run (configuration, coverage,
+#     metrics); the result stores themselves are gitignored.
+#   - Built to diff: identical results render byte-identically.
+#     Volatile fields sit only in the Provenance section
+#     (`provenance = FALSE` drops it), numbers use fixed decimals,
+#     rows are ordered deterministically, and missing values are
+#     "-". An unseeded run (`seed = NULL`) still differs between
+#     runs.
 # ---
 
 # 1. Setup ----
@@ -71,11 +43,8 @@ fmt_value <- function(x, digits = 4L) {
     return("-")
   }
 
-  # Decided by type rather than by value. Choosing the number
-  # of decimals from whether the values happen to be whole
-  # would let the same column render as "1" in one run and
-  # "1.0000" in the next, which is a formatting change showing
-  # up as a result change.
+  # Format by type, not value, so a column never flips between
+  # "1" and "1.0000" across runs
   if (is.integer(x)) {
     out <- formatC(x, format = "d")
     out[is.na(x)] <- "-"
@@ -102,9 +71,8 @@ fmt_value <- function(x, digits = 4L) {
 
 #' Render a Data Frame as a Markdown Table
 #'
-#' @param df A data frame. Zero rows yields a stated absence
-#'   rather than an empty table, so the section still appears
-#'   and the diff shows what changed.
+#' @param df A data frame. Zero rows renders as "_None._" so the
+#'   section still appears in a diff.
 #' @param digits Integer. Decimal places for numeric columns.
 #' @return A character vector of lines.
 #'
@@ -189,13 +157,10 @@ kv_lines <- function(values, digits = 4L) {
 #'   taxa, species count, draws, engines, selection rules.
 #'   Rendered sorted by name.
 #' @param provenance Logical. Include the volatile section.
-#'   FALSE gives a body that is byte-identical between two runs
-#'   of the same configuration, which is what makes a diff
-#'   between experiments readable.
+#'   FALSE gives a body byte-identical across identical runs.
 #' @param digits Integer. Decimal places for every number.
-#' @param collected The result of collect_results() for this
-#'   pipeline directory, or NULL to read the stores here. Passing
-#'   it saves reading every store a second time.
+#' @param collected collect_results() output for this pipeline
+#'   directory, or NULL to read the stores here.
 #' @return The path written, invisibly.
 #'
 #' @example # Example usage of the function
@@ -227,8 +192,6 @@ run_record <- function(
   )
 
   ## 3.1 Provenance ----
-  # Everything that differs between two identical runs lives
-  # here and nowhere else, so the rest of the file diffs clean.
   if (provenance) {
     commit <- tryCatch(
       system2("git", c("rev-parse", "--short", "HEAD"),
@@ -263,8 +226,7 @@ run_record <- function(
   )
 
   ## 3.3 Coverage and artefacts ----
-  # The inventory. Row counts rather than file sizes: both say
-  # what was produced, only one is stable between runs.
+  # Row counts, not file sizes: sizes vary between identical runs
   coverage <- collected$store_rows
 
   if (!is.null(coverage)) {
@@ -283,8 +245,7 @@ run_record <- function(
   )
 
   ## 3.4 Metrics ----
-  # One row per run, region and metric, pooled over species and
-  # draws, ordered so that two records line up row for row.
+  # Pooled over species and draws
   metric_summary <- NULL
 
   if (!is.null(collected$metrics) && nrow(collected$metrics) > 0) {
@@ -310,11 +271,8 @@ run_record <- function(
   )
 
   ## 3.5 Write ----
-  # A .txt record drops the table pipes rather than the tables,
-  # so the same content survives in a plain-text reader.
   if (grepl("[.]txt$", out_file, ignore.case = TRUE)) {
-    # Dividers go first: once the pipes are gone the line is
-    # no longer recognisable as a divider.
+    # Drop dividers before the pipes, while still recognizable
     lines <- lines[!grepl("^[|] --- ([|] --- )*[|]$", lines)]
     lines <- gsub("^[|] | [|]$", "", lines)
     lines <- gsub(" [|] ", "  ", lines)

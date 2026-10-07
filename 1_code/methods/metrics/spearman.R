@@ -5,9 +5,7 @@
 # inputs: none
 # outputs: registers the `spearman` metric
 # notes:
-#   - Takes observed and predicted vectors on the response scale
-#     and returns one number. Computed from predictions only, so
-#     every engine is scored the same way.
+#   - Metric contract: see register_metric() (harness/registry.R).
 # ---
 
 # 1. Setup ----
@@ -19,8 +17,7 @@
 
 #' Rank Correlation of Observed and Predicted
 #'
-#' Scale-free, so it compares a density model against a count
-#' model without either being rescaled.
+#' Scale-free, so density and count models compare directly.
 #'
 #' @param observed,predicted Numeric vectors.
 #' @return A number between -1 and 1.

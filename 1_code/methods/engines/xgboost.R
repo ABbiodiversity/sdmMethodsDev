@@ -5,50 +5,30 @@
 # inputs: none
 # outputs: registers the `xgboost` engine
 # notes:
-#   - xgboost::xgb.train. Trees choose their own variables, split
-#     points and interactions, so a stage fitted with this engine
-#     is given one formula holding every candidate covariate
-#     (models_union()) and the `single` rule, through
-#     replace_stage_method().
-#   - It replaces the earlier gbm engine, which could not fit the
-#     mammal hurdle: gbm's bernoulli refuses a response between 0
-#     and 1 (v2's lure-scaled presence), and gbm has no Gamma.
-#     xgboost's `binary:logistic` takes a proportion as the label,
-#     and `reg:gamma` is a log-link Gamma.
-#   - It has no coefficients, no information criterion and no
-#     standard errors, and declares none. validate_spec() therefore
-#     refuses it with a rule that needs them; use `single`.
-#   - Only the formula's variables are used: `I(x^2)` and `a:b`
-#     contribute x, a and b, because a tree finds curvature and
-#     interactions itself. Text and factor columns are one-hot
-#     coded with the fitted levels. A missing value stays missing:
-#     xgboost routes it down a branch of its own.
-#   - The offset is honoured on the link scale, in fitting and in
-#     prediction, as xgboost's `base_margin`. Without it on new
-#     data xgboost would substitute its own fitted intercept, so a
-#     bird prediction would be neither a rate nor a count.
-#   - The number of rounds is chosen per fit by early stopping on
-#     a held-out share of the rows (`valid_fraction`, 20%), then
-#     the model is refitted on every row at that number. The
-#     holdout is drawn under the fit's seed, so a run reproduces
-#     exactly. Pitfall: on a small draw the holdout is small and
-#     the chosen number of rounds noisy.
-#   - Settings, through the stage's `control`: nrounds (the most),
-#     eta, max_depth, subsample, colsample_bytree,
-#     min_child_weight, early_stopping_rounds, valid_fraction,
-#     seed. The defaults are untuned starting points chosen to
-#     keep a test run quick (eta 0.05 is higher than Elith,
-#     Leathwick and Hastie 2008 generally advise for boosted
-#     trees). Tune before reading a result as the method's best.
-#   - One thread per fit, because the harness already runs one
-#     species per worker.
+#   - Use via replace_stage_method() (one models_union() formula,
+#     `single` rule): it declares no coefficients, IC or SE.
+#   - Replaces gbm, which cannot fit the mammal hurdle (no 0-1
+#     proportion response, no Gamma); xgboost has
+#     `binary:logistic` with proportions and log-link `reg:gamma`.
+#   - Only formula variables are used (`I(x^2)`, `a:b` give x, a,
+#     b). Categoricals are one-hot coded with the fitted levels;
+#     NAs stay NA. The offset is the `base_margin`, in fitting and
+#     prediction.
+#   - Rounds are chosen by early stopping on a seeded holdout
+#     (`valid_fraction`), then refitted on all rows. Noisy on
+#     small draws.
+#   - `control` settings: nrounds, eta, max_depth, subsample,
+#     colsample_bytree, min_child_weight, early_stopping_rounds,
+#     valid_fraction, seed. Defaults are untuned and quick (eta
+#     0.05 is higher than Elith, Leathwick and Hastie 2008
+#     advise); tune before judging the method.
+#   - One thread per fit; the harness parallelizes over species.
 # ---
 
 # 1. Setup ----
 
 ## 1.1 Load packages ----
-# xgboost (version: 3.2.1), lazily, so a run that never uses this
-# engine does not need it installed.
+# xgboost (version: 3.2.1), loaded lazily
 
 # 2. engine_xgboost() ----
 
@@ -103,9 +83,8 @@ xgboost_fit <- function(formula, data, family, weights = NULL,
         control
       )
 
-      # Step 1: The response, the predictors and any offset. A row
-      # missing its response, weight or offset is dropped, as a GLM
-      # drops it; a missing predictor is kept.
+      # Step 1: Drop rows missing response, weight or offset (as a
+      # GLM does); missing predictors are kept
       terms <- xgboost_terms(formula)
       w_all <- if (is.null(weights)) rep(1, nrow(data)) else weights
       keep <- !is.na(data[[terms$response]]) & !is.na(w_all)
@@ -138,8 +117,7 @@ xgboost_fit <- function(formula, data, family, weights = NULL,
         )
       }
 
-      # Step 2: The number of rounds, by early stopping on a
-      # held-out share, then a refit on every row at that number
+      # Step 2: Rounds by early stopping, then refit on every row
       model <- with_seed(settings$seed, {
         n <- length(y)
         held <- sample.int(
@@ -201,8 +179,7 @@ xgboost_predict <- function(fit, newdata, type = "link", se = FALSE) {
       tree <- fit$fit
       design <- xgboost_design(newdata, tree$variables, tree$levels)
 
-      # A model fitted with an offset reads it as the base margin;
-      # a model fitted without one uses its own fitted intercept
+      # Without base_margin xgboost uses its own fitted intercept
       matrix <- xgboost::xgb.DMatrix(
         design$x[, tree$columns, drop = FALSE],
         base_margin = if (tree$offset) newdata$offset else NULL
@@ -248,11 +225,8 @@ xgboost_terms <- function(formula) {
 
 #' The Numeric Matrix xgboost Takes
 #'
-#' Numeric columns pass through, missing values included. Text,
-#' logical and factor columns become one indicator column per
-#' level, with the fitted levels when predicting, so a category is
-#' read on new data as it was in fitting. A missing category is
-#' missing in every indicator rather than a level of its own.
+#' Text, logical and factor columns become one indicator per
+#' fitted level; a missing category is NA in every indicator.
 #'
 #' @param data A data frame.
 #' @param variables Character vector of column names.

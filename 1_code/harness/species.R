@@ -7,22 +7,11 @@
 #     - species_queue.csv, from _setup/09_harmonize_lookups.R
 # outputs: none; returns objects in memory
 # notes:
-#   - One species queue for every taxon, in one schema: taxon,
-#     region, season, tier, species, order and source_name. The
-#     three taxon leads' lookups are flattened into it once, by
-#     _setup/09, so an experiment asks for species the same way
-#     whatever the taxon.
-#   - `tier` separates a taxon's model classes where it has them -
-#     mammals fit a full habitat model for species with at least
-#     20 detections and a use-availability model for those with
-#     at least 3 - and is "modelled" elsewhere. `season` is empty
-#     for everything but mammals.
-#   - `order` preserves each source list's own ordering, so a
-#     narrowed run visits species in the order v2 would have.
-#   - resolve_species() is the entry point an experiment uses to
-#     pick focal species. Passing NULL takes every modelled
-#     species; passing a vector takes those, and an unknown name
-#     stops the run before any fitting rather than after.
+#   - One queue for every taxon, flattened from the taxon leads'
+#     lookups by _setup/09. `tier` separates model classes where a
+#     taxon has them (mammals) and is "modelled" elsewhere;
+#     `season` is empty except for mammals; `order` keeps v2's
+#     species order.
 # ---
 
 # 1. Setup ----
@@ -80,16 +69,13 @@ species_catalogue <- function(data_dir, taxon = NULL) {
 
 #' List the Species Available for a Taxon
 #'
-#' What an experiment reads to decide which focal species to run.
-#'
 #' @param data_dir Character. The test dataset folder.
 #' @param taxon Character. Taxon slug.
 #' @param region Character. Restrict to one region, or NULL.
 #' @param tier Character. Restrict to one model tier, or NULL.
 #' @param season Character. Restrict to one season, or NULL.
-#'   Only mammals have seasons, and a mammal spec is fitted for
-#'   one; without this, a summer spec would also queue the
-#'   `_Winter` species and fit them with summer weights.
+#'   Mammal specs must pass it, or a summer spec would also queue
+#'   the `_Winter` species and fit them with summer weights.
 #' @return A character vector of species names, in source order.
 #'
 #' @example # Example usage of the function
@@ -155,10 +141,8 @@ species_source_name <- function(data_dir, taxon, species) {
 
 #' Choose the Focal Species for a Run
 #'
-#' NULL means every species the queue declares as modelled. A
-#' character vector means those species, and an unknown name
-#' stops the run here rather than failing inside a bootstrap
-#' hours later.
+#' NULL means every modelled species. An unknown name stops the
+#' run here rather than hours later inside a bootstrap.
 #'
 #' @param species Character vector of species, or NULL for all.
 #' @param data_dir Character. The test dataset folder.
@@ -203,8 +187,7 @@ resolve_species <- function(
     )
   }
 
-  # Intersecting rather than reordering keeps the source order,
-  # so a narrowed run visits species in the sequence v2 would.
+  # Keeps source (v2) order rather than the caller's
   intersect(available, species)
 }
 
@@ -212,10 +195,9 @@ resolve_species <- function(
 
 #' Read a Named Vector's Entries for One Taxon
 #'
-#' The convention an experiment uses to select species and
-#' covariates: a named character vector whose names are taxa.
-#' Names may repeat, so several entries can apply to the same
-#' taxon, and an unnamed entry applies to every taxon.
+#' Experiments select species and covariates with a character
+#' vector named by taxon. Names may repeat; unnamed entries apply
+#' to every taxon.
 #'
 #' \preformatted{
 #' species <- c(
@@ -228,9 +210,7 @@ resolve_species <- function(
 #' @param x A named character vector, or NULL.
 #' @param taxon Character. The taxon to read.
 #' @return A character vector of the entries that apply, or NULL
-#'   when none do. NULL means "no selection", which callers read
-#'   as "everything", so an empty result is never an empty
-#'   selection.
+#'   when none do. Callers read NULL as "everything".
 #'
 #' @example # Example usage of the function
 #' # taxon_values(c(lichen = "a", mite = "b"), "lichen")

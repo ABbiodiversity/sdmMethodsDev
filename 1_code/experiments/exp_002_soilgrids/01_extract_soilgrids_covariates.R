@@ -14,30 +14,17 @@
 #       sg_*_0_5cm columns, one row per survey unit
 #     - soilgrids_0_5cm_source.csv: where the columns came from
 # notes:
-#   - The experiment's own covariates. They are written here, not
-#     into the test dataset, which stays the frozen v2 data;
-#     run.R names the file in experiment_config(covariate_files =)
-#     and the harness joins it on survey_unit_id when loading.
-#   - The shallowest depth, 0-5 cm, of the ten SoilGrids
-#     properties published at it: bulk density, cation exchange
-#     capacity, coarse fragments, clay, nitrogen, pH, sand, silt,
-#     soil organic carbon and organic carbon density. Organic
-#     carbon stock is published for 0-30 cm only and is left out.
-#     Units are the layer's: kg/dm3, cmol(c)/kg, vol %, %, g/kg,
-#     pH, %, %, g/kg and kg/m3.
-#   - Each survey unit takes the value of the 1 km cell it falls
-#     in. The layer has no missing cells inside Alberta: gaps were
-#     filled from the nearest data (see the layer's readme), so a
-#     filled cell is an interpolation, not a measurement.
-#   - Survey units are located by their easting and northing,
-#     which are Alberta 10-TM (EPSG:3400), the layer's own grid:
-#     for plant units they match latitude and longitude projected
-#     to EPSG:3400 to within 1e-8 m, and bird units with v2's
-#     south-only flag fall 98% in the Grassland and Parkland
-#     natural regions (checked 2026-10-04). Mammal deployments
-#     carry no coordinates in the dataset, so their values are NA.
-#   - Values depend only on location, so one row per survey unit
-#     serves every taxon.
+#   - Written to 2_pipeline/, not the frozen test dataset; run.R
+#     passes the file as `covariate_files`.
+#   - All ten SoilGrids properties published at 0-5 cm (organic
+#     carbon stock is 0-30 cm only, so excluded), in the layer's
+#     units. Gap-filled cells are interpolations (see the layer's
+#     readme).
+#   - Each unit takes its 1 km cell's value, located by easting
+#     and northing in EPSG:3400 (the layer's grid). Checked
+#     2026-10-04: plant units match projected lat/long to 1e-8 m;
+#     98% of v2's south-only bird units fall in the Grassland and
+#     Parkland regions. Mammals have no coordinates, so NA.
 # ---
 
 # 1. Setup ----

@@ -5,24 +5,12 @@
 # inputs: none
 # outputs: none; returns objects in memory
 # notes:
-#   - Bryophytes, lichens, soil mites and vascular plants each
-#     have their own module directory, because each is free to
-#     diverge and a taxon-specific quirk should have one obvious
-#     home. What they still share is the v2 pipeline shape, and
-#     that lives here so four copies cannot drift apart.
-#   - "Plant group" names a survey design rather than a taxonomy.
-#     Soil mites are animals; they are here because v2 fits them
-#     with the plant scripts, on the plant survey design.
-#   - Each taxon module states its own facts and calls this
-#     builder. Nothing in here looks a taxon up in a table, so
-#     adding a quirk means editing that taxon's file rather than
-#     adding a branch to a shared one.
-#   - The underscore prefix marks this as shared machinery rather
-#     than a taxon, matching _setup/.
-#   - What this spec reproduces of v2 is stated once, in
-#     `v2_coverage` below. The report is generated from it, so
-#     change it here when the harness changes, and nowhere else.
-#     Per-quirk detail is in docs/taxon_quirks.md.
+#   - The v2 pipeline shape shared by the four plant-group taxa
+#     (a survey design, not a taxonomy). Taxon quirks live in each
+#     taxon's module, which calls this builder.
+#   - `v2_coverage` below is the single statement of what is
+#     reproduced; the report reads it. Detail is in
+#     docs/taxon_quirks.md.
 # ---
 
 # 1. Setup ----
@@ -34,27 +22,18 @@
 
 #' Build a v2 Spec for One Plant-Group Taxon
 #'
-#' The v2 pipeline shape shared by bryophytes, lichens, soil
-#' mites and vascular plants. Called by each taxon module rather
-#' than directly.
+#' Called by each taxon module rather than directly.
 #'
-#' @param taxon Character. The data slug, which keys the response
-#'   file, the species catalogue and the covariate catalogue.
-#'   Note that soil mites carry the slug "mite".
+#' @param taxon Character. The data slug ("mite" for soil mites).
 #' @param protocol_in_v2 Logical. Whether v2 fits Protocol for
-#'   this taxon. Recorded so a run can say whether it followed v2
-#'   or overrode it.
+#'   this taxon.
 #' @param use_protocol Logical, or NULL to take the v2 value.
-#'   Setting it equalizes a term v2 applies inconsistently, which
-#'   is what a cross-taxa experiment wants.
 #' @param reference_note Character, or NULL. One clause on where
 #'   this taxon's v2 reference comes from, appended to the spec
 #'   notes. Bryophytes differ from the other three.
-#' @param bootstrap Character. "spatial_block" draws v2's
-#'   spatially blocked bootstrap afresh; "v2_ids" replays the
-#'   draws v2 itself made, stored per species by
-#'   _setup/07_harmonize_v2_plant_bootstrap_ids.R, which makes
-#'   parity numerical draw by draw.
+#' @param bootstrap Character. "spatial_block" draws afresh;
+#'   "v2_ids" replays v2's stored draws (_setup/07), making
+#'   parity numerical.
 #' @return A spec list, as run_spec() consumes.
 #'
 #' @example # Example usage of the function
@@ -86,11 +65,9 @@ plant_group_spec <- function(
     use_protocol <- protocol_in_v2
   }
 
-  # The habitat sets are spliced from the mite script, which
-  # fits no Protocol. In the bryophyte and lichen scripts the
-  # same formulas carry the term directly after Climate and
-  # nowhere else, so inserting it there reproduces them. The
-  # climate set carries no Protocol in any variant.
+  # The habitat sets come from the mite script (no Protocol); the
+  # bryophyte and lichen scripts differ only by Protocol directly
+  # after Climate. No climate set carries Protocol.
   with_protocol <- function(set) {
     models <- get_model_set(set)
 
@@ -110,8 +87,7 @@ plant_group_spec <- function(
     # The stage a methods experiment replaces by default
     habitat_stage = "habitat",
 
-    # Plant-group responses are cover or abundance values; v2
-    # models presence, so anything above zero is a detection.
+    # v2 models presence: any value above zero is a detection
     response_transform = "detection",
     family = "binomial",
     weight_column = NULL,
@@ -142,17 +118,14 @@ plant_group_spec <- function(
         selection = "aic_average",
         ic = "AICc",
         control = list(maxit = 250),
-        # Fitted once per draw on every unit, as v2's
-        # climate_models() is, and shared by both regions.
+        # Province-wide, as v2's climate_models()
         scope = "province",
-        # The habitat stage takes this stage's prediction as a
-        # term called Climate, which is how v2 composes them.
+        # Carried into the habitat stage as `Climate`, as in v2
         carry_as = "Climate"
       ),
       list(
         name = "habitat",
-        # Set per region below, because north fits vegetation
-        # types and south fits soil types.
+        # Per region below: veg in the north, soil in the south
         models = NULL,
         engine = "bayesglm",
         selection = "ivw_grid",
@@ -160,10 +133,7 @@ plant_group_spec <- function(
         control = list(maxit = 250),
         carry_from = "climate",
         carry_from_as = "Climate",
-        # v2 predicts each candidate onto the grid holding
-        # Climate at zero, and at the new protocol where Protocol
-        # is fitted, so the habitat effects are read at an
-        # average climate under one protocol.
+        # v2 predicts the grid at Climate = 0 and the new protocol
         grid_constants = if (use_protocol) {
           list(
             Climate = 0,
@@ -177,11 +147,9 @@ plant_group_spec <- function(
         } else {
           c("Intercept", "Climate")
         },
-        # v2's steps after the averaging, in v2's order: the
-        # stand-age splines, the cutblock convergence, the south
-        # pAspen, then the footprint pooling, which borrows from
-        # a spline-fitted age class. The splines read the aged
-        # stand-cover columns, which no formula names.
+        # v2's post-averaging steps, in v2's order (pooling
+        # borrows from a spline-fitted age class). The splines
+        # read aged stand-cover columns no formula names.
         post_process = list(
           plant_age_splines, plant_cutblock_convergence,
           plant_paspen, plant_footprint_pooling
@@ -196,19 +164,13 @@ plant_group_spec <- function(
             c("R", 1:4), paste0
           )))
         ),
-        # v2 skips the habitat model when the draw, after the
-        # region filter, holds fewer than 20 detections.
         min_detections = 20L
       )
     ),
 
-    # One draw per species for the whole province, as v2's
-    # bootstrap_data() makes it, filtered to each region's units
-    # when the habitat stage is fitted.
-    #
-    # No seed here. The experiment sets one base seed, `boot_seed`
-    # in run.R, and each species derives its own from it. Without
-    # one the fresh draws are unseeded, as in v2.
+    # One province-wide draw per species, as v2's
+    # bootstrap_data(). No seed here: the experiment's seed is
+    # used.
     resample = if (bootstrap == "v2_ids") {
       list(
         scheme = "precomputed",
@@ -223,8 +185,6 @@ plant_group_spec <- function(
       )
     },
 
-    # What this spec reproduces of v2, per stage. The single
-    # source of truth for coverage: the report reads it.
     v2_coverage = list(
       climate = v2_status(
         "reproduced",
@@ -279,8 +239,6 @@ plant_group_spec <- function(
     use_protocol = use_protocol,
     protocol_is_v2 = identical(use_protocol, protocol_in_v2),
 
-    # Facts about this taxon's configuration. Coverage is in
-    # v2_coverage, not here.
     notes = paste0(
       "Protocol ", if (use_protocol) "fitted" else "not fitted",
       if (identical(use_protocol, protocol_in_v2)) {
@@ -428,9 +386,8 @@ plant_age_splines <- function(selected, data) {
     return(selected)
   }
 
-  # The site-level IVW prediction, on the link scale, is the
-  # ivw_grid rule's final model. Computed here rather than by the
-  # rule, so regions without aged stand types never pay for it.
+  # Site-level IVW prediction (link scale), computed only where
+  # aged stand types exist
   prediction <- if (is.function(selected$predict)) {
     selected$predict(data, "link")
   } else {
@@ -1060,8 +1017,7 @@ cutblock_recovery_weights <- function() {
 
 #' Every Plant-Group Spec
 #'
-#' A convenience for running all four at once. Each taxon module
-#' must already be sourced.
+#' Each taxon module must already be sourced.
 #'
 #' @param use_protocol Logical, or NULL for the v2 setting per
 #'   taxon.

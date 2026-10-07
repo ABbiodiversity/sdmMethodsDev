@@ -30,11 +30,10 @@
 #     easily. The ratio closes that: too wide or too narrow a band
 #     fails, including one read from a store holding too few
 #     draws.
-#   - Spearman of the medians is reported but no longer gated.
-#     Model averaging shrinks unsupported terms towards zero in
-#     both runs, and ranking values of 1e-30 against 1e-40 ranks
-#     noise: it failed the mite climate stage with every term in
-#     band. It caught nothing the other tests missed.
+#   - Spearman of the medians is reported, not gated: averaging
+#     shrinks unsupported terms to ~1e-30 in both runs, so it
+#     ranks noise (it failed the mite climate stage with every
+#     term in band).
 #   - The calibration (bryophyte climate, two v2 runs of the same
 #     code): 100% in band, median standardized difference 0.019;
 #     per-species median band ratio 1.00, 5th to 95th percentile

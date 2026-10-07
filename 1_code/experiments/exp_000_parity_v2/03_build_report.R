@@ -14,20 +14,11 @@
 #   in out_dir/:
 #     - report.md
 # notes:
-#   - Holds no status of its own. What each spec reproduces of v2
-#     is read from the specs' `v2_coverage`, what v2 reference
-#     exists from v2_results_coverage.csv, and what the gate
-#     actually reached from the comparison step. Coverage is
-#     stated once, in the specs, so the report cannot drift from
-#     them.
-#   - States what kind of run this was first. A trial run writes
-#     the same files as a full one, and its parity numbers are
-#     not a parity read.
-#   - Written on every run, so a partial run still leaves a
-#     legible record of what it was.
-#   - Run by run_experiment() as a step, in an environment of its
-#     own holding only `config` and `results`; see
-#     script_step().
+#   - Holds no status of its own: coverage comes from the specs'
+#     `v2_coverage`, references from v2_results_coverage.csv, and
+#     results from the comparison step.
+#   - Leads with the kind of run, since a trial writes the same
+#     files as a full run. Run as a script_step().
 # ---
 
 # 1. Setup ----
@@ -118,9 +109,7 @@ gate_lines <- if (length(gate_notes) == 0) {
 fit_lines <- if (is.null(metric_summary)) {
   "_No metrics recorded._"
 } else {
-  # In-sample against held-out, and v2's own validation where
-  # the spec supplies it. Out-of-bag is the honest read;
-  # in-sample is what v2 reports.
+  # Out-of-bag is the honest read; in-sample is what v2 reports
   shown <- c(
     insample_auc = "insample_auc",
     oob_auc = "oob_auc",

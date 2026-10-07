@@ -5,20 +5,12 @@
 # inputs: none
 # outputs: none; defines functions in memory
 # notes:
-#   - A selection rule turns a candidate model set into one result:
-#     coefficients, a fit, and a predictor for the final model. The
-#     rules themselves live in 1_code/methods/selection/, one file
-#     each; this file holds what every rule shares.
-#   - A rule fits its own candidates rather than being handed
-#     fitted objects, because staged selection has to refit as it
-#     goes: each stage updates the previous stage's winner. One
-#     interface then covers both shapes.
-#   - Every rule returns selection_result(), so the fitting loop
-#     and the result writer do not know which rule ran.
-#   - Candidates are fitted through fit_with() (engines.R), which
-#     computes a fit's coefficients once and keeps them on it.
-#     Rules read `fit$coefficients` rather than recomputing them,
-#     which matters for bayesglm, where summary() is slow.
+#   - Shared plumbing for the rules in 1_code/methods/selection/.
+#     Every rule returns selection_result(), so callers need not
+#     know which rule ran.
+#   - Rules fit their own candidates rather than receiving fits,
+#     because staged selection refits each stage on the previous
+#     stage's winner.
 # ---
 
 # 1. Setup ----
@@ -29,8 +21,6 @@
 # 2. selection_run() ----
 
 #' Run One Selection Rule
-#'
-#' The single entry point the fitting loop calls.
 #'
 #' @param rule Character, a registered rule name, or a function a
 #'   spec supplies with the same arguments.
@@ -45,9 +35,8 @@
 #' @param weights,offset Numeric vectors or NULL.
 #' @param ic Character. "AIC", "AICc" or "BIC".
 #' @param control Named list passed to the engine.
-#' @param ... Further arguments. Only those the rule declares are
-#'   passed, so a stage can carry settings for one rule without
-#'   another failing on them.
+#' @param ... Further arguments; only those the rule declares are
+#'   passed on.
 #' @return A selection result; see selection_result(). `rule` is
 #'   set to the rule's name, and `predict` to a predictor for the
 #'   final model when the rule did not supply one.
@@ -68,9 +57,8 @@ selection_run <- function(
   control = list(),
   ...
 ) {
-  # A rule is a registered name, or a function a spec supplies
-  # for a model the registry has no shape for: the v2 mammal
-  # hurdle is one.
+  # A function rule covers shapes the registry lacks (e.g. the v2
+  # mammal hurdle)
   if (is.function(rule)) {
     rule_fn <- rule
     rule_name <- "custom"
@@ -154,8 +142,8 @@ fit_candidates <- function(
 
 #' Apply a Candidate to a Base Formula
 #'
-#' A candidate may be a complete formula or an update such as
-#' `. ~ . + MAP`. Both forms appear in the v2 model sets.
+#' v2 model sets mix complete formulas and updates such as
+#' `. ~ . + MAP`.
 #'
 #' @param model A formula.
 #' @param base A formula to update.
@@ -164,8 +152,7 @@ fit_candidates <- function(
 #' @example # Example usage of the function
 #' # resolve_formula(. ~ . + MAP, response ~ 1)
 resolve_formula <- function(model, base) {
-  # A one-sided candidate, or one whose left side is a dot, is an
-  # update; anything else is complete in itself.
+  # One-sided or dot-left candidates are updates
   left <- if (length(model) == 3) deparse(model[[2]]) else "."
 
   if (left == ".") {
@@ -179,10 +166,9 @@ resolve_formula <- function(model, base) {
 
 #' The Data Columns a Formula Reads
 #'
-#' Read from the formula rather than from a fitted object, so it
-#' works for any engine. The response and the harness-supplied
-#' offset and weight are left out: a prediction frame never has
-#' to supply them as data.
+#' Read from the formula, not a fit, so it works for any engine.
+#' Excludes response, offset and weight, which a prediction frame
+#' never supplies as data.
 #'
 #' @param formula A formula, or formula text.
 #' @return A character vector of column names.
@@ -234,8 +220,7 @@ candidate_table <- function(fitted, names_in = NULL) {
   best <- suppressWarnings(min(scores, na.rm = TRUE))
   delta <- scores - best
 
-  # Akaike weights. A failed model scores Inf, so exp(-Inf/2) is
-  # zero and it carries no weight.
+  # Akaike weights; a failed model scores Inf and gets weight 0
   raw <- exp(-delta / 2)
   raw[!is.finite(raw)] <- 0
   total <- sum(raw)
@@ -278,9 +263,8 @@ family_linkinv <- function(family) {
 
 #' A Predictor That Averages Several Fits on the Link Scale
 #'
-#' What a rule that combines candidates returns as `predict`, so
-#' the final model scored and projected onto a grid is the
-#' combined one, not the best single candidate.
+#' Returned as `predict` by combining rules, so scoring and grid
+#' projection use the combined model, not the best candidate.
 #'
 #' @param fits List of engine fits.
 #' @param engine An engine definition.
@@ -314,9 +298,8 @@ combined_predictor <- function(fits, engine, family, weights = NULL) {
         engine$predict(f, newdata, "link", se = TRUE)
       })
 
-      # Precision weights renormalize by construction, so a
-      # candidate that cannot predict is left out, as v2 leaves
-      # out a failed fit
+      # Precision weights renormalize, so a candidate that cannot
+      # predict is dropped, as v2 drops a failed fit
       predictions <- predictions[
         !vapply(predictions, is.null, logical(1))
       ]

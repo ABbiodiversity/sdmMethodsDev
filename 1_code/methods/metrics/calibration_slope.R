@@ -5,9 +5,7 @@
 # inputs: none
 # outputs: registers the `calibration_slope` metric
 # notes:
-#   - Takes observed and predicted vectors on the response scale
-#     and returns one number. Computed from predictions only, so
-#     every engine is scored the same way.
+#   - Metric contract: see register_metric() (harness/registry.R).
 # ---
 
 # 1. Setup ----
@@ -19,10 +17,8 @@
 
 #' Calibration Slope
 #'
-#' The slope of observed on predicted. One is perfect
-#' calibration; below one means the predictions are too extreme,
-#' which is the usual signature of overfitting and the thing a
-#' regularized fit is trying to fix.
+#' Slope of observed on predicted. One is perfect; below one
+#' means predictions are too extreme (typical of overfitting).
 #'
 #' @param observed,predicted Numeric vectors.
 #' @return A number.

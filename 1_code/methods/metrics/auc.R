@@ -5,9 +5,7 @@
 # inputs: none
 # outputs: registers the `auc` metric
 # notes:
-#   - Takes observed and predicted vectors on the response scale
-#     and returns one number. Computed from predictions only, so
-#     every engine is scored the same way.
+#   - Metric contract: see register_metric() (harness/registry.R).
 # ---
 
 # 1. Setup ----
@@ -19,11 +17,8 @@
 
 #' Area Under the ROC Curve
 #'
-#' The Mann-Whitney form: the probability that a randomly chosen
-#' detection scores above a randomly chosen non-detection, with
-#' ties counting a half. Values above zero are treated as
-#' detections, so a count or a density scores the same way a
-#' presence does.
+#' Mann-Whitney form (ties count a half). Values above zero are
+#' detections, so counts and densities score like presences.
 #'
 #' @param observed,predicted Numeric vectors.
 #' @return A number between 0 and 1, or NA when the observations
@@ -34,20 +29,15 @@
 metric_auc <- function(observed, predicted) {
   positive <- observed > 0
 
-  # An AUC needs both classes present. A bootstrap where a
-  # species was never detected has none, which is a fact about
-  # the draw rather than a failure.
+  # Both classes are needed; a draw without detections has none
   if (!any(positive) || all(positive)) {
     return(NA_real_)
   }
 
   ranks <- rank(predicted, ties.method = "average")
 
-  # Counted as doubles, not integers. sum() of a logical returns
-  # an integer, and at bird scale - 16,745 detections against
-  # 199,013 non-detections - their product is 3.3e9, past the
-  # 32-bit maximum. That overflows to NA silently, so every large
-  # run would report no AUC at all.
+  # Doubles, not integers: at bird scale the product of the class
+  # counts (~3.3e9) overflows 32-bit integers to NA
   n_pos <- as.numeric(sum(positive))
   n_neg <- as.numeric(sum(!positive))
 

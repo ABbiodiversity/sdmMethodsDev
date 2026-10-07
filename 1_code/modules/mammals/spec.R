@@ -5,34 +5,16 @@
 # inputs: none
 # outputs: none; returns objects in memory
 # notes:
-#   - The v2 configuration for mammals, as data.
-#   - v2 does not fit climate in this pipeline. It reads a
-#     prediction from mammal_climate_predictions.csv, produced by
-#     1_code/2_habitat-modeling/climate/ in ABbiodiversity/
-#     MammalModels: nine binomial GLMs over FFP, MAP, CMD and TD,
-#     averaged by AICc weight. That pipeline is adapted here as a
-#     fitted stage, so a bioclimatic question can be asked of
-#     mammals at all. `climate_source` selects which:
-#     "precomputed" (the default, v2's) reads the prediction file
-#     through mammal_precomputed_climate() in hurdle.R; "fitted"
-#     fits climate as the first stage.
-#   - The climate block, CMD and TD included, comes from
-#     abmi-camera-climate_2023.Rdata, the file v2 fitted against,
-#     joined by the harmonizer. The fitted stage runs the full
-#     nine-model v2 set.
-#   - What this spec reproduces of v2 is stated once, in
-#     `v2_coverage`. The report is generated from it.
-#   - North and south are separate models on overlapping
-#     deployments, and their covariates disagree, so the two are
-#     separate covariate keys rather than a filter on one table.
-#   - Weights are season days. The season a species is modelled
-#     in is part of its name, so the weight column follows the
-#     species rather than the taxon.
-#   - The habitat stage is the generic `hurdle` rule with v2's
-#     GLMs, and v2's table-building as a post_process step
-#     (hurdle.R). It has the same shape as the plant habitat
-#     stage, so replace_stage_method() swaps its engine for both
-#     halves of the hurdle.
+#   - v2 reads mammal climate from mammal_climate_predictions.csv
+#     (ABbiodiversity/MammalModels, 1_code/2_habitat-modeling/
+#     climate/: nine binomial GLMs over FFP, MAP, CMD, TD, AICc
+#     averaged). `climate_source = "fitted"` instead fits that set
+#     as a stage, on the climate from
+#     abmi-camera-climate_2023.Rdata that v2 used.
+#   - North and south are separate covariate keys: overlapping
+#     deployments with disagreeing covariates.
+#   - Weights are season days, so the weight column follows the
+#     season in the species name.
 # ---
 
 # 1. Setup ----
@@ -44,20 +26,11 @@
 
 #' Standardise Detections to the No-Lure Scale
 #'
-#' A lured camera detects more, so a raw detection is not
-#' comparable across lured and unlured deployments. v2 estimates
-#' the lure effect from the numbered ABMI grid sites alone -
-#' those are the ones deployed in matched lured and unlured pairs,
-#' so the ratio between them is a lure effect rather than a
-#' difference in where cameras were put - and divides the lured
-#' detections by it.
-#'
-#' The result is then scaled to a maximum of one, which is what
-#' makes it a proportion a binomial model can take.
-#'
-#' A ratio that cannot be estimated - no lured or no unlured grid
-#' sites for this species and season - leaves the detections
-#' uncorrected rather than dividing by zero or by NA.
+#' As v2: lured detections are divided by the lure ratio
+#' estimated from the numbered ABMI grid sites (matched lured and
+#' unlured pairs), then scaled to a maximum of one for a binomial
+#' model. If the ratio cannot be estimated, detections are left
+#' uncorrected.
 #'
 #' @param values Numeric vector of counts.
 #' @param frame The assembled frame, carrying `lured` and
@@ -69,8 +42,7 @@
 mammal_pa_response <- function(values, frame) {
   detected <- sign(values)
 
-  # Numbered locations are the ABMI grid; other projects are
-  # not part of the lure comparison.
+  # Numbered locations are the ABMI grid
   grid_site <- grepl("^[[:digit:]]+", as.character(frame$location))
   lured <- as.character(frame$lured) == "Yes"
 
@@ -101,17 +73,9 @@ mammal_pa_response <- function(values, frame) {
 
 #' Standardise Abundance to the No-Lure Scale
 #'
-#' The abundance half of the hurdle. Lure is corrected as for
-#' presence, but from the ratio of mean counts rather than mean
-#' detections, because the question is how many rather than
-#' whether.
-#'
-#' The result is winsorized at the 99th percentile of the
-#' positive counts. A handful of density estimates are genuinely
-#' enormous, and a Gamma model fitted on the log scale gives them
-#' leverage out of all proportion to how much they say about a
-#' habitat type. Capping is a judgement that those points are
-#' real but uninformative, not that they are wrong.
+#' Lure-corrected from the ratio of mean counts, then winsorized
+#' at the 99th percentile of positive counts: a few enormous
+#' densities would otherwise dominate the log-link Gamma fit.
 #'
 #' @param values Numeric vector of counts.
 #' @param frame The assembled frame, carrying `lured` and
@@ -155,12 +119,9 @@ mammal_agp_response <- function(values, frame) {
 
 #' Build the v2 Spec for Mammals
 #'
-#' The habitat stage is v2's hurdle: presence, then abundance
-#' given presence, fitted by the generic `hurdle` rule with v2's
-#' GLMs and best-by-AICc selection, then turned into v2's three
-#' tables by mammal_v2_habitat_tables() (hurdle.R). A methods
-#' experiment swaps the engine for both halves with one
-#' replace_stage_method() call, as for any taxon.
+#' The habitat stage is the generic `hurdle` rule with v2's GLMs
+#' (best by AICc), turned into v2's tables by
+#' mammal_v2_habitat_tables() (hurdle.R).
 #'
 #' @param climate_source Character. "precomputed", the v2
 #'   default, reads each species' climate prediction from
@@ -191,16 +152,13 @@ mammal_spec <- function(
     stages <- list(
       list(
         name = "climate",
-        # The full v2 set. CMD and TD come from the camera
-        # climate file, which the harmonizer now joins.
+        # The full v2 set (CMD and TD from the camera climate file)
         models = "climate_bird_mammal_v2",
         engine = "glm",
         selection = "aic_average",
         ic = "AICc",
         carry_as = "Climate",
-        # Climate is modelled on presence: the abundance half
-        # takes the same climate term, and fitting a binomial on
-        # counts would fail outright.
+        # Fitted on presence; the abundance half reuses it
         response_transform = mammal_pa_response
       )
     )
@@ -212,8 +170,7 @@ mammal_spec <- function(
     # The stage a methods experiment replaces by default
     habitat_stage = "habitat",
 
-    # v2 models presence rather than the recorded density; the
-    # abundance half reads the raw count (see the habitat stage).
+    # Presence; the abundance half reads the raw count
     response_transform = mammal_pa_response,
 
     # v2 reads climate from a separate pipeline's prediction
@@ -230,8 +187,7 @@ mammal_spec <- function(
     family = "binomial",
     weight_column = paste0("wt_", season),
 
-    # The formulas fit `seas_days`; which column that is depends
-    # on the season being modelled.
+    # `seas_days` is the season's days column
     aliases = list(seas_days = paste0(season, "_days")),
     tier = tier,
     season = season,
@@ -273,9 +229,8 @@ mammal_spec <- function(
         # v2's 30 south candidates, from south-models/00_models.R
         habitat_models = "habitat_mammal_south_pa_v2",
         intercept_cats = "intercept_mammal_south_pa_v2",
-        # Half the south candidates carry pAspen. Like sampling
-        # effort, it is held fixed on the grid rather than read
-        # as a habitat type, and it is not cover.
+        # pAspen (in half the candidates) is held fixed on the
+        # grid and is not cover
         constants = list(seas_days = 100, Climate = 0, pAspen = 0)
       )
     ),
@@ -285,9 +240,7 @@ mammal_spec <- function(
         name = "habitat",
         models = NULL,
         engine = "glm",
-        # Presence, then abundance given presence, each the best
-        # of its candidates by AICc. See
-        # methods/selection/hurdle.R.
+        # Each half best by AICc; see methods/selection/hurdle.R
         selection = "hurdle",
         part_selection = "aic_best",
         ic = "AICc",
@@ -317,15 +270,11 @@ mammal_spec <- function(
     resample = list(
       scheme = "spatial_block",
       min_detections = 20L
-      # No seed here. The experiment sets one base seed,
-      # `boot_seed` in run.R, and each species derives its own
-      # from it. Without one the draws are unseeded, as in v2.
+      # No seed here: the experiment's seed is used
     ),
 
     climate_source = climate_source,
 
-    # What this spec reproduces of v2, per stage. The single
-    # source of truth for coverage: the report reads it.
     v2_coverage = list(
       climate = if (climate_source == "precomputed") {
         v2_status(
@@ -371,8 +320,6 @@ mammal_spec <- function(
       )
     ),
 
-    # Facts about this run's configuration. Coverage is in
-    # v2_coverage, not here.
     notes = paste0(
       if (climate_source == "fitted") {
         "Climate fitted with the full 9-model v2 set."

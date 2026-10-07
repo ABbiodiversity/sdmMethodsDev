@@ -9,15 +9,9 @@
 #   - Data slug: "vascular_plant". Response file
 #     vascular_plant.csv. v2 names this taxon with a hyphen in
 #     its file names, which the parity gate translates.
-#   - The largest plant-group taxon by species count, so it is
-#     usually the slowest of the four to run and the one worth
-#     restricting with focal_species during a smoke test.
-#   - v2 does not fit Protocol for this taxon, passing the flag
-#     as FALSE. Only bryophytes and lichens get it. The asymmetry
-#     is v2's and is preserved here for parity, with
-#     `use_protocol` exposed so an experiment can equalize it.
-#   - Anything true of every plant-group taxon belongs in
-#     _shared/plant_group.R, not here.
+#   - The most species of the four, so the slowest to run.
+#   - v2 does not fit Protocol for this taxon (bryophytes and
+#     lichens only); `use_protocol` can equalize it across taxa.
 # ---
 
 # 1. Setup ----

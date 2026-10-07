@@ -13,20 +13,15 @@
 #     - <name>/<version>/publish_record.md: when, by whom, from
 #       which commit
 # notes:
-#   - Experiments, tests and downstream scripts read these
-#     published copies (1_code/harness/data_source.R), so only
-#     whoever rebuilds the data runs _setup/.
-#   - A published version is never overwritten. The script stops
-#     if <version>/ exists; a rebuilt dataset is published as a
-#     new version and data_source.R's pin is moved to it.
-#   - Files go to <version>.partial/ first, are re-hashed there
-#     against the local md5s, and only then is the folder renamed
-#     to <version>/, so a reader never sees a half copy.
+#   - Runs read these copies (harness/data_source.R). A version
+#     is never overwritten: publish a new one and move the pin.
+#   - Files are copied to <version>.partial/, re-hashed, then
+#     renamed, so readers never see a half copy.
 #   - SDM_DATASET_VERSION sets the version (default: today's
 #     date, YYYY-MM-DD). SDM_PUBLISH picks the datasets,
 #     comma-separated (default: test_dataset,v2_results).
-#   - Run 02_validate_test_dataset.R first. It is not run from
-#     here because it re-reads every source.
+#   - Run 02_validate_test_dataset.R first (not run here: it
+#     re-reads every source).
 #   - Run from the repository root.
 # ---
 

@@ -3,10 +3,8 @@
 # author: Brendan Casey
 # created: 2026-09-08
 # inputs:
-#   Read from the input mirror on ABMI-DATA2 (utils/
-#   input_paths.R; 00_mirror_setup_inputs.R made it). The
-#   locations below are the originals, which the SDM_* variables
-#   can point back to.
+#   Read via setup_input() (utils/input_paths.R); the original
+#   locations are listed, and SDM_* variables can point back.
 #   in 0_data/test_dataset/, written by
 #   _setup/01_harmonize_model_ready_v2.R:
 #     - sites.csv
@@ -37,27 +35,15 @@
 # outputs:
 #   - none; every result is printed to the console
 # notes:
-#   Two passes over the harmonized dataset. Section 2 describes
-#   it: sizes, coverage, value ranges, and whether the tables
-#   join the way they are meant to. Section 3 traces every
-#   written value back to the snapshot it came from: responses in
-#   3.3 to 3.5, covariates in 3.6, and lookups in 3.7 to 3.9.
-#
-#   Covariates now live in one master table keyed on
-#   survey_unit_id and taxon, not in a file per taxon and block.
-#   Section 3.6 rebuilds each block from it using
-#   lookup/covariate_columns.csv, which maps every master column
-#   back to the block and the v2 spelling it came from. That is
-#   also what catches a column being dropped or renamed, since a
-#   block is only checked against the map's own account of it.
-#
-#   Covariate values are compared on relative difference, not
-#   absolute. A CSV carries about 15 significant digits, so UTMY
-#   at 6.6e6 comes back about 6e-9 away from the source; that is
-#   a round-trip artefact, not a harmonization error.
-#
-#   Run after 01_harmonize_model_ready_v2.R, and again whenever
-#   the snapshot or that script changes.
+#   - Section 2 describes the dataset (sizes, coverage, ranges,
+#     joins); section 3 traces every written value back to its
+#     source snapshot.
+#   - Covariate blocks are rebuilt from the master table via
+#     lookup/covariate_columns.csv, which also catches dropped or
+#     renamed columns.
+#   - Covariates are compared on relative difference: CSV keeps
+#     ~15 significant digits (UTMY at 6.6e6 drifts ~6e-9).
+#   - Run after 01, and whenever the snapshot or 01 changes.
 # ---
 
 # 1. Setup ----
@@ -615,10 +601,8 @@ for (rg in names(mammal_files)) {
 
 #' Count Disagreements on Relative Difference
 #'
-#' The absolute counterpart, compare_blocks(), is right for the
-#' response, whose values are small integers. Covariates span
-#' UTM coordinates at 1e6 and cover proportions at 1e-4, so a
-#' single absolute tolerance cannot serve both.
+#' Covariates span 1e-4 (cover) to 1e6 (UTM), so no single
+#' absolute tolerance fits; compare_blocks() suits responses.
 #'
 #' @param a,b Data frames or matrices of the same shape.
 #' @param tol Numeric. Largest relative difference treated as
@@ -665,11 +649,9 @@ derived_terms <- list(
 
 #' Check One Taxon's Covariate Blocks Against Their Source
 #'
-#' Rebuilds each block from the master table using the column
-#' map, then compares it to the frame it came from. The map is
-#' what makes this possible: a master column may be suffixed
-#' with its block, so the v2 spelling cannot be recovered from
-#' the header alone.
+#' Rebuilds each block from the master table via the column map
+#' (master columns may carry a block suffix) and compares it to
+#' its source frame.
 #'
 #' @param taxon_label Character. Value in covariates$taxon.
 #' @param source_frames Named list of source data frames, one
@@ -700,9 +682,7 @@ check_covariates <- function(taxon_label, source_frames,
     return(invisible(NULL))
   }
 
-  # Step 1: Line the rows up with the source before any value is
-  # compared, by key where there is one and by position where
-  # there is not
+  # Step 1: Align rows with the source, by key or by position
   n_source <- nrow(source_frames[[1]])
 
   if (is.null(source_ids)) {
@@ -916,8 +896,8 @@ for (taxon in names(plant_files)) {
   )
 }
 
-# The prediction matrices are written once for all four taxa, so
-# they are checked once, against the last taxon read above.
+# Shared by all four taxa, so checked once (against the last
+# taxon read above)
 veg_pm_csv <- as.data.frame(fread(
   file.path(data_dir, "lookup", "veg_prediction_matrix.csv")
 ))
@@ -963,9 +943,7 @@ note(
 )
 
 ## 3.6 Mammal covariates and lookups against source ----
-# Mammal covariates come from the same two SpTable files as the
-# mammal response, and are written per region because north and
-# south are separate models on overlapping deployments.
+# From the same two SpTable files as the mammal response
 
 mammal_habitat_name <- c(north = "veg", south = "soil")
 
@@ -974,10 +952,9 @@ for (region in names(mammal_files)) {
   d <- as.data.frame(env$d, stringsAsFactors = FALSE)
   label <- paste("mammal", region)
 
-  # Mammal covariates carry a taxon of mammal_<region>, because
-  # north and south are separate models on overlapping
-  # deployments. The habitat block is called veg in the north and
-  # soil in the south, matching the model each one feeds.
+  # Keyed mammal_<region>: north and south are separate models on
+  # overlapping deployments. The habitat block is veg in the north
+  # and soil in the south.
   habitat <- mammal_habitat_name[[region]]
   frames <- list(d, d)
   names(frames) <- c("climate", habitat)
@@ -1142,8 +1119,7 @@ if (file.exists(bird_data_file)) {
     sprintf("%d cells, max diff %.1g", cmp$n, cmp$max_diff)
   )
 
-  # Counts feed a Poisson model, so they have to be whole and
-  # non-negative for the fit to mean anything.
+  # Poisson counts: whole and non-negative
   bird_counts <- as.matrix(bird_csv[, ..bird_spp])
   note(
     "bird",
@@ -1154,8 +1130,7 @@ if (file.exists(bird_data_file)) {
     paste("max", max(bird_counts))
   )
 
-  # Offsets are response-shaped: one per survey and species, and
-  # the model cannot run without the pair.
+  # One offset per survey and species
   off_csv <- fread(file.path(data_dir, "bird_offsets.csv"))
 
   note(
@@ -1248,9 +1223,8 @@ if (file.exists(bird_data_file)) {
     )
   )
 
-  # Factor levels have to travel separately: read back from a
-  # CSV a factor takes alphabetical levels, which moves the
-  # reference level and renames every coefficient.
+  # Read back from CSV, factors take alphabetical levels, moving
+  # the reference level
   levels_csv <- fread(
     file.path(data_dir, "lookup", "bird_factor_levels.csv")
   )
@@ -1283,11 +1257,9 @@ if (file.exists(bird_data_file)) {
   )
 }
 
-## 3.6.3 Harmonized lookups ----
-# _setup/09 writes one species queue, one factor-level table, the
-# bird grids and the dataset manifest from the files checked
-# above. They are checked here against those files, so a lookup
-# left stale by a rebuild of 01 or 06 fails rather than passing.
+## 3.6.4 Harmonized lookups ----
+# _setup/09's outputs against the files checked above, so a
+# lookup left stale by a rebuild of 01 or 06 fails
 lookup_dir <- file.path(data_dir, "lookup")
 harmonized <- c(
   "species_queue.csv", "factor_levels.csv", "dataset_manifest.csv",

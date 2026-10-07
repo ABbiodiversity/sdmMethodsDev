@@ -5,28 +5,16 @@
 # inputs: none
 # outputs: registers the `ivw_grid` rule
 # notes:
-#   - The v2 plant habitat rule, and the one place where a
-#     "coefficient" is not a regression coefficient. v2 fits each
-#     candidate, predicts it onto the prediction matrix - one row
-#     per habitat type - and combines those predictions across
-#     candidates weighting each by the precision of its own
-#     prediction. The result is an effect per habitat type on the
-#     link scale, which is what the v2 coefficient tables hold.
-#   - Weighting by precision rather than by AICc is a different
-#     claim: a candidate that is confident about a habitat type
-#     dominates there even if it is a poor model overall, and the
-#     weighting is per habitat type rather than per model.
-#   - Non-converged candidates are dropped from the grid average,
-#     not down-weighted, matching v2. A zero standard error is
-#     floored at 1e-4, because a precision weight of 1/0 would take
-#     the whole average.
-#   - The site-level prediction - v2 keeps it as `data$prediction`
-#     and uses it as the offset of its stand-age splines - is the
-#     result's `predict()` on the link scale. It averages every
-#     fitted candidate, converged or not, as v2 does; one that
-#     failed outright is left out, where v2's would turn the whole
-#     average into NaN. It is computed when a step asks for it,
-#     not on every draw.
+#   - The v2 plant habitat rule. Candidates are predicted onto the
+#     grid and combined per habitat type by inverse variance, so a
+#     "coefficient" is a link-scale effect per habitat type.
+#   - Unlike AICc weighting, a candidate confident about one
+#     habitat type dominates there even if it is poor overall.
+#   - Non-converged candidates are dropped from the grid average
+#     (as v2). Zero SEs are floored at 1e-4.
+#   - `predict()` gives v2's site-level `data$prediction` (offset
+#     of the stand-age splines): every fitted candidate, converged
+#     or not, as v2; failed fits are left out (v2 would give NaN).
 # ---
 
 # 1. Setup ----
@@ -112,15 +100,12 @@ select_ivw_grid <- function(
     rbind, lapply(predictions[usable], function(x) x$se.fit)
   )
 
-  # A zero standard error would carry infinite weight
   error[error == 0] <- 1e-4
 
   grid_coefficients <- ivw_combine(estimate, error)
 
-  # Step 2: The leading coefficients are averaged the same way,
-  # from each model's own coefficient table rather than from a
-  # prediction. Read by position, as v2 reads them: the head
-  # terms lead every candidate's formula.
+  # Step 2: Head terms, from each model's coefficient table, read
+  # by position as v2 does (they lead every formula)
   head_estimate <- do.call(rbind, lapply(
     which(converged), function(i) {
       fitted$fits[[i]]$coefficients$estimate[seq_along(head_terms)]
@@ -155,8 +140,7 @@ select_ivw_grid <- function(
     )
   )
 
-  # Each fitted candidate's own coefficients, for steps that
-  # average a term the grid does not carry: v2's pAspen.
+  # For steps averaging a term the grid lacks (v2's pAspen)
   result$candidate_coefficients <- lapply(
     which(table$ok), function(i) fitted$fits[[i]]$coefficients
   )
@@ -178,9 +162,6 @@ select_ivw_grid <- function(
 ivw_combine <- function(estimate, error) {
   precision <- 1 / error^2
 
-  # The variance of the combined estimate is the reciprocal of
-  # the summed precision, not its mean, so adding candidates
-  # sharpens rather than dilutes it.
   list(
     estimate = colSums(estimate * precision) / colSums(precision),
     se = sqrt(1 / colSums(precision))

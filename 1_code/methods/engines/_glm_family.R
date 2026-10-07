@@ -5,16 +5,10 @@
 # inputs: none
 # outputs: none; defines functions in memory
 # notes:
-#   - glm and bayesglm take the same arguments and return objects
-#     of the same shape, so fitting, coefficients, prediction and
-#     scoring are written once here and both engines point at
-#     them. A new engine with a different shape writes its own.
-#   - The leading underscore makes the loader source this before
-#     the engine files that use it.
-#   - Fitting failures are caught and returned, not raised. A
-#     candidate model set is expected to contain models that
-#     cannot be estimated for a given species and bootstrap, and
-#     the selection rule needs to see which ones failed.
+#   - Shared by glm and bayesglm, which take and return the same
+#     shapes. The leading underscore makes it load first.
+#   - Fitting failures are returned, not raised, so selection
+#     rules can see which candidates failed.
 # ---
 
 # 1. Setup ----
@@ -51,9 +45,9 @@ fit_glm_family <- function(
     control
   )
 
-  # Weights and offsets are passed as values rather than named in
-  # the formula, so the same formula serves a taxon that has them
-  # and one that does not.
+  # Passed as values so one formula serves taxa with and without
+  # weights. The harness passes offset = NULL and puts offsets in
+  # the formula instead (see run_stage()).
   if (!is.null(weights)) {
     args$weights <- weights
   }
@@ -62,10 +56,9 @@ fit_glm_family <- function(
     args$offset <- offset
   }
 
-  # A Gamma fit starts at the mean response unless told otherwise.
-  # The default start, y itself, spans orders of magnitude for a
-  # right-skewed density and sends the fitting off; v2's mammal
-  # abundance models start at the mean for that reason.
+  # Gamma fits start at the mean response, as v2's mammal
+  # abundance models do: starting at y diverges for skewed
+  # densities
   family_name <- if (is.character(family)) family else family$family
   starts <- c("mustart", "start", "etastart")
 
@@ -75,11 +68,8 @@ fit_glm_family <- function(
     args$mustart <- rep(mean(y, na.rm = TRUE), nrow(data))
   }
 
-  # A convergence warning still leaves a usable fit, so it is
-  # recorded rather than treated as a failure. It is caught with
-  # withCallingHandlers() and muffled, so the model is fitted
-  # once; catching it with tryCatch() would abandon the fit and
-  # force a second one.
+  # Warnings (e.g. non-convergence) are recorded, not failures;
+  # muffled rather than caught so the model is fitted once
   warnings_seen <- character(0)
 
   tryCatch(
@@ -179,9 +169,8 @@ fit_predict <- function(fit, newdata, type = "link", se = FALSE) {
 
 #' Score a Fit for Model Selection
 #'
-#' AICc rather than AIC by default, because the candidate sets
-#' are large relative to the number of survey units a rare
-#' species is detected at.
+#' AICc by default: candidate sets are large relative to a rare
+#' species' detections.
 #'
 #' @param fit A list from fit_glm_family().
 #' @param type Character. "AIC", "AICc" or "BIC".
@@ -201,15 +190,11 @@ information_criterion <- function(fit, type = "AICc") {
       AIC = stats::AIC(fit$fit),
       BIC = stats::BIC(fit$fit),
       AICc = {
-        # The parameter count is the log-likelihood's degrees of
-        # freedom, as MuMIn uses, not the length of the
-        # coefficient vector, which also counts aliased (NA)
-        # terms and so over-penalizes a rank-deficient model.
+        # k from logLik df, as MuMIn, so aliased (NA) terms are
+        # not counted
         k <- attr(stats::logLik(fit$fit), "df")
         n <- stats::nobs(fit$fit)
-        # The correction is undefined once the parameter count
-        # reaches the sample size; Inf keeps such a model out of
-        # the selection rather than returning a negative score.
+        # Undefined once k + 1 >= n; Inf excludes the model
         if (is.na(n) || n - k - 1 <= 0) {
           Inf
         } else {

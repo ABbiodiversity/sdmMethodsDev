@@ -5,16 +5,11 @@
 # inputs: none
 # outputs: none; returns objects in memory
 # notes:
-#   - One place that lists the runs an experiment can choose
-#     between, each a taxon spec in its v2 configuration. An
-#     experiment names runs (`taxa = c("lichen", "bird")`) rather
-#     than building specs, so its run.R stays short and every
-#     experiment starts from the same v2 configuration.
-#   - Run names are the folder names results are written under.
-#     Mammals run once per season, because v2's mammal references
-#     average the summer and winter fits; the two runs share the
-#     data slug "mammal". Soil mites run as "mite", their slug.
-#   - A new taxon module adds its run here.
+#   - The runs an experiment can name (`taxa = c("lichen",
+#     "bird")`), each in its v2 configuration. Run names are the
+#     result folder names. Mammals run once per season (v2's
+#     references average summer and winter), both with slug
+#     "mammal". A new taxon module adds its run here.
 # ---
 
 # 1. Setup ----

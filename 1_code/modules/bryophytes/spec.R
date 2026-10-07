@@ -7,22 +7,14 @@
 # outputs: none; returns objects in memory
 # notes:
 #   - Data slug: "bryophyte". Response file bryophyte.csv.
-#   - v2 fits Protocol for this taxon. Only bryophytes and
-#     lichens get it; soil mites and vascular plants do not. The
-#     asymmetry is v2's and is preserved here for parity, with
-#     `use_protocol` exposed so an experiment can equalize it.
-#   - The published bryophyte model file is unusable twice over:
-#     every species and draw in it is an error object reading
-#     `could not find function "model.avg"`, and the bootstrap-id
-#     file held 3 draws where the other three taxa hold 100.
-#   - The parity reference is ABMIexploreR's bryophyte arrays
-#     (_setup/08), which are complete and match v2's own
-#     COEFS.RData to ~1e-15. _setup/03_rerun_bryophyte_v2_
-#     reference.R also regenerated the climate stage into
-#     2_pipeline/v2_reference/, for v2_self_agreement.R and the
-#     stored bootstrap draws.
-#   - Anything true of every plant-group taxon belongs in
-#     _shared/plant_group.R, not here.
+#   - v2 fits Protocol for this taxon (bryophytes and lichens
+#     only); `use_protocol` can equalize it across taxa.
+#   - The published bryophyte model file is unusable (every entry
+#     is a `could not find function "model.avg"` error; 3 stored
+#     draws, not 100). The parity reference is ABMIexploreR's
+#     arrays (_setup/08), matching v2's COEFS.RData to ~1e-15.
+#     _setup/03 regenerated the climate stage into
+#     2_pipeline/v2_reference/ for v2_self_agreement.R.
 # ---
 
 # 1. Setup ----

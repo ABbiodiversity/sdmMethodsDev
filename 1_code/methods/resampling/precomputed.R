@@ -10,15 +10,11 @@
 #     - per_species_rds: one file per species (plant groups)
 # outputs: registers the `precomputed` scheme
 # notes:
-#   - Replays draws the source pipeline stored. Replaying v2's own
-#     draws is what makes parity numerical rather than
-#     distributional: the harness then fits the same rows v2
-#     fitted, draw by draw.
-#   - Two layouts. Birds store one table for the taxon, one column
-#     per draw, keyed on `surveyid`. The plant-group taxa store
-#     v2's draws per species, because v2 drew them per species,
-#     written by 1_code/_setup/07_harmonize_v2_plant_bootstrap_ids.R.
-#   - The seed is ignored: the draws are stored, not drawn.
+#   - Replays v2's stored draws, so parity can be numerical rather
+#     than distributional. Birds: one table keyed on `surveyid`.
+#     Plant groups: per species, as v2 drew them (written by
+#     _setup/07_harmonize_v2_plant_bootstrap_ids.R).
+#   - The seed is ignored.
 # ---
 
 # 1. Setup ----
@@ -79,8 +75,7 @@ resample_precomputed <- function(
       ids <- unique(ids)
     }
 
-    # Step 2: Translate to survey unit ids when the stored ids
-    # are a different key, which is how the bird ids are stored
+    # Step 2: Translate other keys (birds) to survey unit ids
     if (is.null(id_column)) {
       return(as.character(ids))
     }
@@ -102,8 +97,8 @@ resample_precomputed <- function(
 
 #' Read One Taxon's or Species' Stored Draws
 #'
-#' Cached for the session, because a bird run otherwise re-reads
-#' the 38 MB draw table once per species.
+#' Cached: the bird draw table (~38 MB) is otherwise re-read per
+#' species.
 #'
 #' @param data_dir,taxon,species,per_species As in
 #'   resample_precomputed().

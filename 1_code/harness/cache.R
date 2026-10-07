@@ -5,18 +5,11 @@
 # inputs: none
 # outputs: none; holds read results in memory
 # notes:
-#   - The frozen dataset does not change during a run, but the
-#     small lookups were being re-read many times: the covariate
-#     catalogue several times per region, the species queue once
-#     per region, the stored bird draws once per species. This
-#     keeps one copy per file per session.
-#   - Entries are keyed on the file's path, its modification time
-#     and size, and a tag naming how it was read, so editing a
-#     lookup (or rebuilding the dataset) is picked up on the next
-#     read rather than served stale.
-#   - Only files are cached, never model fits or results, so the
-#     cache cannot change what a run computes - only how often it
-#     reads. clear_cache() empties it.
+#   - Keeps one copy per file per session of lookups that were
+#     re-read many times per run. Keyed on path, mtime, size and a
+#     read tag, so an edited file is re-read, not served stale.
+#   - Only file reads are cached, never fits or results, so the
+#     cache cannot change what a run computes.
 # ---
 
 # 1. Setup ----

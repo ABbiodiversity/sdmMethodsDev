@@ -13,39 +13,18 @@
 #     - parity_bell.png, v2 and the run as bell curves, one facet
 #       each
 # notes:
-#   - One figure per taxon. Each panel is a stage and region (and,
-#     for mammals, a hurdle part) for one species; each row a term.
-#     v2 and exp_000 are drawn in different colours as a median and
-#     a 10th-to-90th percentile bar, the same summaries the gate
-#     compares.
-#   - Intervals, not densities: v2's reference keeps only the
-#     median and the 10th and 90th percentiles of its draws, so its
-#     full distribution cannot be drawn. The run's is summarized
-#     the same way, so the two are read alike.
-#   - Terms span 1e-144 to 1e2, so no single axis holds them. Each
-#     term is put on its own scale, relative to v2: 0 is v2's
-#     median and one unit is half v2's 10-90% band, the scale the
-#     gate's standardized difference uses. Where v2 fitted once and
-#     has no band (the mammal hurdle), one unit is half the run's
-#     band instead, and v2 is drawn as a point. There the gate
-#     compares the run's first draw with v2's single fit, so that
-#     draw is drawn too, as its own colour.
-#   - Values beyond +/- 4 units are drawn at the panel's edge, so
-#     one far-off term does not flatten the rest. Terms the gate
-#     cannot reach, or with no band to scale by, are left out and
-#     counted in the caption.
-#   - parity_mean.png averages the same scaled values over every
-#     species and term, one facet per taxon (or per group; section
-#     1.4), one row per stage and region.
-#   - parity_bell.png draws each row as two curves, v2 and the run,
-#     each the average of its terms read as normal curves from
-#     their median and band. A shifted curve is a location
-#     difference, a wider or narrower one a spread difference. The
-#     normal shape is a drawing convenience; v2 keeps only three
-#     summaries of its draws.
-#   - Run by run_experiment() as a step, in an environment of its
-#     own; see script_step(). Can also be run on its own from the
-#     repository root after 01_compare_to_v2.R.
+#   - Medians and 10-90% bars, not densities: v2 keeps only those
+#     three summaries of its draws.
+#   - Terms span 1e-144 to 1e2, so each is scaled to v2: 0 is v2's
+#     median, one unit is half v2's band (the gate's standardized
+#     difference). Where v2 fitted once (mammal hurdle), the unit
+#     is half the run's band, v2 is a point, and the run's first
+#     draw (what the gate compares) is shown.
+#   - Values beyond +/- 4 units are clamped to the edge;
+#     unreachable or unscalable terms are dropped and counted in
+#     the caption.
+#   - Runs as a script_step(), or alone from the repository root
+#     after 01_compare_to_v2.R.
 # ---
 
 # 1. Setup ----
@@ -261,15 +240,9 @@ for (one_taxon in sort(unique(plot_data$taxon))) {
 # One figure, one facet per taxon (or group), each row a stage and
 # region. Input: plot_data. Output: parity_mean.png.
 #
-# The per-term values are averaged over every species and term in
-# the row, still in v2 units, so v2 sits at 0 and its bar is its
-# mean band. The averages use the clamped values, so a term past
-# the axis counts as +/- 4, not as its full distance.
-#
-# A signed mean shows bias but lets a +2 and a -2 cancel, so each
-# row is also labelled with the mean absolute difference of the
-# run's median from v2's, and the share of terms whose v2 median
-# lies inside the run's band: the gate's first two measures.
+# Averages the clamped scaled values over species and terms. A
+# signed mean lets +2 and -2 cancel, so rows are also labelled
+# with the mean absolute difference and the in-band share.
 
 ## 4.1 Average per facet, row and source ----
 plot_data[, facet := get(mean_facet)]
@@ -373,19 +346,10 @@ cat("Parity figure: ", mean_file, "\n", sep = "")
 # stage and region, stacked. Input: plottable. Output:
 # parity_bell.png.
 #
-# Each term's 100 draws are summarized, in both runs, by a median
-# and a 10-90% band. Read as a normal curve, the median is its
-# centre and the band spans 2 x 1.2816 standard deviations. Each
-# row's curve is the average of its terms' curves, in v2 units,
-# so v2's sits at 0 and the run's shows where, and how widely, the
-# run lands against it: shifted if the medians differ, wider or
-# narrower if the bands do.
-#
-# The normal shape is a drawing convenience, not a claim: v2 keeps
-# only the three summaries, so the true shape of its draws is not
-# known. Negligible terms are left out, as the gate leaves them
-# out. Where v2 fitted once (the mammal hurdle) it has no band and
-# is drawn as a line at 0.
+# Each term as a normal curve (median centre; the 10-90% band is
+# 2 x 1.2816 SD), averaged per row in v2 units. The normal shape
+# is a drawing convenience, not a claim. Negligible terms are
+# left out; v2 without a band is a line at 0.
 
 ## 5.1 One normal curve per term ----
 # qnorm(0.9): the 90th percentile is this many standard deviations

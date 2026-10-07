@@ -5,11 +5,9 @@
 # inputs: none
 # outputs: registers the `staged_bic` rule
 # notes:
-#   - The v2 bird landcover rule. `models` is a list of named
-#     groups. Each group is fitted as an update to the previous
-#     group's winner, and the winner is the smallest model within
-#     `threshold` of the best score - a parsimony tie-break, not
-#     simply the minimum.
+#   - The v2 bird landcover rule. Each group of `models` updates
+#     the previous group's winner: the smallest model within
+#     `threshold` of the best score.
 # ---
 
 # 1. Setup ----
@@ -38,8 +36,7 @@ select_staged_bic <- function(
   weights = NULL, offset = NULL, ic = "BIC", control = list(),
   threshold = 2, always_advance = TRUE
 ) {
-  # Step 1: Fit the base model. It is the starting point every
-  # group updates, and the fallback if no group improves on it.
+  # Step 1: Fit the base model, the fallback if no group improves
   current <- fit_with(
     engine, base, data, family, weights, offset, control
   )
@@ -82,18 +79,13 @@ select_staged_bic <- function(
       next
     }
 
-    # Step 3: Among candidates within `threshold` of the best,
-    # take the one with fewest parameters. This is a parsimony
-    # rule, and it is why the winner is not simply which.min().
+    # Step 3: Fewest parameters within `threshold` of the best
     best <- min(fitted$scores[eligible])
     close <- eligible[fitted$scores[eligible] <= best + threshold]
     winner <- close[which.min(table$k[close])]
 
-    # Step 4: Carry the group's winner forward. v2 always does,
-    # even when it scores worse than the model it updated
-    # (07.ModelLandcover.R, section 14); `always_advance = FALSE`
-    # keeps the running model instead unless the group improves
-    # on it.
+    # Step 4: Carry the winner forward. v2 always does, even when
+    # it scores worse (07.ModelLandcover.R, section 14)
     if (always_advance || fitted$scores[winner] < current_score) {
       current <- fitted$fits[[winner]]
       current_formula <- fitted$formulas[[winner]]

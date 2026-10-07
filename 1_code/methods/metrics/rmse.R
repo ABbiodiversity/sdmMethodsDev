@@ -5,9 +5,7 @@
 # inputs: none
 # outputs: registers the `rmse` metric
 # notes:
-#   - Takes observed and predicted vectors on the response scale
-#     and returns one number. Computed from predictions only, so
-#     every engine is scored the same way.
+#   - Metric contract: see register_metric() (harness/registry.R).
 # ---
 
 # 1. Setup ----

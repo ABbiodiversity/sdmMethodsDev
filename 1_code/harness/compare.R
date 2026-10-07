@@ -11,26 +11,12 @@
 #   the per-taxon, region and metric summary is returned (and
 #   printed by run_experiment()) but not written
 # notes:
-#   - Every experiment after exp_000 asks the same thing: did the
-#     change do better or worse than the v2 baseline? This answers
-#     it the same way for any method, from the two experiments'
-#     summary tables, so a new experiment needs one call.
-#   - Model fit is compared on the out-of-bag metrics, which
-#     score each draw on the units it left out. In-sample metrics
-#     flatter a flexible method, so they are not the default.
-#   - Rows are matched on taxon, region, season, part, species
-#     and metric, so two experiments that name
-#     their runs differently still line up.
-#   - "Better" depends on the metric: higher AUC, deviance
-#     explained and Spearman; lower RMSE; a calibration slope
-#     closer to 1. better_direction() states it once.
-#   - Each side's draw count is kept in the summary
-#     (`draws_baseline`, `draws_candidate`), and a mismatch is
-#     warned about: a trial against a full run is not a result.
-#   - A difference is a difference in medians over draws. Whether
-#     it is larger than draw-to-draw noise is read from
-#     `share_better` across species and from the p10-p90 bands in
-#     comparison_metrics.csv, not from a single number.
+#   - Rows match on taxon, region, season, part, species and
+#     metric, not run name; differences are in medians over draws.
+#   - Defaults to out-of-bag metrics: in-sample metrics flatter
+#     flexible methods.
+#   - Warns when the two sides hold different draw counts. Judge
+#     noise from `share_better` and the p10-p90 bands.
 # ---
 
 # 1. Setup ----

@@ -5,15 +5,11 @@
 # inputs: none
 # outputs: registers the `spatial_block` scheme
 # notes:
-#   - Reproduces the v2 plant bootstrap: resample survey units
-#     with replacement within coarse latitude and longitude
-#     blocks, so a draw keeps the geographic spread rather than
-#     drifting toward whichever region is best surveyed.
-#   - Iteration 1 is the complete data, matching v2, so the first
-#     fit of every run is the full-data fit.
-#   - Every draw comes from one stream under the species' seed, so
-#     draws 1 to 5 of a 5-draw run are the same as draws 1 to 5 of
-#     a 100-draw run.
+#   - The v2 plant bootstrap: resample units with replacement
+#     within coarse lat/long blocks, keeping the geographic spread.
+#   - Iteration 1 is the complete data, as in v2.
+#   - One seeded stream per species, so draws 1-5 of a 5-draw run
+#     equal draws 1-5 of a 100-draw run.
 # ---
 
 # 1. Setup ----
@@ -25,8 +21,7 @@
 
 #' Draw a Spatially Blocked Bootstrap
 #'
-#' Resamples survey units with replacement within each spatial
-#' block, so every block keeps its original number of units.
+#' Each block keeps its original number of units.
 #'
 #' @param frame A data frame with `survey_unit_id` and the
 #'   coordinate columns.
@@ -37,9 +32,7 @@
 #'   check.
 #' @param response Numeric vector, one per row of `frame`, used
 #'   only for the detection check.
-#' @param max_attempts Integer. How many redraws before giving
-#'   up, so a species that can never meet the threshold fails
-#'   rather than looping forever.
+#' @param max_attempts Integer. Redraws before failing.
 #' @param seed Integer or NULL. NULL leaves the stream unseeded,
 #'   which is what v2 did.
 #' @return A list of character vectors, one per iteration.
@@ -87,8 +80,7 @@ resample_spatial_block <- function(
       return(units)
     }
 
-    # Step 2: Redraw until the sample carries enough detections
-    # for a model to be estimable
+    # Step 2: Redraw until the sample has enough detections
     for (attempt in seq_len(max_attempts)) {
       rows <- draw_once()
 
@@ -114,10 +106,9 @@ resample_spatial_block <- function(
 
 #' The Registered Form of the Spatially Blocked Bootstrap
 #'
-#' Adds v2's redraw rule: a sample is redrawn for detections only
-#' when the full data could meet the threshold in at least one
-#' model region; otherwise the first draw is taken. Checked per
-#' region, on the full data.
+#' Adds v2's redraw rule: redraw for detections only if the full
+#' data meets the threshold in at least one region; otherwise
+#' take the first draw.
 #'
 #' @param frame The one-species frame.
 #' @param iterations Integer vector.
@@ -139,9 +130,7 @@ resampler_spatial_block <- function(
 
   if (min_detections > 0) {
     viable <- any(vapply(context$spec$regions, function(region) {
-      # A region whose filter names columns this frame lacks -
-      # another region's, when the draw is not province-wide -
-      # cannot be judged here, and does not count.
+      # Skip regions whose filter columns this frame lacks
       if (!is.null(region$filter) &&
             !all(all.vars(region$filter) %in% names(frame))) {
         return(FALSE)
@@ -162,8 +151,7 @@ resampler_spatial_block <- function(
     }
   }
 
-  # `seed = NULL` is passed through deliberately: it means
-  # unseeded, not the resampler's harness_seed() default.
+  # Pass NULL through: unseeded, not the harness_seed() default
   resample_spatial_block(
     frame = frame, iterations = iterations,
     long_column = long_column, lat_column = lat_column,

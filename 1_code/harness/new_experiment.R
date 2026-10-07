@@ -14,20 +14,14 @@
 #     intermediates
 #   - 3_output/<id>/: figures/, tables/ and a stub report.md
 # notes:
-#   - One call starts an experiment, so its id is chosen once and
-#     used verbatim in all three places:
+#   - Usage:
 #       source("1_code/harness/new_experiment.R")
 #       new_experiment("covariate scale")
 #   - The number is one past the highest exp_NNN in any of the
-#     three folders, not just 1_code/experiments/. A pipeline
-#     folder left from a removed experiment still holds its
-#     number, so a new experiment never shares stores with an old
-#     one. Gaps are not reused, for the same reason.
-#   - Nothing is written until every target is known to be free,
-#     and a call that fails partway removes what it created.
-#   - Base R only, so it can be sourced without load_framework().
-#   - The empty folders carry a .gitkeep, which .gitignore lets
-#     through, so the structure is committed with the code.
+#     three folders, and gaps are not reused, so a new experiment
+#     never shares stores with a removed one.
+#   - Base R only, so it runs without load_framework(). Empty
+#     folders get a .gitkeep so the structure is committed.
 # ---
 
 # 1. Setup ----
@@ -250,9 +244,8 @@ new_experiment <- function(
 
 #' Copy the Template, Filling its Placeholders
 #'
-#' Replaces the template's placeholders with the experiment's
-#' values in every file, and drops the run.R note on how to start
-#' an experiment, which is done once the copy exists.
+#' Also drops the template run.R's note on starting an
+#' experiment.
 #'
 #' @param template_dir Character. The template folder.
 #' @param code_dir Character. The new experiment's code folder.

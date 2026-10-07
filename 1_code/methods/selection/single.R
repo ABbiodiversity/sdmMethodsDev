@@ -5,10 +5,8 @@
 # inputs: none
 # outputs: registers the `single` rule
 # notes:
-#   - Fits the first formula and keeps it. No ranking, so it needs
-#     nothing of the engine beyond fit and predict, which makes it
-#     the rule for an engine with no information criterion - a
-#     boosted tree, say - or for any one-model question.
+#   - Fits the first formula only. Needs only fit and predict, so
+#     it suits engines without an information criterion.
 # ---
 
 # 1. Setup ----
