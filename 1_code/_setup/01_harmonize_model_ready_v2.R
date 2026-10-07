@@ -3,6 +3,8 @@
 # author: Brendan Casey
 # created: 2026-09-05
 # inputs:
+#   Read via setup_input() (utils/input_paths.R); the original
+#   locations are listed, and SDM_* variables can point back.
 #   from 0_data/data_snapshots/model_ready_v2/ on ABMI-DATA2:
 #     - vascular-plant-model-data.Rdata
 #     - bryophyte-model-data.Rdata
@@ -14,6 +16,9 @@
 #       coefficients 2024.RData
 #   from the ABMI Mammals shared drive:
 #     - Lookup Tables/WildTrax Species Strings.RData
+#   from the work_abmi shared drive, read-only:
+#     - 1_projects/active/sdmMethodsDev/remote/birds_data_v2/
+#       Stratified.Rdata, the copy v2's birds were fitted on
 # outputs:
 #   in 0_data/test_dataset/:
 #     - sites.csv           one row per survey unit, all sources
@@ -22,13 +27,48 @@
 #     - lichen.csv          survey_unit_id + species columns
 #     - mite.csv            survey_unit_id + species columns
 #     - mammal.csv          survey_unit_id + species columns
+#     - bird.csv            survey_unit_id + species counts
+#     - bird_offsets.csv    survey_unit_id + QPAD log offsets
+#     - covariates.csv      survey_unit_id + taxon + every
+#                           covariate, all taxa in one table
+#   in 0_data/test_dataset/lookup/:
+#     - veg_prediction_matrix.csv   north habitat prediction grid
+#     - soil_prediction_matrix.csv  south habitat prediction grid
+#     - modelled_species.csv        which species each model set
+#                                   is fitted for, per plant taxon
+#     - mammal_<region>_prediction_matrix.csv
+#     - mammal_modelled_species.csv
+#     - mammal_climate_predictions.csv
+#     - bird_modelled_species.csv   species x region work queue
+#     - bird_bootstrap_ids.csv      the 100 bootstrap draws
+#     - bird_factor_levels.csv      factor levels, source order
+#     - covariate_columns.csv       which block each covariates
+#                                   column came from, per taxon
 # notes:
-#   Source files use two incompatible survey designs, so
-#   they are harmonized into one shared convention rather than
-#   one table: every taxon CSV is `survey_unit_id` followed by
-#   that taxon's species columns, and every identity, design and
-#   location field is factored out into sites.csv. Join any taxon
-#   CSV to sites.csv on survey_unit_id.
+#   - Every taxon CSV is survey_unit_id + species columns;
+#     identity, design and location fields go to sites.csv. The
+#     covariate and lookup tables let the modules run from
+#     0_data/test_dataset/ alone.
+#   - covariates.csv is keyed on survey_unit_id AND taxon (taxa
+#     disagree on shared quadrats; see section 5.4). Filter on
+#     taxon before joining, then drop empty columns.
+#   - Names in more than one block are block-suffixed (e.g.
+#     Crop_veg, Crop_soil); lookup/covariate_columns.csv maps
+#     each column to its block and v2 spelling.
+#   - The plant-group mite covariates differ from vascular plant
+#     mostly in the Surr* buffer terms (20 columns carry 67% of
+#     differing veg cells, 80% of soil), in every year 2007-2022:
+#     likely a different upstream extraction, unconfirmable here.
+#   - Mammal covariates and prediction matrices come from the
+#     SpTable files (matrices checked identical to the ABMI
+#     Mammals drive CSVs); the climate block is replaced (1.6).
+#   - Birds come from Stratified.Rdata (1.10), read-only
+#     (SDM_BIRD_DATA overrides). Prediction matrices come from
+#     the vegetation models project (1.8; SDM_V2_LOOKUP
+#     overrides).
+#   - TODO: the plant-group files are read twice (response, then
+#     covariates); simpler than threading one environment, and
+#     this runs once per snapshot.
 # ---
 
 # 1. Setup ----
@@ -39,29 +79,23 @@ library(data.table)
 ## 1.2 Configure paths ----
 project_root <- normalizePath(getwd(), winslash = "/")
 
-# Directory containing the v2 model ready snapshot files on ABMI-DATA2
+# The _setup inputs mirrored on ABMI-DATA2 (setup_input())
+source(file.path(project_root, "1_code/_setup/utils/input_paths.R"))
+
 snapshot_dir <- Sys.getenv(
   "SDM_SNAPSHOT_V2",
-  unset = paste0(
-    "//ABMI-DATA2/science/sc/sdmMethodsDev/0_data/",
-    "data_snapshots/model_ready_v2"
-  )
+  unset = setup_input("model_ready_v2")
 )
 
-# Output is the frozen test dataset itself, so it lands in
-# 0_data/test_dataset/. That folder is otherwise read-only: this
-# script is what writes it, by hand and once per snapshot, and
-# every experiment then treats the result as fixed. The CSVs are
-# gitignored along with the rest of 0_data/.
+# The frozen test dataset; only this script writes it
 output_dir <- file.path(project_root, "0_data/test_dataset")
 
+lookup_dir <- file.path(output_dir, "lookup")
+
 ## 1.3 Name the source files ----
-# Plant-group files share one schema, mammal files another.
-#
-# "Plant group" names a file layout, not a taxonomy. It covers
-# vascular plants, bryophytes, lichens and soil mites, because
-# all four are surveyed on the same site-year-quadrant design
-# and arrive in the same three-frame layout.
+# "Plant group" is a file layout (the site-year-quadrant design),
+# not a taxonomy: vascular plants, bryophytes, lichens and soil
+# mites. Mammal files have another schema.
 plant_files <- c(
   vascular_plant = "vascular-plant-model-data.Rdata",
   bryophyte = "bryophyte-model-data.Rdata",
@@ -81,12 +115,9 @@ mammal_files <- c(
 )
 
 ## 1.4 Name the plant-group non-species columns ----
-# Plant-group frames are identity + species + site and climate.
-# Species are whatever is left once the other two are named, so
-# both are listed here rather than found by position: column
-# order is an accident of how the files were built, and `Protocol`
-# already sits last in two of the four files rather than with the
-# site block it belongs to.
+# Species are whatever is left once identity and site columns
+# are named; column order is not reliable (`Protocol` sits last
+# in two of the four files).
 
 # The six identity columns every plant-group frame opens with.
 plant_id_cols <- c(
@@ -155,21 +186,235 @@ plant_site_cols <- c(
   "Protocol"
 )
 
-## 1.5 Name the WildTrax species lookup ----
+# Fields sites.csv carries, dropped from the climate table; the
+# loader joins them back under their v2 names
+plant_site_cols_in_sites <- c(
+  "Lat",
+  "Long",
+  "Elevation",
+  "NR",
+  "NSR",
+  "LufName",
+  "Easting",
+  "Northing"
+)
+
+# Products of stored columns, not written: the loader recomputes
+# them as 01a_data-standardization.R did. Stored separately they
+# would drift apart at CSV precision (Northing2 off by ~0.05).
+plant_site_cols_derived <- c(
+  "Easting2",
+  "Northing2",
+  "EastingNorthing",
+  "MAPPET",
+  "MAT2",
+  "CMDMAT",
+  "MWMT2"
+)
+
+## 1.5 Name the mammal column blocks ----
+# The mammal frame `d`: species from its first_sp_col and
+# last_sp_col indices; the two non-habitat blocks are named
+# below and habitat is the remainder (checked in 6.6).
+
+# Design and identity fields. sites.csv already carries these,
+# so they are dropped from the covariate tables.
+mammal_site_cols <- c(
+  "project",
+  "location",
+  "SummerDays",
+  "WinterDays",
+  "Lat",
+  "Long",
+  "NearestSite",
+  "NR",
+  "NSR",
+  "LUF",
+  "Lured"
+)
+
+# Model covariates that are not habitat: climate, the aspen and
+# Peace River terms, the subregion factor, the deployment key the
+# climate predictions join on, and the seasonal model weights.
+# Not every column is in both files - pAspen and PeaceRiver are
+# south only, NSR1 north only.
+mammal_climate_cols <- c(
+  "AHM",
+  "PET",
+  "FFP",
+  "MAP",
+  "MAT",
+  "MCMT",
+  "MWMT",
+  "TrueLat",
+  "pAspen",
+  "NSR1",
+  "PeaceRiver",
+  "location_project",
+  "wt_summer",
+  "wt_winter"
+)
+
+## 1.6 Name the mammal camera climate ----
+# The v2 mammal climate pipeline joins this file, not the
+# SpTable's climate block (they differ by up to 531 mm MAP at
+# matched deployments), so its columns replace the SpTable's.
+# Also the only mammal source of CMD and TD.
+mammal_camera_climate_file <- Sys.getenv(
+  "SDM_MAMMAL_CAMERA_CLIMATE",
+  unset = setup_input(
+    "ab_data_v2023", "abmi-camera-climate_2023.Rdata"
+  )
+)
+
+# Not pAspen: v2's south models fit the SpTable's own (up to
+# 0.92 different at matched deployments)
+mammal_camera_climate_cols <- c(
+  "MAT", "MWMT", "MCMT", "TD", "MAP", "MSP", "AHM",
+  "SHM", "DD_0", "DD5", "DD_18", "DD18", "NFFD", "bFFP", "eFFP",
+  "FFP", "PAS", "EMT", "EXT", "Eref", "CMD", "RH", "CMI",
+  "DD1040", "bio9", "bio15", "HTV"
+)
+
+## 1.7 Name the mammal climate predictions ----
+# The climate prediction 03_basic-models.R reads for both
+# regions, from a separate pipeline; copied in
+mammal_climate_pred_file <- Sys.getenv(
+  "SDM_MAMMAL_CLIMATE_PRED",
+  unset = setup_input(
+    "abmi_mammals",
+    "Results/Habitat Modeling/2024/Climate/Predictions",
+    "All Species Climate Predictions.csv"
+  )
+)
+
+## 1.8 Name the v2 prediction-matrix lookups ----
+# The v2 scripts read these CSVs, not the snapshot's veg.pm and
+# soil.pm. The veg CSV adds Peatland, Mineral, Upland and
+# CCR1234 (needed by four of the twelve veg models) and drops
+# MarshSwamp, CCPineR1, CCPine234, CCWhiteSpruceR1 and
+# CCDecidMixedR1; shared columns are identical, as are the soil
+# matrices. The snapshot is the fallback (reported in 7.4).
+v2_lookup_dir <- Sys.getenv(
+  "SDM_V2_LOOKUP",
+  unset = setup_input(
+    "vegetation_models", "0_data/lookup/prediction-matrix"
+  )
+)
+
+v2_lookup_files <- c(
+  veg_prediction_matrix = "veg-prediction-matrix-CC_2024.csv",
+  soil_prediction_matrix = "soil-prediction-matrix_2024.csv"
+)
+
+## 1.9 Name the WildTrax species lookup ----
 # The naming authority for mammal species.
 wt_species_file <- Sys.getenv(
   "SDM_WT_SPECIES",
-  unset = paste0(
-    "G:/Shared drives/ABMI Mammals/Data/Lookup Tables/",
+  unset = setup_input(
+    "abmi_mammals", "Data/Lookup Tables",
     "WildTrax Species Strings.RData"
   )
 )
 
-## 1.6 Check the inputs are reachable ----
+## 1.10 Name the bird data package ----
+# `covs`, `bird`, `off`, `boot` and `birdlist`, from a
+# stratification stage not in 0_data/v2_scripts/birds/. Use the
+# copy v2 was fitted on (remote/birds_data_v2/), NOT the
+# BirdModels drive's Archive/2025 file, rebuilt on 2026-08-19
+# with different draws. With this copy the harness reproduces
+# v2's per-draw bird coefficients to ~1e-10 (checked
+# 2026-10-02). Read-only.
+bird_data_file <- Sys.getenv(
+  "SDM_BIRD_DATA",
+  unset = setup_input("birds_data_v2", "Stratified.Rdata")
+)
+
+## 1.11 Name the bird covariate blocks ----
+# Every name appears in a formula in 00.ClimateModels.R,
+# 00.NorthModels.R or 00.SouthModels.R (checked in 6.8)
+
+# The climate stage. EMT is carried because it sits with the
+# other climate normals in the source, but no formula uses it.
+bird_climate_cols <- c(
+  "MAP",
+  "TD",
+  "CMD",
+  "FFP",
+  "EMT"
+)
+
+# The north landcover stage. Footprint, method and water terms
+# are shared with the south block.
+bird_veg_cols <- c(
+  "vegc",
+  "wtAge",
+  "wtAge2",
+  "wtAge05",
+  "isCon",
+  "isUpCon",
+  "isBogFen",
+  "isMix",
+  "isPine",
+  "isWSpruce",
+  "fcc2",
+  "road",
+  "mWell",
+  "mSoft",
+  "mEnSft",
+  "mTrSft",
+  "mSeism",
+  "method",
+  "pWater_KM",
+  "pWater2_KM"
+)
+
+# The south soil stage. A narrower footprint set than the north.
+bird_soil_cols <- c(
+  "soilc",
+  "paspen",
+  "road",
+  "mWell",
+  "mSoft",
+  "method",
+  "pWater_KM",
+  "pWater2_KM"
+)
+
+# Design fields rather than covariates: which region each survey
+# is eligible for, the model weights, the train/test split, the
+# spatial block, and the keys. `year` here is the recoded model
+# term, calendar year minus 1992; sites.csv carries the calendar
+# year derived from date_time.
+bird_design_cols <- c(
+  "surveyid",
+  "useNorth",
+  "useSouth",
+  "vegw",
+  "soilw",
+  "use",
+  "block",
+  "year",
+  "method",
+  "locationid",
+  "gisid",
+  "organization",
+  "project_id",
+  "date_time"
+)
+
+# Carried by sites.csv, so dropped from the covariate tables.
+bird_cols_in_sites <- c(
+  "Easting",
+  "Northing"
+)
+
+## 1.12 Check the inputs are reachable ----
 # Fail before any reading, so a disconnected drive is obvious.
 all_files <- c(
   file.path(snapshot_dir, c(plant_files, mammal_files)),
-  wt_species_file
+  wt_species_file,
+  bird_data_file
 )
 missing_files <- all_files[!file.exists(all_files)]
 
@@ -187,16 +432,10 @@ if (length(missing_files) > 0) {
 dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 
 # 2. Helper functions ----
-# One reader per source family, plus a name normalizer for the
-# mammal crosswalk and a duplicate-key guard shared by both.
 
 ## 2.1 load_rdata() ----
 
 #' Load an .RData File into an Isolated Environment
-#'
-#' Reads a saved workspace without touching the global
-#' environment, so the six files cannot overwrite each other's
-#' objects.
 #'
 #' @param path Character. Path to an .RData file.
 #' @return An environment holding the file's objects.
@@ -256,11 +495,8 @@ make_unique_ids <- function(ids, label) {
 
 #' Reduce a Species String to a Column-Safe Token
 #'
-#' Collapses a common-name string to CamelCase with no
-#' punctuation.
-#' Apostrophes are deleted before splitting, so "Richardson's"
-#' becomes "Richardsons" and not "Richardson" + "S"; the
-#' remaining punctuation and spaces are split points.
+#' CamelCase without punctuation; apostrophes are deleted first
+#' ("Richardson's" becomes "Richardsons").
 #'
 #' @param x Character. Species strings.
 #' @return Character. One token per input.
@@ -291,11 +527,8 @@ squash_name <- function(x) {
 
 #' Resolve Source Species Names against the WildTrax Strings
 #'
-#' Maps each source species name to its WildTrax common-name
-#' string, which is the naming authority for mammals. An exact
-#' match is tried first, then a punctuation-insensitive one: the
-#' North file already uses the WildTrax strings verbatim, while
-#' the South file uses their camel-cased form.
+#' WildTrax is the mammal naming authority. Exact match first,
+#' then punctuation-insensitive (the South file camel-cases).
 #'
 #' @param base Character. Source species names, no season suffix.
 #' @param native_sp Character. WildTrax common-name strings.
@@ -391,25 +624,17 @@ normalize_mammal_column <- function(x, native_sp, label) {
 
 #' Read One Plant-Group Snapshot File
 #'
-#' Despite the name, "plant group" is a file layout rather than a
-#' taxon: this reads the vascular plant, bryophyte, lichen and
-#' mite files, which share one site-year-quadrant schema.
-#'
-#' Splits a plant-group file into its species block and its site
-#' block. Species are identified by elimination: every column
-#' that is neither an identity column (`plant_id_cols`) nor a
-#' site or climate column (`plant_site_cols`) is a species.
-#'
-#' Two checks keep the rule honest in both directions. Anything
-#' wrongly counted as a species fails the 0/1 test, and anything
-#' wrongly excluded is caught against the file's own
-#' `veg.species.list` and `soil.species.list`.
+#' Species are identified by elimination (neither
+#' `plant_id_cols` nor `plant_site_cols`), checked both ways: a
+#' 0/1 test, and the file's own species lists.
 #'
 #' @param path Character. Path to a plant-group .Rdata file.
 #' @param taxon Character. Taxon slug, used in messages and in
 #'   the site table.
 #' @return A list with `species` (survey_unit_id + species
-#'   columns) and `sites` (one row per survey unit).
+#'   columns), `sites` (one row per survey unit), `climate` and
+#'   `habitat` (the two covariate blocks), `pred_matrix`, and
+#'   `species_lists` (the four sp_table vectors as one frame).
 #'
 #' @example # Example usage of the function
 #' # out <- read_plant_taxon("mite-model-data.Rdata", "mite")
@@ -432,8 +657,7 @@ read_plant_taxon <- function(path, taxon) {
     )
   }
 
-  # Step 2: Species are what remains once identity and site
-  # columns are removed, so column order does not matter.
+  # Step 2: Species by elimination
   species_cols <- setdiff(cols, c(plant_id_cols, plant_site_cols))
 
   # Step 3: Confirm the block really is presence/absence data.
@@ -530,12 +754,181 @@ read_plant_taxon <- function(path, taxon) {
   return(list(species = species, sites = sites))
 }
 
-## 2.7 read_mammal_region() ----
+## 2.7 read_plant_covariates() ----
+
+#' Read One Plant-Group File's Covariate and Lookup Blocks
+#'
+#' Habitat blocks are found by difference from `climate.data`,
+#' reproducing the column spans the v2 scripts hard-code
+#' (`[403:489]` for bryophytes, `[448:534]`, `[328:414]` and
+#' `[1408:1494]` for the others) without relying on order.
+#'
+#' @param path Character. Path to a plant-group .Rdata file.
+#' @param taxon Character. Taxon slug, used in messages.
+#' @return A list with `climate`, `veg` and `soil` (each
+#'   survey_unit_id + that block's columns), `veg_pm` and
+#'   `soil_pm` (the prediction matrices), and `species_lists`
+#'   (taxon, species, in_veg_models, in_soil_models).
+#'
+#' @example # Example usage of the function
+#' # out <- read_plant_covariates("mite-model-data.Rdata", "mite")
+#' # dim(out$veg)
+read_plant_covariates <- function(path, taxon) {
+  env <- load_rdata(path)
+  clim <- env$climate.data
+  clim_cols <- names(clim)
+
+  # Step 1: Take the climate block, minus the fields sites.csv
+  # already carries, in the order plant_site_cols declares.
+  climate_cols <- setdiff(
+    intersect(plant_site_cols, clim_cols),
+    c(plant_site_cols_in_sites, plant_site_cols_derived)
+  )
+
+  climate <- data.frame(
+    survey_unit_id = as.character(clim$SiteYearQu),
+    clim[, climate_cols, drop = FALSE],
+    stringsAsFactors = FALSE
+  )
+
+  # Step 2: Each habitat block, by difference from climate.data
+  take_block <- function(frame) {
+    block_cols <- setdiff(names(frame), clim_cols)
+
+    data.frame(
+      survey_unit_id = as.character(frame$SiteYearQu),
+      frame[, block_cols, drop = FALSE],
+      stringsAsFactors = FALSE
+    )
+  }
+
+  veg <- take_block(env$veg.data)
+  soil <- take_block(env$soil.data)
+
+  # Step 3: v2 takes the first 87 columns positionally as its
+  # coefficient template, so check the width
+  if (ncol(veg) - 1 < 87) {
+    stop(
+      taxon,
+      ": vegetation block has ",
+      ncol(veg) - 1,
+      " columns; the coefficient template needs at least 87.",
+      call. = FALSE
+    )
+  }
+
+  # Step 4: All three frames must list the same units in order
+  if (
+    !identical(climate$survey_unit_id, veg$survey_unit_id) ||
+      !identical(climate$survey_unit_id, soil$survey_unit_id)
+  ) {
+    stop(
+      taxon,
+      ": climate, veg and soil frames do not share one survey ",
+      "unit ordering.",
+      call. = FALSE
+    )
+  }
+
+  # Step 5: Which species each model set is fitted for (the v2
+  # work queue)
+  modelled <- union(env$veg.species.list, env$soil.species.list)
+
+  # Each list keeps its own v2 order, as a position per list
+  species_lists <- data.frame(
+    taxon = taxon,
+    species = modelled,
+    in_veg_models = modelled %in% env$veg.species.list,
+    in_soil_models = modelled %in% env$soil.species.list,
+    veg_order = match(modelled, env$veg.species.list),
+    soil_order = match(modelled, env$soil.species.list),
+    stringsAsFactors = FALSE
+  )
+
+  message(
+    "  ",
+    taxon,
+    ": ",
+    ncol(climate) - 1,
+    " climate, ",
+    ncol(veg) - 1,
+    " veg, ",
+    ncol(soil) - 1,
+    " soil covariates; ",
+    nrow(species_lists),
+    " modelled species"
+  )
+
+  return(list(
+    climate = climate,
+    veg = veg,
+    soil = soil,
+    veg_pm = env$veg.pm,
+    soil_pm = env$soil.pm,
+    species_lists = species_lists
+  ))
+}
+
+## 2.8 read_camera_climate() ----
+
+#' Read the Mammal Camera Climate
+#'
+#' 30-year normals, so identical across years: as v2, the year
+#' and the CMU and NWSAR project prefixes are stripped, leaving
+#' one row per location.
+#'
+#' @param path Character. Path to abmi-camera-climate_*.Rdata.
+#' @param columns Character vector of climate columns to keep.
+#' @return A data frame of `location` plus those columns, one row
+#'   per location, or NULL when the file is absent.
+#'
+#' @example # Example usage of the function
+#' # read_camera_climate(mammal_camera_climate_file,
+#' #                     mammal_camera_climate_cols)
+read_camera_climate <- function(path, columns) {
+  if (!file.exists(path)) {
+    return(NULL)
+  }
+
+  env <- load_rdata(path)
+  climate <- env$camera.climate
+
+  if (is.null(climate)) {
+    stop(
+      basename(path), " holds no `camera.climate` object.",
+      call. = FALSE
+    )
+  }
+
+  absent <- setdiff(columns, names(climate))
+
+  if (length(absent) > 0) {
+    stop(
+      basename(path), " is missing ", length(absent),
+      " expected column(s): ",
+      paste(utils::head(absent, 10), collapse = ", "),
+      call. = FALSE
+    )
+  }
+
+  location <- sub("_[0-9]{4}$", "", rownames(climate))
+  location <- sub("^CMU-|^NWSAR-", "", location)
+
+  out <- data.frame(
+    location = location,
+    climate[, columns, drop = FALSE],
+    stringsAsFactors = FALSE
+  )
+
+  out[!duplicated(out$location), ]
+}
+
+## 2.9 read_mammal_region() ----
 
 #' Read One Mammal Snapshot File
 #'
-#' Reads the camera tibble `d` and harmonizes its species-season
-#' column names. NAs in the species cells are preserved.
+#' Values are densities; NA means fewer than 10 camera-days that
+#' season (v2's 02_process-data-files.R).
 #'
 #' @param path Character. Path to a mammal .RData file.
 #' @param region Character. "north" or "south".
@@ -628,6 +1021,118 @@ read_mammal_region <- function(path, region, native_sp) {
     stringsAsFactors = FALSE
   )
 
+  # Step 5: Split the covariates off (section 1.5). Reuse the
+  # unit ids: make_unique_ids() numbered duplicate deployments.
+  take_block <- function(wanted) {
+    present <- intersect(wanted, names(d))
+
+    data.frame(
+      survey_unit_id = unit_id,
+      d[, present, drop = FALSE],
+      check.names = FALSE,
+      stringsAsFactors = FALSE
+    )
+  }
+
+  climate <- take_block(mammal_climate_cols)
+
+  # Step 5b: Replace the climate block wholesale with the camera
+  # climate (section 1.6). Unmatched deployments keep NA, as v2
+  # excludes them.
+  camera_climate <- read_camera_climate(
+    mammal_camera_climate_file, mammal_camera_climate_cols
+  )
+
+  if (is.null(camera_climate)) {
+    warning(
+      "Camera climate not found at ", mammal_camera_climate_file,
+      "; mammal ", region, " keeps the SpTable climate block, ",
+      "which has no CMD or TD. Set SDM_MAMMAL_CAMERA_CLIMATE.",
+      call. = FALSE
+    )
+  } else {
+    matched <- match(
+      as.character(d$location), camera_climate$location
+    )
+
+    replaced <- intersect(
+      mammal_camera_climate_cols, names(climate)
+    )
+    added <- setdiff(mammal_camera_climate_cols, names(climate))
+
+    for (column in mammal_camera_climate_cols) {
+      climate[[column]] <- camera_climate[[column]][matched]
+    }
+
+    message(
+      "  mammal ", region, ": camera climate matched ",
+      sum(!is.na(matched)), " of ", nrow(d), " deployments (",
+      round(100 * mean(!is.na(matched)), 1), "%); ",
+      length(replaced), " column(s) replaced, ",
+      length(added), " added"
+    )
+  }
+
+  habitat_cols <- setdiff(
+    names(d),
+    c(mammal_site_cols, mammal_climate_cols, species_cols)
+  )
+  habitat <- take_block(habitat_cols)
+
+  # The four blocks must partition `d` exactly
+  accounted <- length(species_cols) + length(habitat_cols) +
+    length(intersect(mammal_site_cols, names(d))) +
+    length(intersect(mammal_climate_cols, names(d)))
+
+  if (accounted != ncol(d)) {
+    stop(
+      "mammal ",
+      region,
+      ": the design, climate, species and habitat blocks cover ",
+      accounted,
+      " of ",
+      ncol(d),
+      " columns.",
+      call. = FALSE
+    )
+  }
+
+  # Step 6: The work queue: per season, sp_table_* (20+
+  # detections, full habitat model) and sp_table_*_ua (3+,
+  # use-availability)
+  season_lists <- list(
+    summer = list(
+      modelled = env$sp_table_summer,
+      ua = env$sp_table_summer_ua
+    ),
+    winter = list(
+      modelled = env$sp_table_winter,
+      ua = env$sp_table_winter_ua
+    )
+  )
+
+  species_lists <- do.call(rbind, lapply(
+    names(season_lists),
+    function(season) {
+      lists <- season_lists[[season]]
+      all_species <- union(lists$modelled, lists$ua)
+
+      data.frame(
+        region = region,
+        season = season,
+        species_season = all_species,
+        species = normalize_mammal_column(
+          all_species, native_sp, paste0("mammal ", region)
+        ),
+        in_models = all_species %in% lists$modelled,
+        in_ua_models = all_species %in% lists$ua,
+        model_order = match(all_species, lists$modelled),
+        ua_order = match(all_species, lists$ua),
+        stringsAsFactors = FALSE
+      )
+    }
+  ))
+
   message(
     "  mammal ",
     region,
@@ -635,10 +1140,233 @@ read_mammal_region <- function(path, region, native_sp) {
     nrow(species),
     " units x ",
     length(species_cols),
-    " species-season columns"
+    " species-season columns; ",
+    ncol(climate) - 1,
+    " climate, ",
+    ncol(habitat) - 1,
+    " habitat covariates"
   )
 
-  return(list(species = species, sites = sites))
+  return(list(
+    species = species,
+    sites = sites,
+    climate = climate,
+    habitat = habitat,
+    pred_matrix = as.data.frame(env$pred_matrix),
+    species_lists = species_lists
+  ))
+}
+
+## 2.10 read_bird_data() ----
+
+#' Read the Bird Data Package
+#'
+#' Birds add a response-shaped QPAD offset table, eligibility as
+#' two flags (north and south; a survey may feed both or
+#' neither), and integer point counts.
+#'
+#' @param path Character. Path to Stratified.Rdata.
+#' @return A list with `species`, `offsets`, `sites`, `climate`,
+#'   `veg`, `soil`, `design`, `species_lists`, `bootstrap`,
+#'   `factor_levels`, and `covs_cols` for the block check.
+#'
+#' @example # Example usage of the function
+#' # out <- read_bird_data(bird_data_file)
+#' # dim(out$species)
+read_bird_data <- function(path) {
+  env <- load_rdata(path)
+
+  expected <- c("covs", "bird", "off", "boot", "birdlist")
+  absent <- setdiff(expected, ls(env))
+
+  if (length(absent) > 0) {
+    stop(
+      "Object(s) missing from ",
+      basename(path),
+      ": ",
+      paste(absent, collapse = ", "),
+      call. = FALSE
+    )
+  }
+
+  covs <- as.data.frame(env$covs, stringsAsFactors = FALSE)
+  counts <- as.data.frame(env$bird, stringsAsFactors = FALSE)
+  offsets <- as.data.frame(env$off, stringsAsFactors = FALSE)
+
+  # Step 1: The frames must be row-aligned (tables below are
+  # built by position). Compare surveyid on a common type: `covs`
+  # holds it as double, the others as integer.
+  key <- as.integer(covs$surveyid)
+
+  if (
+    !identical(key, counts$surveyid) ||
+      !identical(key, offsets$surveyid)
+  ) {
+    stop(
+      "bird: covs, bird and off are no longer row-aligned on ",
+      "surveyid; this reader assumes they are.",
+      call. = FALSE
+    )
+  }
+
+  if (anyDuplicated(key) > 0) {
+    stop("bird: surveyid is not unique in covs.", call. = FALSE)
+  }
+
+  unit_id <- paste0("bird|", key)
+
+  # Step 2: Counts, and offsets for species with counts (`off`
+  # has 219 species, `bird` 127)
+  species_cols <- setdiff(names(counts), "surveyid")
+
+  absent_offsets <- setdiff(species_cols, names(offsets))
+
+  if (length(absent_offsets) > 0) {
+    stop(
+      "bird: ",
+      length(absent_offsets),
+      " species have counts but no QPAD offset: ",
+      paste(utils::head(absent_offsets, 10), collapse = ", "),
+      call. = FALSE
+    )
+  }
+
+  species <- data.frame(
+    survey_unit_id = unit_id,
+    counts[, species_cols, drop = FALSE],
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
+
+  offset_table <- data.frame(
+    survey_unit_id = unit_id,
+    offsets[, species_cols, drop = FALSE],
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
+
+  # Step 3: Blocks by name (intersection): shared terms sit in
+  # both habitat blocks
+  take_block <- function(wanted) {
+    present <- setdiff(
+      intersect(wanted, names(covs)),
+      bird_cols_in_sites
+    )
+
+    data.frame(
+      survey_unit_id = unit_id,
+      covs[, present, drop = FALSE],
+      check.names = FALSE,
+      stringsAsFactors = FALSE
+    )
+  }
+
+  climate <- take_block(bird_climate_cols)
+  veg <- take_block(bird_veg_cols)
+  soil <- take_block(bird_soil_cols)
+  design <- take_block(bird_design_cols)
+
+  # Format local time: fwrite would write UTC, shifting surveys
+  # by six hours
+  design$date_time <- format(design$date_time)
+
+  # Step 4: Site rows. Lat, long and natural region stay NA (not
+  # reprojected); `year` is calendar year (the recoded model year
+  # is in the design table).
+  calendar_year <- as.integer(format(covs$date_time, "%Y"))
+
+  if (!all(covs$year == calendar_year - 1992)) {
+    stop(
+      "bird: the recoded `year` column is no longer calendar ",
+      "year minus 1992, so the calendar year cannot be trusted.",
+      call. = FALSE
+    )
+  }
+
+  sites <- data.frame(
+    survey_unit_id = unit_id,
+    survey_design = "bird_point_count",
+    region = NA_character_,
+    site = as.character(covs$locationid),
+    site_year = as.character(covs$gisid),
+    year = calendar_year,
+    quadrant = NA_character_,
+    on_off_grid = NA_character_,
+    location = as.character(covs$gisid),
+    project = as.character(covs$organization),
+    nearest_site = NA_character_,
+    lured = NA,
+    summer_days = NA_real_,
+    winter_days = NA_real_,
+    lat = NA_real_,
+    long = NA_real_,
+    elevation = NA_real_,
+    easting = as.numeric(covs$Easting),
+    northing = as.numeric(covs$Northing),
+    nr = NA_character_,
+    nsr = NA_character_,
+    luf = NA_character_,
+    stringsAsFactors = FALSE
+  )
+
+  # Step 5: The work queue (birdlist, per species and region)
+  species_lists <- data.frame(
+    as.data.frame(env$birdlist, stringsAsFactors = FALSE),
+    stringsAsFactors = FALSE
+  )
+
+  # Step 6: Prefix the bootstrap columns "1" to "100", which a
+  # CSV reader takes for a data row rather than a header
+  bootstrap <- as.data.frame(env$boot)
+  names(bootstrap) <- sprintf(
+    "boot_%03d", seq_len(ncol(bootstrap))
+  )
+
+  # Step 7: Factor levels in source order, since a CSV re-read
+  # would give alphabetical levels and move the reference
+  factor_cols <- names(covs)[vapply(covs, is.factor, logical(1))]
+
+  factor_levels <- do.call(rbind, lapply(
+    factor_cols,
+    function(col) {
+      data.frame(
+        column = col,
+        level_order = seq_along(levels(covs[[col]])),
+        level = levels(covs[[col]]),
+        stringsAsFactors = FALSE
+      )
+    }
+  ))
+
+  message(
+    "  bird: ",
+    nrow(species),
+    " surveys x ",
+    length(species_cols),
+    " species; ",
+    ncol(climate) - 1,
+    " climate, ",
+    ncol(veg) - 1,
+    " veg, ",
+    ncol(soil) - 1,
+    " soil covariates; ",
+    nrow(species_lists),
+    " species-region models"
+  )
+
+  return(list(
+    species = species,
+    offsets = offset_table,
+    sites = sites,
+    climate = climate,
+    veg = veg,
+    soil = soil,
+    design = design,
+    species_lists = species_lists,
+    bootstrap = bootstrap,
+    factor_levels = factor_levels,
+    covs_cols = names(covs)
+  ))
 }
 
 # 3. Read the sources ----
@@ -657,9 +1385,22 @@ plant_parts <- lapply(
 )
 names(plant_parts) <- names(plant_files)
 
-## 3.2 Read the mammal files ----
-# The WildTrax strings are loaded once and passed to both
-# regions, so each resolves its names against the same authority.
+## 3.2 Read the plant-group covariates and lookups ----
+# A second pass over the same four files (see the header TODO)
+message("Reading plant-group covariates ...")
+
+covariate_parts <- lapply(
+  names(plant_files),
+  function(taxon) {
+    read_plant_covariates(
+      file.path(snapshot_dir, plant_files[[taxon]]),
+      taxon
+    )
+  }
+)
+names(covariate_parts) <- names(plant_files)
+
+## 3.3 Read the mammal files ----
 message("Reading mammal files ...")
 
 native_sp <- load_rdata(wt_species_file)$native_sp
@@ -684,13 +1425,15 @@ mammal_parts <- lapply(
 )
 names(mammal_parts) <- names(mammal_files)
 
+## 3.4 Read the bird data package ----
+message("Reading bird data ...")
+
+bird_parts <- read_bird_data(bird_data_file)
+
 # 4. Harmonize the mammal regions into one taxon table ----
-# North and South are one taxon split across two models, so they
-# are stacked.
 
 ## 4.1 Confirm the North names reconcile with the South ----
-# A North name that no longer matches means the crosswalk has
-# drifted and would split one species across two columns.
+# A mismatch would split one species across two columns
 north_species <- setdiff(
   names(mammal_parts$north$species),
   "survey_unit_id"
@@ -747,25 +1490,27 @@ message(
 )
 
 # 5. Build the master site table ----
-# One row per survey unit across all six sources, plus a flag per
-# taxon recording which taxon files cover that unit.
+# One row per survey unit, with an in_<taxon> flag per taxon
 
 ## 5.1 Stack every source's site rows ----
 all_sites <- do.call(
   rbind,
   c(
     lapply(plant_parts, function(x) x$sites),
-    lapply(mammal_parts, function(x) x$sites)
+    lapply(mammal_parts, function(x) x$sites),
+    list(bird = bird_parts$sites)
   )
 )
 rownames(all_sites) <- NULL
 
 ## 5.2 Record which taxon files cover each unit ----
-# The four plant taxa share the SiteYearQu key but sample
-# different unit sets. The flags make that coverage explicit.
+# The plant taxa share keys but sample different units
 taxon_units <- c(
   lapply(plant_parts, function(x) x$species$survey_unit_id),
-  list(mammal = mammal_species$survey_unit_id)
+  list(
+    mammal = mammal_species$survey_unit_id,
+    bird = bird_parts$species$survey_unit_id
+  )
 )
 
 for (taxon in names(taxon_units)) {
@@ -774,8 +1519,6 @@ for (taxon in names(taxon_units)) {
 }
 
 ## 5.3 Collapse to one row per survey unit ----
-# A plant unit contributes an identical site row from each taxon
-# file that sampled it.
 flag_cols <- grep("^in_", names(all_sites), value = TRUE)
 attribute_cols <- setdiff(
   names(all_sites),
@@ -801,13 +1544,154 @@ if (length(conflicting) > 0) {
 sites <- all_sites[!duplicated(all_sites$survey_unit_id), ]
 rownames(sites) <- NULL
 
+## 5.4 Build the master covariate table ----
+# Keyed on survey_unit_id and taxon because the plant files
+# disagree: on the 7001 quadrats vascular plant and mite share,
+# 154 of 162 veg and 58 of 59 soil columns differ (climate
+# agrees; bryophyte and lichen match vascular plant). Each file
+# is a separate extraction (01a_data-standardization.R); choosing
+# between them is not this script's call. Columns are the union
+# across taxa (~16% populated; birds are 86% of rows).
+
+#' Join One Taxon's Covariate Blocks Side by Side
+#'
+#' Combined by position (one source frame). Names in more than
+#' one block are block-suffixed: of 42 plant names in both veg
+#' and soil, 14 differ (footprint computed under each framework),
+#' so a single `Crop` would feed the south models north numbers.
+#'
+#' @param blocks Named list of data frames, each keyed on
+#'   survey_unit_id. The names become the block suffixes.
+#' @param taxon Character. Value for the taxon column.
+#' @return A list with `table` (survey_unit_id, taxon, then the
+#'   blocks' columns) and `map` (taxon, block, source_column,
+#'   master_column) recording where each column came from.
+#'
+#' @example # Example usage of the function
+#' # merge_blocks(list(climate = a, veg = b), "bryophyte")
+merge_blocks <- function(blocks, taxon) {
+  # Step 1: Find the names more than one block carries
+  every_name <- unlist(lapply(blocks, function(block) {
+    setdiff(names(block), "survey_unit_id")
+  }))
+  collide <- unique(every_name[duplicated(every_name)])
+
+  key <- blocks[[1]]$survey_unit_id
+  out <- data.frame(
+    survey_unit_id = key,
+    stringsAsFactors = FALSE
+  )
+  map <- list()
+
+  for (block_name in names(blocks)) {
+    block <- blocks[[block_name]]
+
+    # Step 2: Refuse to combine blocks that have drifted apart,
+    # since they are joined by position and not by key
+    if (!identical(key, block$survey_unit_id)) {
+      stop(
+        taxon,
+        ": covariate blocks are not in one row order.",
+        call. = FALSE
+      )
+    }
+
+    # Step 3: Suffix the colliding names, keep the rest as the
+    # v2 scripts spell them
+    cols <- setdiff(names(block), "survey_unit_id")
+    renamed <- ifelse(
+      cols %in% collide,
+      paste0(cols, "_", block_name),
+      cols
+    )
+
+    piece <- block[, cols, drop = FALSE]
+    names(piece) <- renamed
+    out <- cbind(out, piece)
+
+    map[[length(map) + 1]] <- data.frame(
+      taxon = taxon,
+      block = block_name,
+      source_column = cols,
+      master_column = renamed,
+      stringsAsFactors = FALSE
+    )
+  }
+
+  out$taxon <- taxon
+
+  return(list(table = out, map = do.call(rbind, map)))
+}
+
+# Mammals are split by region (separate models on overlapping
+# deployments: 512 location_project values in both); birds add
+# a design block
+covariate_blocks <- c(
+  lapply(covariate_parts, function(x) {
+    list(climate = x$climate, veg = x$veg, soil = x$soil)
+  }),
+  list(
+    mammal_north = list(
+      climate = mammal_parts$north$climate,
+      veg = mammal_parts$north$habitat
+    ),
+    mammal_south = list(
+      climate = mammal_parts$south$climate,
+      soil = mammal_parts$south$habitat
+    ),
+    bird = list(
+      climate = bird_parts$climate,
+      veg = bird_parts$veg,
+      soil = bird_parts$soil,
+      design = bird_parts$design
+    )
+  )
+)
+
+merged_covariates <- lapply(
+  names(covariate_blocks),
+  function(taxon) {
+    merge_blocks(covariate_blocks[[taxon]], taxon)
+  }
+)
+
+covariates <- as.data.frame(rbindlist(
+  lapply(merged_covariates, function(x) x$table),
+  fill = TRUE,
+  use.names = TRUE
+))
+
+covariate_columns <- do.call(
+  rbind,
+  lapply(merged_covariates, function(x) x$map)
+)
+rownames(covariate_columns) <- NULL
+
+covariates <- covariates[
+  , c(
+    "survey_unit_id",
+    "taxon",
+    setdiff(names(covariates), c("survey_unit_id", "taxon"))
+  )
+]
+
+message(
+  "  covariates: ",
+  nrow(covariates),
+  " unit-taxon rows x ",
+  ncol(covariates) - 2,
+  " covariates"
+)
+
 # 6. Validate the assembled tables ----
-# Cheap checks that would catch a layout change in a future
-# snapshot before the CSVs are trusted downstream.
+# Catch layout changes in a future snapshot
 
 species_tables <- c(
   lapply(plant_parts, function(x) x$species),
-  list(mammal = mammal_species)
+  list(
+    mammal = mammal_species,
+    bird = bird_parts$species
+  )
 )
 
 ## 6.1 Every taxon key must resolve in the site table ----
@@ -844,9 +1728,241 @@ for (taxon in names(species_tables)) {
   }
 }
 
+## 6.3 Covariates must cover the response, unit for unit ----
+# Otherwise units drop silently at model time. Mammal regions
+# are pooled first (two covariate keys, one response table).
+covariate_taxa <- list(
+  vascular_plant = "vascular_plant",
+  bryophyte = "bryophyte",
+  lichen = "lichen",
+  mite = "mite",
+  mammal = c("mammal_north", "mammal_south"),
+  bird = "bird"
+)
+
+for (taxon in names(covariate_taxa)) {
+  response_ids <- species_tables[[taxon]]$survey_unit_id
+  block_ids <- covariates$survey_unit_id[
+    covariates$taxon %in% covariate_taxa[[taxon]]
+  ]
+
+  if (!setequal(response_ids, block_ids)) {
+    stop(
+      taxon,
+      ": the covariates and the response cover different survey ",
+      "units (",
+      length(setdiff(response_ids, block_ids)),
+      " missing, ",
+      length(setdiff(block_ids, response_ids)),
+      " extra).",
+      call. = FALSE
+    )
+  }
+}
+
+## 6.3b Every covariate row must resolve in the site table ----
+orphan_covariates <- setdiff(
+  covariates$survey_unit_id,
+  sites$survey_unit_id
+)
+
+if (length(orphan_covariates) > 0) {
+  stop(
+    length(orphan_covariates),
+    " covariate row(s) name a survey unit that sites.csv does ",
+    "not carry.",
+    call. = FALSE
+  )
+}
+
+## 6.4 Modelled species must exist as response columns ----
+# Otherwise it fails per bootstrap, inside a tryCatch
+for (taxon in names(covariate_parts)) {
+  declared <- covariate_parts[[taxon]]$species_lists$species
+  available <- setdiff(
+    names(species_tables[[taxon]]),
+    "survey_unit_id"
+  )
+  unknown <- setdiff(declared, available)
+
+  if (length(unknown) > 0) {
+    stop(
+      taxon,
+      ": ",
+      length(unknown),
+      " modelled species are not response columns:\n  ",
+      paste(utils::head(unknown, 10), collapse = "\n  "),
+      call. = FALSE
+    )
+  }
+}
+
+## 6.5 The prediction matrices must agree across taxa ----
+# Written once, so all four files must carry the same grid
+for (matrix_name in c("veg_pm", "soil_pm")) {
+  reference <- covariate_parts[[1]][[matrix_name]]
+
+  for (taxon in names(covariate_parts)) {
+    written <- covariate_parts[[taxon]][[matrix_name]]
+
+    if (!identical(written, reference)) {
+      stop(
+        "The ",
+        matrix_name,
+        " prediction matrix in ",
+        taxon,
+        " differs from ",
+        names(covariate_parts)[1],
+        "; it can no longer be written once for all taxa.",
+        call. = FALSE
+      )
+    }
+  }
+}
+
+## 6.6 Mammal habitat must be cover proportions ----
+# Habitat is the remainder, so a stray design field would land
+# here; check it is all numeric
+for (region in names(mammal_parts)) {
+  part <- mammal_parts[[region]]
+
+  habitat_values <- part$habitat[
+    , setdiff(names(part$habitat), "survey_unit_id"),
+    drop = FALSE
+  ]
+
+  non_numeric <- names(habitat_values)[
+    !vapply(habitat_values, is.numeric, logical(1))
+  ]
+
+  if (length(non_numeric) > 0) {
+    stop(
+      "mammal ",
+      region,
+      ": non-numeric column(s) fell into the habitat block: ",
+      paste(non_numeric, collapse = ", "),
+      "\nName them in mammal_site_cols or mammal_climate_cols.",
+      call. = FALSE
+    )
+  }
+}
+
+## 6.7 Mammal species lists must be response columns ----
+for (region in names(mammal_parts)) {
+  declared <- mammal_parts[[region]]$species_lists$species
+  unknown <- setdiff(declared, names(mammal_species))
+
+  if (length(unknown) > 0) {
+    stop(
+      "mammal ",
+      region,
+      ": ",
+      length(unknown),
+      " modelled species are not response columns:\n  ",
+      paste(utils::head(unknown, 10), collapse = "\n  "),
+      call. = FALSE
+    )
+  }
+}
+
+## 6.8 Bird blocks must account for every covariate column ----
+# Blocks are taken by name, so a new source column would drop
+# silently. Easting and Northing are in sites.csv.
+bird_named <- unique(c(
+  bird_climate_cols,
+  bird_veg_cols,
+  bird_soil_cols,
+  bird_design_cols,
+  bird_cols_in_sites
+))
+
+bird_unnamed <- setdiff(bird_parts$covs_cols, bird_named)
+
+if (length(bird_unnamed) > 0) {
+  stop(
+    "bird: ",
+    length(bird_unnamed),
+    " covariate column(s) belong to no block: ",
+    paste(bird_unnamed, collapse = ", "),
+    "\nAdd them to one of the bird_*_cols vectors.",
+    call. = FALSE
+  )
+}
+
+## 6.9 Bird counts and offsets must be model ready ----
+bird_counts <- as.matrix(
+  bird_parts$species[, -1, drop = FALSE]
+)
+
+if (
+  anyNA(bird_counts) ||
+    any(bird_counts < 0) ||
+    !all(bird_counts %% 1 == 0)
+) {
+  stop(
+    "bird: the count block is not non-negative whole numbers.",
+    call. = FALSE
+  )
+}
+
+bird_offsets <- as.matrix(
+  bird_parts$offsets[, -1, drop = FALSE]
+)
+
+if (anyNA(bird_offsets)) {
+  stop(
+    "bird: ",
+    sum(is.na(bird_offsets)),
+    " QPAD offset(s) are NA; every count needs one.",
+    call. = FALSE
+  )
+}
+
+if (
+  !identical(names(bird_parts$species), names(bird_parts$offsets))
+) {
+  stop(
+    "bird: the count and offset tables do not carry the same ",
+    "species columns in the same order.",
+    call. = FALSE
+  )
+}
+
+## 6.10 Bird species lists must be response columns ----
+bird_declared <- unique(bird_parts$species_lists$species)
+bird_unknown <- setdiff(
+  bird_declared,
+  names(bird_parts$species)
+)
+
+if (length(bird_unknown) > 0) {
+  stop(
+    "bird: ",
+    length(bird_unknown),
+    " modelled species are not response columns:\n  ",
+    paste(utils::head(bird_unknown, 10), collapse = "\n  "),
+    call. = FALSE
+  )
+}
+
+## 6.11 Bootstrap draws must resolve to surveys ----
+bird_boot_ids <- unique(unlist(bird_parts$bootstrap))
+bird_orphan_draws <- setdiff(
+  bird_boot_ids,
+  bird_parts$design$surveyid
+)
+
+if (length(bird_orphan_draws) > 0) {
+  stop(
+    "bird: ",
+    length(bird_orphan_draws),
+    " bootstrap draw(s) name a surveyid that is not in the ",
+    "design table.",
+    call. = FALSE
+  )
+}
+
 # 7. Write the CSVs ----
-# One file per taxon plus the site table, all sharing the
-# survey_unit_id key.
 
 ## 7.1 Write the taxon tables ----
 for (taxon in names(species_tables)) {
@@ -875,6 +1991,295 @@ message(
   ncol(sites),
   " cols"
 )
+
+## 7.3 Write the master covariate table ----
+# Also removes the old per-taxon covariate folder, so a stale
+# copy cannot be read
+old_covariate_dir <- file.path(output_dir, "covariates")
+
+if (dir.exists(old_covariate_dir)) {
+  unlink(old_covariate_dir, recursive = TRUE)
+  message("Removed the superseded covariates/ folder")
+}
+
+covariates_path <- file.path(output_dir, "covariates.csv")
+fwrite(covariates, covariates_path, na = "")
+
+message(
+  "Wrote covariates.csv: ",
+  nrow(covariates),
+  " rows x ",
+  ncol(covariates),
+  " cols (",
+  round(file.size(covariates_path) / 1024^2),
+  " MB)"
+)
+
+dir.create(lookup_dir, recursive = TRUE, showWarnings = FALSE)
+
+columns_path <- file.path(lookup_dir, "covariate_columns.csv")
+fwrite(covariate_columns, columns_path, na = "")
+
+renamed_count <- sum(
+  covariate_columns$source_column != covariate_columns$master_column
+)
+
+message(
+  "Wrote lookup/covariate_columns.csv: ",
+  nrow(covariate_columns),
+  " rows x ",
+  ncol(covariate_columns),
+  " cols; ",
+  renamed_count,
+  " column(s) suffixed by block to avoid a collision"
+)
+
+## 7.4 Write the shared lookups ----
+# Written once (checked identical across taxa in 6.5)
+dir.create(lookup_dir, recursive = TRUE, showWarnings = FALSE)
+
+prediction_matrices <- list(
+  veg_prediction_matrix = covariate_parts[[1]]$veg_pm,
+  soil_prediction_matrix = covariate_parts[[1]]$soil_pm
+)
+
+# The v2 CSVs when reachable (section 1.8)
+for (matrix_name in names(prediction_matrices)) {
+  if (is.na(v2_lookup_dir) || !nzchar(v2_lookup_dir)) {
+    next
+  }
+
+  source_csv <- file.path(
+    v2_lookup_dir, v2_lookup_files[[matrix_name]]
+  )
+
+  if (file.exists(source_csv)) {
+    prediction_matrices[[matrix_name]] <- as.data.frame(
+      fread(source_csv)
+    )
+    message("  using ", source_csv)
+  } else {
+    warning(
+      "SDM_V2_LOOKUP is set but ",
+      source_csv,
+      " was not found; falling back to the snapshot copy.",
+      call. = FALSE
+    )
+  }
+}
+
+for (matrix_name in names(prediction_matrices)) {
+  path <- file.path(lookup_dir, paste0(matrix_name, ".csv"))
+  fwrite(prediction_matrices[[matrix_name]], path, na = "")
+
+  message(
+    "Wrote lookup/",
+    basename(path),
+    ": ",
+    nrow(prediction_matrices[[matrix_name]]),
+    " rows x ",
+    ncol(prediction_matrices[[matrix_name]]),
+    " cols"
+  )
+}
+
+# Report whether the four aggregate columns are present, rather
+# than fail later at prediction time
+veg_aggregates <- c("Peatland", "Mineral", "Upland", "CCR1234")
+absent_aggregates <- setdiff(
+  veg_aggregates,
+  colnames(prediction_matrices$veg_prediction_matrix)
+)
+
+if (length(absent_aggregates) > 0) {
+  message(
+    "  note: the vegetation prediction matrix has no column for ",
+    paste(absent_aggregates, collapse = ", "),
+    ".\n  The vegetation models cannot be fitted until ",
+    v2_lookup_files[["veg_prediction_matrix"]],
+    "\n  from the v2 project is available. Set SDM_V2_LOOKUP to ",
+    "the folder holding it\n  and re-run this script. The ",
+    "climate and soil models are unaffected."
+  )
+}
+
+modelled_species <- do.call(
+  rbind,
+  lapply(covariate_parts, function(x) x$species_lists)
+)
+rownames(modelled_species) <- NULL
+
+modelled_path <- file.path(lookup_dir, "modelled_species.csv")
+fwrite(modelled_species, modelled_path, na = "")
+
+message(
+  "Wrote lookup/modelled_species.csv: ",
+  nrow(modelled_species),
+  " rows x ",
+  ncol(modelled_species),
+  " cols"
+)
+
+## 7.5 Write the mammal lookups ----
+# From the snapshot (checked identical to the ABMI Mammals CSVs)
+for (region in names(mammal_parts)) {
+  path <- file.path(
+    lookup_dir,
+    paste0("mammal_", region, "_prediction_matrix.csv")
+  )
+  fwrite(mammal_parts[[region]]$pred_matrix, path, na = "")
+
+  message(
+    "Wrote lookup/",
+    basename(path),
+    ": ",
+    nrow(mammal_parts[[region]]$pred_matrix),
+    " rows x ",
+    ncol(mammal_parts[[region]]$pred_matrix),
+    " cols"
+  )
+}
+
+# Own table: season by threshold does not fit the plant schema
+mammal_modelled <- do.call(
+  rbind,
+  lapply(mammal_parts, function(x) x$species_lists)
+)
+rownames(mammal_modelled) <- NULL
+
+mammal_modelled_path <- file.path(
+  lookup_dir, "mammal_modelled_species.csv"
+)
+fwrite(mammal_modelled, mammal_modelled_path, na = "")
+
+message(
+  "Wrote lookup/mammal_modelled_species.csv: ",
+  nrow(mammal_modelled),
+  " rows x ",
+  ncol(mammal_modelled),
+  " cols"
+)
+
+# Copied in with survey_unit_id added; unmatched deployments
+# keep NA, as the v2 join gives
+if (file.exists(mammal_climate_pred_file)) {
+  climate_pred <- as.data.frame(
+    fread(mammal_climate_pred_file), stringsAsFactors = FALSE
+  )
+
+  unit_lookup <- do.call(rbind, lapply(
+    names(mammal_parts),
+    function(region) {
+      data.frame(
+        survey_unit_id =
+          mammal_parts[[region]]$climate$survey_unit_id,
+        location_project =
+          mammal_parts[[region]]$climate$location_project,
+        stringsAsFactors = FALSE
+      )
+    }
+  ))
+
+  climate_pred <- merge(
+    unit_lookup, climate_pred,
+    by = "location_project", all.x = TRUE, sort = FALSE
+  )
+
+  climate_pred <- climate_pred[
+    , c(
+      "survey_unit_id", "location_project",
+      setdiff(
+        names(climate_pred),
+        c("survey_unit_id", "location_project")
+      )
+    )
+  ]
+
+  climate_pred_path <- file.path(
+    lookup_dir, "mammal_climate_predictions.csv"
+  )
+  fwrite(climate_pred, climate_pred_path, na = "")
+
+  uncovered <- sum(is.na(climate_pred[[3]]))
+
+  message(
+    "Wrote lookup/mammal_climate_predictions.csv: ",
+    nrow(climate_pred),
+    " rows x ",
+    ncol(climate_pred),
+    " cols; ",
+    uncovered,
+    " deployment(s) have no climate prediction"
+  )
+} else {
+  warning(
+    "Mammal climate predictions not found at ",
+    mammal_climate_pred_file,
+    "; the mammal habitat models cannot be fitted without them. ",
+    "Set SDM_MAMMAL_CLIMATE_PRED.",
+    call. = FALSE
+  )
+}
+
+## 7.6 Write the bird offsets ----
+# One QPAD offset per survey and species; the largest table
+offsets_path <- file.path(output_dir, "bird_offsets.csv")
+fwrite(bird_parts$offsets, offsets_path, na = "")
+
+message(
+  "Wrote bird_offsets.csv: ",
+  nrow(bird_parts$offsets),
+  " rows x ",
+  ncol(bird_parts$offsets),
+  " cols (",
+  round(file.size(offsets_path) / 1024^2),
+  " MB)"
+)
+
+## 7.7 Write the bird lookups ----
+# The species-region work queue, the bootstrap draws, and the
+# factor levels in source order.
+bird_modelled_path <- file.path(
+  lookup_dir, "bird_modelled_species.csv"
+)
+fwrite(bird_parts$species_lists, bird_modelled_path, na = "")
+
+message(
+  "Wrote lookup/bird_modelled_species.csv: ",
+  nrow(bird_parts$species_lists),
+  " rows x ",
+  ncol(bird_parts$species_lists),
+  " cols"
+)
+
+# Raw surveyids (joined via covariates.csv's surveyid), a tenth
+# the size of prefixed keys
+bird_boot_path <- file.path(
+  lookup_dir, "bird_bootstrap_ids.csv"
+)
+fwrite(bird_parts$bootstrap, bird_boot_path, na = "")
+
+message(
+  "Wrote lookup/bird_bootstrap_ids.csv: ",
+  nrow(bird_parts$bootstrap),
+  " rows x ",
+  ncol(bird_parts$bootstrap),
+  " cols"
+)
+
+bird_levels_path <- file.path(
+  lookup_dir, "bird_factor_levels.csv"
+)
+fwrite(bird_parts$factor_levels, bird_levels_path, na = "")
+
+message(
+  "Wrote lookup/bird_factor_levels.csv: ",
+  nrow(bird_parts$factor_levels),
+  " rows x ",
+  ncol(bird_parts$factor_levels),
+  " cols"
+)
+
 message("Output written to ", output_dir)
 
 # End of script ----

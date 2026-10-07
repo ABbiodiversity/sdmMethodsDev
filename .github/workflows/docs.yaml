@@ -1,0 +1,75 @@
+# Build the Quarto docs site in docs/ and publish it to GitHub
+# Pages. Same pattern as sciSpatialR's pkgdown workflow.
+#
+# The site is rebuilt from docs/ on every run and handed to Pages
+# as a build artifact, so no rendered HTML is ever committed and
+# there is no gh-pages branch to keep in sync. Pull requests build
+# but do not publish, which surfaces a broken page during review
+# rather than after merge.
+#
+# The pages are plain Markdown, so Quarto renders them without R.
+# Which pages are built is set by `project: render` in
+# docs/_quarto.yml.
+#
+# Repository prerequisite: Settings > Pages > Source = "GitHub
+# Actions". Without that, the deploy job fails with a 404.
+
+name: docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - ".github/workflows/docs.yaml"
+  pull_request:
+    paths:
+      - "docs/**"
+      - ".github/workflows/docs.yaml"
+  workflow_dispatch:
+
+# Deny by default; each job requests only the scopes it needs.
+permissions: {}
+
+# Serialize publishing. Queued runs collapse to the newest, but an
+# in-flight deployment is allowed to finish so the live site is
+# never left half-written.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: quarto-dev/quarto-actions/setup@v2
+
+      # Renders to docs/_site, as set in docs/_quarto.yml
+      - name: Build site
+        run: quarto render docs
+
+      # No configure-pages step: Quarto reads its base URL from
+      # `site-url` in docs/_quarto.yml, so this job stays on
+      # contents:read alone.
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs/_site
+
+  deploy:
+    # Publishing is a main-branch-only consequence of a green build.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

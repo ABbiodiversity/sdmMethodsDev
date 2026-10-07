@@ -1,179 +1,103 @@
 # ---
 # title: Run Experiment 000 - v2.0 Parity Check
 # author: Brendan Casey
-# created: 2026-09-05
+# created: 2026-09-09
 # inputs:
-#   harness, in 1_code/harness/utils/:
-#     - v2_script_runner.R
-#     - stage_v2_inputs.R
-#   experiment:
-#     - 1_code/experiments/exp_000_parity_v2/utils/species_lists.R
-#   modules, in 1_code/modules/plants/:
-#     - run_v2_bryophytes.R
-#     - run_v2_lichens.R
-#     - run_v2_mites.R
-#     - run_v2_vascular_plants.R
+#   - the published test dataset (harness/data_source.R)
+#   - the published v2 results, the ABMIexploreR reference
+#     (section 1.3; see harness/data_source.R)
+#   - the framework: 1_code/harness/, methods/, modules/
 # outputs:
 #   in 2_pipeline/exp_000_parity_v2/:
-#     - <taxon>/ (staged inputs and raw v2 model output)
-#     - logs/
+#     - <run>/<region>/ result stores, and run_log.csv
 #   in 3_output/exp_000_parity_v2/:
-#     - tables/
-#     - figures/
-#     - report.md
+#     - tables/, figures/, report.md, run_record.md
 # notes:
-#   - Entry point for the experiment. Sets which taxa run and on
-#     which species, stages the inputs, then sources the taxon
-#     modules, which in turn source the unmodified v2 scripts.
-#   - Species vectors live in utils/species_lists.R. A vector of
-#     NULL models every species in the source data.
-#   - Each taxon is staged into its own run root under
-#     2_pipeline/, so a run writes nothing to 0_data/ and edits
-#     no v2 code.
-#   - Set SDM_V2_ROOT to the v2 project holding the source data.
-#     It is read only, and only at staging.
+#   - The validation gate and the baseline for every experiment:
+#     each taxon's v2 spec against the published v2 output.
+#   - Section 1.2 is the whole configuration.
+#   - Parity is mostly distributional (v2 seeds nothing); see the
+#     parity ledger in docs/framework_design.md.
 # ---
 
 # 1. Setup ----
 
-## 1.1 Set the working directory ----
-# Every path below is relative to this repository's root. In
-# RStudio or Positron, uncomment to set it from this script's
-# location.
-# setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
-# setwd("../../..")
+## 1.1 Load the framework ----
+# Run from the repository root
+source("1_code/harness/harness.R")
+load_framework()
 
-## 1.2 Configure the experiment ----
-# The identifier is used verbatim in 1_code/experiments/,
-# 2_pipeline/, and 3_output/, so all three paths derive from one
-# variable rather than being typed per stage.
-exp_id <- "exp_000_parity_v2"
+exp_dir <- "1_code/experiments/exp_000_parity_v2"
 
-project_root <- normalizePath(getwd(), winslash = "/")
+source(file.path(exp_dir, "utils", "parity_targets.R"))
 
-exp_code_dir <- file.path(
-  project_root, "1_code/experiments", exp_id
+## 1.2 Configure the run ----
+# See experiment_config() and docs/getting_started.md
+config <- experiment_config(
+  id = "exp_000_parity_v2",
+
+  # Runs, from names(standard_specs())
+  taxa = c(
+    "bryophyte",
+    "lichen",
+    "mite",
+    "vascular_plant",
+    "mammal_summer",
+    "mammal_winter",
+    "bird"
+  ),
+
+  # A focal_species_sets() name, a vector named by taxon, or NULL
+  # for every species. Shorten trials by species, not draws, so
+  # the bands stay honest.
+  species = "parity_check",
+
+  # 100 is v2's and the only count the gate reads; below ~20 the
+  # 10-90% bands are unstable. 5 checks the plumbing.
+  n_bootstraps = 5,
+
+  # Base seed; NULL is unseeded, as v2. Birds replay v2's draws.
+  seed = 20260909,
+
+  # "spatial_block" draws v2's plant bootstrap afresh;
+  # "v2_ids" replays v2's stored draws (needs _setup/07).
+  plant_bootstrap = "spatial_block",
+
+  # NULL fits each spec's v2 candidate sets
+  stage_models = NULL,
+
+  # Species fitted at once, one R session each
+  workers = 12,
+
+  # "oob" or "all" write per-unit predictions (GBs for birds)
+  unit_predictions = "none"
 )
 
-log_path <- file.path(project_root, "2_pipeline", exp_id, "logs")
+## 1.3 The v2 reference ----
+# ABMIexploreR's published coefficients, pinned to a commit and
+# harmonized by _setup/08
+config$v2_reference <- "abmiexplorer"
+config$v2_reference_dir <- file.path(
+  v2_results_dir(), "abmiexplorer"
+)
+config$v2_reference_builder <-
+  "1_code/_setup/08_harmonize_abmiexplorer_results.R"
 
-out_dir <- file.path(project_root, "3_output", exp_id)
-
-## 1.3 Load harness helpers ----
-# v2_script_runner.R supplies run_step() and the pre-run checks;
-# stage_v2_inputs.R builds each taxon's run root.
-source(file.path(
-  project_root, "1_code/harness/utils/v2_script_runner.R"
-))
-source(file.path(
-  project_root, "1_code/harness/utils/stage_v2_inputs.R"
-))
-
-## 1.4 Set the taxa to run ----
-# Set to TRUE to model that taxon. Toggling a flag re-runs one
-# taxon without commenting out code.
-bryophytes <- FALSE
-lichens <- FALSE
-mites <- TRUE
-vascular_plants <- FALSE
-
-## 1.5 Load the species vectors ----
-# Defines bryophyte_species, lichen_species, mite_species, and
-# vascular_plant_species. NULL means every species in the data.
-source(file.path(exp_code_dir, "utils/species_lists.R"))
-
-## 1.6 Set the analysis flags ----
-# The steps that turn raw v2 output into committed deliverables.
-run_collect <- TRUE
-run_compare <- TRUE
-run_report <- TRUE
-
-# 2. Run the taxon modules ----
-# Each block stages that taxon's inputs, then sources its module
-# runner. The module reads v2_root and log_path from here, so the
-# staged run root is what the v2 scripts see. Nothing outside
-# 2_pipeline/ is written.
-experiment_start <- Sys.time()
-
-## 2.1 Bryophytes ----
-if (bryophytes) {
-  v2_root <- stage_v2_inputs(
-    exp_id = exp_id,
-    taxon = "bryophyte",
-    species = bryophyte_species,
-    project_root = project_root
+# 2. Run ----
+# `fit = FALSE` re-summarizes existing stores without fitting
+results <- run_experiment(
+  config,
+  fit = TRUE,
+  # Bird landcover onto v2's habitat template
+  translate = list(bird = bird_habitat_translation),
+  steps = list(
+    compare = script_step(file.path(exp_dir, "01_compare_to_v2.R")),
+    plot = script_step(file.path(exp_dir, "02_plot_parity.R")),
+    report = script_step(file.path(exp_dir, "03_build_report.R"))
   )
-  source(file.path(
-    project_root, "1_code/modules/plants/run_v2_bryophytes.R"
-  ))
-}
+)
 
-## 2.2 Lichens ----
-if (lichens) {
-  v2_root <- stage_v2_inputs(
-    exp_id = exp_id,
-    taxon = "lichen",
-    species = lichen_species,
-    project_root = project_root
-  )
-  source(file.path(
-    project_root, "1_code/modules/plants/run_v2_lichens.R"
-  ))
-}
-
-## 2.3 Soil mites ----
-if (mites) {
-  v2_root <- stage_v2_inputs(
-    exp_id = exp_id,
-    taxon = "mite",
-    species = mite_species,
-    project_root = project_root
-  )
-  source(file.path(
-    project_root, "1_code/modules/plants/run_v2_mites.R"
-  ))
-}
-
-## 2.4 Vascular plants ----
-if (vascular_plants) {
-  v2_root <- stage_v2_inputs(
-    exp_id = exp_id,
-    taxon = "vascular-plant",
-    species = vascular_plant_species,
-    project_root = project_root
-  )
-  source(file.path(
-    project_root,
-    "1_code/modules/plants/run_v2_vascular_plants.R"
-  ))
-}
-
-# 3. Summarize the results ----
-# These read the raw v2 output left in 2_pipeline/ and write the
-# committed deliverables to 3_output/. They are placeholders
-# until the parity targets are agreed.
-
-## 3.1 Collect model output ----
-if (run_collect) {
-  source(file.path(exp_code_dir, "01_collect_results.R"))
-}
-
-## 3.2 Compare against the v2.0 reference ----
-if (run_compare) {
-  source(file.path(exp_code_dir, "02_compare_to_v2.R"))
-}
-
-## 3.3 Build the report ----
-if (run_report) {
-  source(file.path(exp_code_dir, "03_build_report.R"))
-}
-
-# 4. Experiment complete ----
-experiment_time <- format(round(Sys.time() - experiment_start, 1))
-cat("\n========================================\n")
-cat("EXPERIMENT ", exp_id, " COMPLETE\n", sep = "")
-cat("Total run time: ", experiment_time, "\n", sep = "")
-cat("========================================\n")
-cat("Deliverables are in ", out_dir, "\n", sep = "")
+# Commit run_record.md, report.md and the small summary tables
+# only after a full run: every species, n_bootstraps = 100.
 
 # End of script ----

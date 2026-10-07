@@ -55,5 +55,19 @@ vignettes/*.pdf
 !3_output/**/
 !3_output/**/.gitkeep
 
+# ...but keep the small, diffable summaries of each experiment:
+# the run record, the report and the summary tables. They are
+# what lets experiments be compared from the repository alone.
+# Per-species detail (coefficient_summary.csv,
+# parity_terms.csv) is large and is rebuilt from the
+# 2_pipeline/ stores, so it stays ignored.
+!3_output/**/run_record.md
+!3_output/**/report.md
+!3_output/**/tables/parity_summary.csv
+!3_output/**/tables/coverage.csv
+!3_output/**/tables/metric_summary.csv
+!3_output/**/tables/grid_summary.csv
+!3_output/**/tables/v2_self_agreement_summary.csv
+
 AGENTS.md
 CLAUDE.md
