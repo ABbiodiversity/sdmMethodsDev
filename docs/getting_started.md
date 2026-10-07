@@ -372,6 +372,12 @@ An experiment asks one question by changing one thing relative to
 exp_000. Everything else (taxa, species, draws, seed) stays the
 same unless it is the question.
 
+For a step-by-step build of a real experiment, from scaffolding to
+write-up, see the worked examples:
+[new covariates](example_experiment.md) (`exp_002_soilgrids`, lever
+1) and [a different method](example_experiment_xgboost.md)
+(`exp_001_xgboost`, lever 2).
+
 ### Scaffold an experiment
 
 `new_experiment()` is base R and runs without `load_framework()`.

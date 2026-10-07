@@ -9,6 +9,8 @@ project:
   render:
     - index.md
     - getting_started.md
+    - example_experiment.md
+    - example_experiment_xgboost.md
 
 website:
   title: "sdmMethodsDev"
@@ -21,6 +23,12 @@ website:
         text: Home
       - href: getting_started.md
         text: Getting started
+      - text: Worked examples
+        menu:
+          - href: example_experiment.md
+            text: "New covariates (exp_002_soilgrids)"
+          - href: example_experiment_xgboost.md
+            text: "A different method (exp_001_xgboost)"
     right:
       - icon: github
         href: https://github.com/ABbiodiversity/sdmMethodsDev
