@@ -29,17 +29,19 @@ load_framework()
 
 ## 1.2 The change: fit the habitat stage with xgboost ----
 xgb_settings <- list(
-  nrounds = 1000,          # the most rounds; early stopping picks
-  eta = 0.05,              # learning rate
-  max_depth = 3,           # tree complexity
-  subsample = 0.5,         # share of rows each tree sees
-  min_child_weight = 1     # smallest leaf, in weighted rows
+  nrounds = 1000, # the most rounds; early stopping picks
+  eta = 0.05, # learning rate
+  max_depth = 3, # tree complexity
+  subsample = 0.5, # share of rows each tree sees
+  min_child_weight = 1 # smallest leaf, in weighted rows
 )
 
 # One call per run: each spec names its own habitat stage
 specs <- lapply(
-  standard_specs(), replace_stage_method,
-  engine = "xgboost", control = xgb_settings
+  standard_specs(),
+  replace_stage_method,
+  engine = "xgboost",
+  control = xgb_settings
 )
 
 ## 1.3 Configure the run ----
@@ -49,7 +51,7 @@ config <- experiment_config(
   taxa = names(specs),
   species = "parity_check",
   # 5 checks the pipeline runs; 100 for a result to read
-  n_bootstraps = 5,
+  n_bootstraps = 100,
   seed = 20260909,
   specs = specs,
   workers = 12
