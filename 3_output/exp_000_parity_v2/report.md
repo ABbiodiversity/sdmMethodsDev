@@ -1,8 +1,8 @@
 # exp_000_parity_v2
 
-Generated 2026-10-06 05:25:57
+Generated 2026-10-08 03:59:22
 
-**Trial run.** 14 focal species, 5 of 100 draws. Its parity numbers show the pipeline ran; they are not a parity read.
+**Trial run.** 14 focal species, 100 of 100 draws. Its parity numbers show the pipeline ran; they are not a parity read.
 
 Draws: `seed = 20260909`, one derived seed per species.
 
@@ -77,20 +77,20 @@ _Every taxon and region that ran had a reference to compare against._
 
 | taxon | run | region | season | part | species | draws | stages | has_coefficients | has_grid |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| bird | bird | north | - | - | 2 | 5 | climate, landcover, habitat | TRUE | TRUE |
-| bird | bird | south | - | - | 2 | 5 | climate, landcover, habitat | TRUE | TRUE |
-| bryophyte | bryophyte | north | - | - | 2 | 5 | climate, habitat | TRUE | TRUE |
-| bryophyte | bryophyte | south | - | - | 2 | 5 | climate, habitat | TRUE | TRUE |
-| lichen | lichen | north | - | - | 2 | 5 | climate, habitat | TRUE | TRUE |
-| lichen | lichen | south | - | - | 2 | 5 | climate, habitat | TRUE | TRUE |
-| mammal | mammal_summer | north | summer | hurdle | 2 | 5 | habitat_presence, habitat_abundance, habitat_total | TRUE | TRUE |
-| mammal | mammal_summer | south | summer | hurdle | 2 | 5 | habitat_presence, habitat_abundance, habitat_total | TRUE | TRUE |
-| mammal | mammal_winter | north | winter | hurdle | 2 | 5 | habitat_presence, habitat_abundance, habitat_total | TRUE | TRUE |
-| mammal | mammal_winter | south | winter | hurdle | 2 | 5 | habitat_presence, habitat_abundance, habitat_total | TRUE | TRUE |
-| mite | mite | north | - | - | 2 | 5 | climate, habitat | TRUE | TRUE |
-| mite | mite | south | - | - | 2 | 5 | climate, habitat | TRUE | TRUE |
-| vascular_plant | vascular_plant | north | - | - | 2 | 5 | climate, habitat | TRUE | TRUE |
-| vascular_plant | vascular_plant | south | - | - | 2 | 5 | climate, habitat | TRUE | TRUE |
+| bird | bird | north | - | - | 2 | 100 | climate, landcover, habitat | TRUE | TRUE |
+| bird | bird | south | - | - | 2 | 100 | climate, landcover, habitat | TRUE | TRUE |
+| bryophyte | bryophyte | north | - | - | 2 | 100 | climate, habitat | TRUE | TRUE |
+| bryophyte | bryophyte | south | - | - | 2 | 100 | climate, habitat | TRUE | TRUE |
+| lichen | lichen | north | - | - | 2 | 100 | climate, habitat | TRUE | TRUE |
+| lichen | lichen | south | - | - | 2 | 100 | climate, habitat | TRUE | TRUE |
+| mammal | mammal_summer | north | summer | hurdle | 2 | 100 | habitat_presence, habitat_abundance, habitat_total | TRUE | TRUE |
+| mammal | mammal_summer | south | summer | hurdle | 2 | 100 | habitat_presence, habitat_abundance, habitat_total | TRUE | TRUE |
+| mammal | mammal_winter | north | winter | hurdle | 2 | 100 | habitat_presence, habitat_abundance, habitat_total | TRUE | TRUE |
+| mammal | mammal_winter | south | winter | hurdle | 2 | 100 | habitat_presence, habitat_abundance, habitat_total | TRUE | TRUE |
+| mite | mite | north | - | - | 2 | 100 | climate, habitat | TRUE | TRUE |
+| mite | mite | south | - | - | 2 | 100 | climate, habitat | TRUE | TRUE |
+| vascular_plant | vascular_plant | north | - | - | 2 | 100 | climate, habitat | TRUE | TRUE |
+| vascular_plant | vascular_plant | south | - | - | 2 | 100 | climate, habitat | TRUE | TRUE |
 
 ## Parity against v2, by stage
 
@@ -102,28 +102,28 @@ fixes at a placeholder are left out of the reachable scores.
 
 | taxon | region | stage | comparison | species | terms_compared | min_draws | in_band_pct | reachable_terms | reachable_in_band_pct | median_standardized_difference | median_absolute_difference | max_absolute_difference | negligible_terms | median_spearman | median_band_ratio | verdict | indicative_verdict |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| bird | north | climate | median | 2 | 20 | 5 | 90.000 | 20 | 90.000 | 0.351 | 0.000 | 0.651 | 0 | 1.000 | 0.694 | not gated (store holds 5 draws) | - |
-| bryophyte | north | climate | median | 1 | 19 | 5 | 94.700 | 19 | 94.700 | 0.671 | 0.000 | 1.810 | 5 | 0.991 | 0.214 | not gated (store holds 5 draws) | - |
-| lichen | north | climate | median | 2 | 38 | 5 | 89.500 | 38 | 89.500 | 0.003 | 0.000 | 1.990 | 17 | 0.991 | 0.301 | not gated (store holds 5 draws) | - |
-| mite | north | climate | median | 2 | 38 | 5 | 94.700 | 38 | 94.700 | 0.082 | 0.000 | 3.790 | 20 | 0.973 | 0.656 | not gated (store holds 5 draws) | - |
-| vascular_plant | north | climate | median | 2 | 38 | 5 | 97.400 | 38 | 97.400 | 0.000 | 0.000 | 0.120 | 24 | 0.982 | 0.602 | not gated (store holds 5 draws) | - |
-| bird | south | climate | median | 2 | 20 | 5 | 90.000 | 20 | 90.000 | 0.351 | 0.000 | 0.651 | 0 | 1.000 | 0.694 | not gated (store holds 5 draws) | - |
-| bryophyte | south | climate | median | 1 | 19 | 5 | 94.700 | 19 | 94.700 | 0.671 | 0.000 | 1.810 | 5 | 0.991 | 0.214 | not gated (store holds 5 draws) | - |
-| lichen | south | climate | median | 2 | 38 | 5 | 89.500 | 38 | 89.500 | 0.003 | 0.000 | 1.990 | 17 | 0.991 | 0.301 | not gated (store holds 5 draws) | - |
-| mite | south | climate | median | 2 | 38 | 5 | 94.700 | 38 | 94.700 | 0.082 | 0.000 | 3.790 | 20 | 0.973 | 0.656 | not gated (store holds 5 draws) | - |
-| vascular_plant | south | climate | median | 2 | 38 | 5 | 97.400 | 38 | 97.400 | 0.000 | 0.000 | 0.120 | 24 | 0.982 | 0.602 | not gated (store holds 5 draws) | - |
-| bird | north | habitat | median | 2 | 178 | 5 | 92.700 | 168 | 92.300 | 0.569 | 0.023 | 2.820 | 0 | 0.989 | 0.699 | not gated (store holds 5 draws) | - |
-| bryophyte | north | habitat | median | 1 | 94 | 5 | 98.900 | 94 | 98.900 | 0.360 | 0.062 | 0.256 | 0 | 0.987 | 0.502 | not gated (store holds 5 draws) | - |
-| lichen | north | habitat | median | 2 | 188 | 5 | 94.700 | 188 | 94.700 | 0.251 | 0.038 | 0.289 | 0 | 0.996 | 0.642 | not gated (store holds 5 draws) | - |
-| mammal | north | habitat | iteration 1 | 2 | 448 | 4 | 100.000 | 436 | 100.000 | 0.000 | 0.000 | 0.000 | 0 | 1.000 | - | not gated (trial run) | - |
-| mite | north | habitat | median | 1 | 94 | 5 | 76.600 | 94 | 76.600 | 0.579 | 0.078 | 0.673 | 0 | 0.993 | 0.642 | not gated (store holds 5 draws) | - |
-| vascular_plant | north | habitat | median | 2 | 188 | 5 | 91.500 | 188 | 91.500 | 0.303 | 0.034 | 0.326 | 0 | 0.997 | 0.596 | not gated (store holds 5 draws) | - |
-| bird | south | habitat | median | 2 | 46 | 5 | 80.400 | 40 | 77.500 | 0.334 | 0.021 | 0.121 | 0 | 0.995 | 0.508 | not gated (store holds 5 draws) | - |
-| bryophyte | south | habitat | median | 1 | 19 | 5 | 100.000 | 19 | 100.000 | 0.399 | 0.066 | 0.267 | 0 | 0.991 | 0.633 | not gated (store holds 5 draws) | - |
-| lichen | south | habitat | median | 2 | 40 | 5 | 87.500 | 40 | 87.500 | 0.337 | 0.048 | 0.655 | 1 | 0.985 | 0.554 | not gated (store holds 5 draws) | - |
-| mammal | south | habitat | iteration 1 | 2 | 126 | 5 | 100.000 | 120 | 100.000 | 0.000 | 0.000 | 0.000 | 0 | 1.000 | - | not gated (trial run) | - |
-| mite | south | habitat | median | 2 | 40 | 5 | 95.000 | 40 | 95.000 | 0.175 | 0.030 | 0.754 | 1 | 0.992 | 0.581 | not gated (store holds 5 draws) | - |
-| vascular_plant | south | habitat | median | 2 | 40 | 5 | 75.000 | 40 | 75.000 | 0.585 | 0.070 | 0.552 | 0 | 0.977 | 0.566 | not gated (store holds 5 draws) | - |
+| bird | north | climate | median | 2 | 20 | 100 | 100.000 | 20 | 100.000 | 0.000 | 0.000 | 0.000 | 0 | 1.000 | 1.000 | not gated (trial run) | pass |
+| bryophyte | north | climate | median | 1 | 19 | 100 | 100.000 | 19 | 100.000 | 0.035 | 0.000 | 1.400 | 6 | 1.000 | 1.062 | not gated (trial run) | pass |
+| lichen | north | climate | median | 2 | 38 | 100 | 100.000 | 38 | 100.000 | 0.000 | 0.000 | 0.644 | 17 | 0.993 | 0.879 | not gated (trial run) | pass |
+| mite | north | climate | median | 2 | 38 | 100 | 100.000 | 38 | 100.000 | 0.000 | 0.000 | 1.950 | 20 | 0.905 | 0.953 | not gated (trial run) | pass |
+| vascular_plant | north | climate | median | 2 | 38 | 100 | 100.000 | 38 | 100.000 | 0.000 | 0.000 | 0.266 | 24 | 1.000 | 0.970 | not gated (trial run) | pass |
+| bird | south | climate | median | 2 | 20 | 100 | 100.000 | 20 | 100.000 | 0.000 | 0.000 | 0.000 | 0 | 1.000 | 1.000 | not gated (trial run) | pass |
+| bryophyte | south | climate | median | 1 | 19 | 100 | 100.000 | 19 | 100.000 | 0.035 | 0.000 | 1.400 | 6 | 1.000 | 1.062 | not gated (trial run) | pass |
+| lichen | south | climate | median | 2 | 38 | 100 | 100.000 | 38 | 100.000 | 0.000 | 0.000 | 0.644 | 17 | 0.993 | 0.879 | not gated (trial run) | pass |
+| mite | south | climate | median | 2 | 38 | 100 | 100.000 | 38 | 100.000 | 0.000 | 0.000 | 1.950 | 20 | 0.905 | 0.953 | not gated (trial run) | pass |
+| vascular_plant | south | climate | median | 2 | 38 | 100 | 100.000 | 38 | 100.000 | 0.000 | 0.000 | 0.266 | 24 | 1.000 | 0.970 | not gated (trial run) | pass |
+| bird | north | habitat | median | 2 | 178 | 100 | 100.000 | 168 | 100.000 | 0.000 | 0.000 | 0.000 | 0 | 1.000 | 1.000 | not gated (trial run) | pass |
+| bryophyte | north | habitat | median | 1 | 94 | 100 | 100.000 | 94 | 100.000 | 0.072 | 0.023 | 0.081 | 0 | 0.997 | 0.911 | not gated (trial run) | pass |
+| lichen | north | habitat | median | 2 | 188 | 100 | 100.000 | 188 | 100.000 | 0.091 | 0.024 | 0.118 | 0 | 0.999 | 0.988 | not gated (trial run) | pass |
+| mammal | north | habitat | iteration 1 | 2 | 448 | 65 | 100.000 | 436 | 100.000 | 0.000 | 0.000 | 0.000 | 0 | 1.000 | - | not gated (trial run) | pass |
+| mite | north | habitat | median | 1 | 94 | 100 | 100.000 | 94 | 100.000 | 0.140 | 0.035 | 0.148 | 0 | 0.999 | 0.993 | not gated (trial run) | pass |
+| vascular_plant | north | habitat | median | 2 | 188 | 100 | 100.000 | 188 | 100.000 | 0.108 | 0.022 | 0.125 | 0 | 0.999 | 0.950 | not gated (trial run) | pass |
+| bird | south | habitat | median | 2 | 46 | 100 | 100.000 | 40 | 100.000 | 0.000 | 0.000 | 0.000 | 0 | 1.000 | 1.000 | not gated (trial run) | pass |
+| bryophyte | south | habitat | median | 1 | 19 | 100 | 100.000 | 19 | 100.000 | 0.047 | 0.021 | 0.060 | 0 | 0.993 | 1.042 | not gated (trial run) | pass |
+| lichen | south | habitat | median | 2 | 40 | 100 | 100.000 | 40 | 100.000 | 0.088 | 0.029 | 0.278 | 1 | 0.994 | 0.961 | not gated (trial run) | pass |
+| mammal | south | habitat | iteration 1 | 2 | 126 | 99 | 100.000 | 120 | 100.000 | 0.000 | 0.000 | 0.000 | 0 | 1.000 | - | not gated (trial run) | pass |
+| mite | south | habitat | median | 2 | 40 | 100 | 100.000 | 40 | 100.000 | 0.068 | 0.024 | 0.464 | 1 | 0.991 | 0.975 | not gated (trial run) | pass |
+| vascular_plant | south | habitat | median | 2 | 40 | 100 | 100.000 | 40 | 100.000 | 0.074 | 0.027 | 0.184 | 0 | 0.997 | 1.021 | not gated (trial run) | pass |
 
 Where v2 bootstraps, parity is **distributional**: v2 seeds no
 random draw, so two v2 runs differ, and each term is scored on
@@ -138,18 +138,18 @@ Median AUC over species, scored on each run's final model: for plants, v2's own 
 
 | taxon | region | species | median_insample_auc | median_oob_auc | median_v2val_full | median_oob_v2val_full |
 | --- | --- | --- | --- | --- | --- | --- |
-| bird | north | 2 | 0.752 | 0.729 | - | - |
-| bryophyte | north | 2 | 0.668 | 0.650 | 0.668 | 0.650 |
-| lichen | north | 2 | 0.808 | 0.803 | 0.808 | 0.803 |
-| mammal | north | 4 | 0.746 | 0.731 | - | - |
-| mite | north | 2 | 0.733 | 0.716 | 0.733 | 0.716 |
-| vascular_plant | north | 2 | 0.833 | 0.828 | 0.833 | 0.828 |
-| bird | south | 2 | 0.704 | 0.702 | - | - |
-| bryophyte | south | 2 | 0.671 | 0.669 | 0.671 | 0.669 |
+| bird | north | 2 | 0.751 | 0.730 | - | - |
+| bryophyte | north | 2 | 0.668 | 0.652 | 0.668 | 0.652 |
+| lichen | north | 2 | 0.808 | 0.802 | 0.808 | 0.802 |
+| mammal | north | 4 | 0.751 | 0.730 | - | - |
+| mite | north | 2 | 0.735 | 0.718 | 0.735 | 0.718 |
+| vascular_plant | north | 2 | 0.833 | 0.829 | 0.833 | 0.829 |
+| bird | south | 2 | 0.706 | 0.702 | - | - |
+| bryophyte | south | 2 | 0.676 | 0.664 | 0.676 | 0.664 |
 | lichen | south | 2 | 0.802 | 0.792 | 0.802 | 0.792 |
-| mammal | south | 4 | 0.753 | 0.686 | - | - |
-| mite | south | 2 | 0.799 | 0.774 | 0.799 | 0.774 |
-| vascular_plant | south | 2 | 0.848 | 0.846 | 0.848 | 0.846 |
+| mammal | south | 4 | 0.739 | 0.716 | - | - |
+| mite | south | 2 | 0.796 | 0.781 | 0.796 | 0.781 |
+| vascular_plant | south | 2 | 0.850 | 0.844 | 0.850 | 0.844 |
 
 ## What is still needed
 

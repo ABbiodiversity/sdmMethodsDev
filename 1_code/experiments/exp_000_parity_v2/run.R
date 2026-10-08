@@ -54,7 +54,7 @@ config <- experiment_config(
 
   # 100 is v2's and the only count the gate reads; below ~20 the
   # 10-90% bands are unstable. 5 checks the plumbing.
-  n_bootstraps = 5,
+  n_bootstraps = 100,
 
   # Base seed; NULL is unseeded, as v2. Birds replay v2's draws.
   seed = 20260909,
@@ -78,7 +78,8 @@ config <- experiment_config(
 # harmonized by _setup/08
 config$v2_reference <- "abmiexplorer"
 config$v2_reference_dir <- file.path(
-  v2_results_dir(), "abmiexplorer"
+  v2_results_dir(),
+  "abmiexplorer"
 )
 config$v2_reference_builder <-
   "1_code/_setup/08_harmonize_abmiexplorer_results.R"
