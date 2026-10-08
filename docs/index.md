@@ -5,15 +5,14 @@ The ABMI Science Centre's shared R&D repository for Species Models
 taxon's v2.0 model as configuration, and a v2 parity check that
 every later experiment is compared against.
 
-This site is for Science Centre modellers. It is intended for
+This site is for the Science Centre modelling team. It is intended for
 internal use.
 
 - **New here?** Start with [Getting started](getting_started.md):
   setup, running the v2 baseline, starting an experiment, and
   adding a taxon module.
 - **Adding an experiment?** Follow a worked example:
-  [new covariates](example_experiment.md) (`exp_002_soilgrids`)
-  or [a different method](example_experiment_xgboost.md)
-  (`exp_001_xgboost`).
+  [new covariates](example_experiment.md)
+  or a [different modelling method](example_experiment_xgboost.md).
 - **The code and the full documentation** are in the
   [repository](https://github.com/ABbiodiversity/sdmMethodsDev).
