@@ -19,7 +19,19 @@ runs every taxon's v2.0 model as a configuration, and a v2 parity check
 
 
 
-**Why this exists**
+
+
+## Contents
+
+- [Why this exists](#why-this-exists)
+- [Repository structure](#repository-structure)
+- [How it works](#how-it-works)
+- [Getting started](#getting-started)
+- [Related resources](#related-resources)
+- [Contact](#contact)
+
+## Why this exists
+
 Species Models are produced one taxon at a time, each by its taxon lead. That
 works for production, but it confines R&D to one taxon: a method that improves
 plant models may or may not improve bird models, and testing it three times in
