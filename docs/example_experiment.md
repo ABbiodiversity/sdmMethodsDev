@@ -5,10 +5,7 @@ This walkthrough builds an experiment from start to finish, using
 near-surface soil properties from SoilGrids 2.0 improve the models
 for the plant-group taxa and birds.
 
-It is a good first example because it uses the most involved
-lever: covariates the frozen dataset does not hold. An experiment
-that only changes formulas skips Step 3; everything else is the
-same. To change the engine or selection rule instead, see the
+ To change the engine or selection rule instead, see the
 [method-swap worked example](example_experiment_xgboost.md).
 
 Read [Getting started](getting_started.md) first. This page
@@ -36,8 +33,7 @@ You need:
   in this example, the SoilGrids layer.
 - **exp_000 tables at the draw count you will run.** Every
   experiment is compared with
-  `3_output/exp_000_parity_v2/tables/`. Compare a 5-draw run with a
-  5-draw exp_000, and a 100-draw run with a 100-draw exp_000.
+  `3_output/exp_000_parity_v2/tables/`.
   `run_experiment()` warns when the two differ.
 - **Any packages your covariate script needs.** Here, that is
   `sf`, `terra`, and
@@ -127,8 +123,7 @@ exp_002's is
   this reason.
 
 Units the file does not list, or lists with `NA`, drop out of any
-model that uses the column. That is how exp_002 handles mammals
-(no coordinates) and twelve plant-group units just outside the
+model that uses the column. That is how exp_002 handles mammals with no coordinates and twelve plant-group units just outside the
 1 km grid. Report how many units that removes, as exp_002's README
 does, because those models fit on fewer units than exp_000.
 
@@ -178,7 +173,7 @@ report. It also writes `soilgrids_0_5cm_source.csv`, recording the
 layer, DOI, depth, date, and method, so the inputs can be traced
 later. Do the same for your own covariates.
 
-The script reads `SDM_SOILGRIDS`, if set, to use a local copy of
+The script reads `SDM_SOILGRIDS`, adjust to use a local copy of
 the raster instead of the share.
 
 ## Step 4: Put the covariates in the formulas
@@ -227,8 +222,6 @@ bird_soil[1]
 To build a candidate set from covariates alone instead, see
 `models_from_covariates()` in `1_code/harness/model_sets.R`.
 
-Leave out terms that are fixed by others (silt here), so the
-models are identifiable.
 
 ## Step 5: Configure the run
 
