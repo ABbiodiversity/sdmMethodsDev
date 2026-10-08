@@ -4,7 +4,7 @@
 # created: 2026-10-05
 # inputs:
 #   - 0_data/test_dataset/, from _setup/01-09, checked by 02
-#   - 0_data/v2_results/abmiexplorer/, from _setup/08
+#   - 0_data/v2_results/abmiexplorer/, from _setup/06
 # outputs:
 #   in //ABMI-DATA2/science/sdmMethodsDev/0_data/ (SDM_SHARE_ROOT
 #   overrides it), for each dataset:
@@ -180,7 +180,7 @@ publish_dataset <- function(name, version) {
     paste0("- R: ", R.version.string),
     "",
     "Built by 1_code/_setup/ in the sdmMethodsDev repository and",
-    "published by 1_code/_setup/10_publish_datasets.R. Never",
+    "published by 1_code/_setup/08_publish_datasets.R. Never",
     "edited after publishing; checksums.csv lists every file."
   ), file.path(partial, "publish_record.md"))
 

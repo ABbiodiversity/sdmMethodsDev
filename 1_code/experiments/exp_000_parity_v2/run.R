@@ -60,7 +60,7 @@ config <- experiment_config(
   seed = 20260909,
 
   # "spatial_block" draws v2's plant bootstrap afresh;
-  # "v2_ids" replays v2's stored draws (needs _setup/07).
+  # "v2_ids" replays v2's stored draws (needs _setup/05).
   plant_bootstrap = "spatial_block",
 
   # NULL fits each spec's v2 candidate sets
@@ -75,14 +75,14 @@ config <- experiment_config(
 
 ## 1.3 The v2 reference ----
 # ABMIexploreR's published coefficients, pinned to a commit and
-# harmonized by _setup/08
+# harmonized by _setup/06
 config$v2_reference <- "abmiexplorer"
 config$v2_reference_dir <- file.path(
   v2_results_dir(),
   "abmiexplorer"
 )
 config$v2_reference_builder <-
-  "1_code/_setup/08_harmonize_abmiexplorer_results.R"
+  "1_code/_setup/06_harmonize_abmiexplorer_results.R"
 
 # 2. Run ----
 # `fit = FALSE` re-summarizes existing stores without fitting

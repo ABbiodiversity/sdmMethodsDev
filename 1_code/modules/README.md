@@ -62,7 +62,7 @@ are also accepted, as settings for that method.
 2. Extend `_setup/01` to write the taxon's response, covariates,
    lookups, and any grid or stored draws; extend `_setup/02` to trace
    them to the source.
-3. Add the taxon's species queue and manifest rows to `_setup/09`,
+3. Add the taxon's species queue and manifest rows to `_setup/07`,
    and re-run it.
 4. Splice the v2 candidate formulas into `harness/model_sets.R`,
    verbatim.
@@ -70,7 +70,7 @@ are also accepted, as settings for that method.
    `birds/spec.R` or `mammals/spec.R`, and add the run to
    `standard_specs()`. If v2 does something no registered method
    covers, add one to [`methods/`](../methods/README.md).
-6. Add the taxon's published v2 results to `_setup/08`, if
+6. Add the taxon's published v2 results to `_setup/06`, if
    ABMIexploreR publishes them.
 7. Check that `validate_spec()` passes and
    `Rscript 1_code/tests/run_tests.R` runs clean. Record each

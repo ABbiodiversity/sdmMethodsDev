@@ -12,7 +12,7 @@
 #   - The published bryophyte model file is unusable (every entry
 #     is a `could not find function "model.avg"` error; 3 stored
 #     draws, not 100). The parity reference is ABMIexploreR's
-#     arrays (_setup/08), matching v2's COEFS.RData to ~1e-15.
+#     arrays (_setup/06), matching v2's COEFS.RData to ~1e-15.
 #     _setup/03 regenerated the climate stage into
 #     2_pipeline/v2_reference/ for v2_self_agreement.R.
 # ---

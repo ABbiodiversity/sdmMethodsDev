@@ -34,7 +34,7 @@ test_that("every taxon in the queue is in the manifest", {
 
 test_that("the species queue matches the source lookups", {
   # The counts the three source schemas give, checked against
-  # the one queue _setup/09 wrote from them
+  # the one queue _setup/07 wrote from them
   plants <- data.table::fread(
     file.path(data_dir, "lookup", "modelled_species.csv")
   )

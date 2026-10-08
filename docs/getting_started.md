@@ -639,7 +639,7 @@ standard_specs <- function(plant_bootstrap = "spatial_block") {
 
 A new taxon also needs data. The full sequence is in the
 [modules README][modules-add]: v2 scripts into
-`0_data/v2_scripts/`, `_setup/01`, `02`, `09`, and `08` extended,
+`0_data/v2_scripts/`, `_setup/01`, `02`, `07`, and `06` extended,
 candidate formulas spliced into `model_sets.R`, and each
 taxon-specific behaviour recorded in
 [`docs/taxon_quirks.md`][quirks]. Those `_setup/` steps are

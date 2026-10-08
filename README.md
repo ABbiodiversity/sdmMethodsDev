@@ -25,7 +25,7 @@ final species models or reporting products.
 | Component | State |
 | --- | --- |
 | Test dataset | Built for bryophytes, lichens, soil mites, vascular plants, mammals and birds. Validated by `_setup/02`. Published to ABMI-DATA2, version 2026-10-05 |
-| v2 reference | ABMIexploreR's published coefficients, harmonized by `_setup/08` |
+| v2 reference | ABMIexploreR's published coefficients, harmonized by `_setup/06` |
 | Pipeline | Built: plug-in methods, parallel species, final-model metrics and habitat grids for every taxon, experiment runner, contract tests |
 | Taxon specs | Every stage of every taxon runs. Each spec's `v2_coverage` states what it reproduces; `report.md` prints it |
 | exp_000 (v2 parity) | A 100-draw run on the `parity_check` species passed all 22 taxon × region × stage rows on 2026-10-03 (see the [exp_000 README](1_code/experiments/exp_000_parity_v2/README.md)). The committed tables are from a later 5-draw trial. Not yet a gate: see [Parity gate](#parity-gate) |
@@ -36,8 +36,8 @@ final species models or reporting products.
 sdmMethodsDev/
 ├── 0_data/                 # gitignored except v2_scripts/ and *.R
 │   ├── test_dataset/       # _setup/ output; runs read the published copy
-│   ├── v2_results/         # the v2 parity reference, from _setup/08
-│   ├── external/           # downloaded sources (ABMIexploreR), from _setup/08
+│   ├── v2_results/         # the v2 parity reference, from _setup/06
+│   ├── external/           # downloaded sources (ABMIexploreR), from _setup/06
 │   ├── covariates/         # reserved; empty
 │   └── v2_scripts/         # v2 scripts as received; reference only
 ├── 1_code/
@@ -45,7 +45,7 @@ sdmMethodsDev/
 │   ├── methods/            # engines, selection rules, resampling, metrics
 │   ├── modules/            # one v2 spec per taxon; _shared/ for common code
 │   ├── experiments/        # one folder per question; _template/, _shared/
-│   ├── _setup/             # 00-10: build, check and publish the dataset
+│   ├── _setup/             # 00-08: build, check and publish the dataset
 │   ├── tests/              # contract tests and the store comparison
 │   └── _scratch.R          # dated workspace for exploration
 ├── 2_pipeline/             # result stores and intermediates; gitignored
@@ -226,7 +226,7 @@ script, ≤70-character lines, and tidyverse style.
 | Item | Convention | Example |
 | --- | --- | --- |
 | Experiments | `exp_NNN_short_description`, the same in `1_code/experiments/`, `2_pipeline/` and `3_output/` | `exp_001_xgboost` |
-| Sequenced scripts | `NN_` run order; entry points are `run.R` | `08_harmonize_abmiexplorer_results.R` |
+| Sequenced scripts | `NN_` run order; entry points are `run.R` | `06_harmonize_abmiexplorer_results.R` |
 | Taxon slugs | As the data files name them | `vascular_plant`, `mite`, `bird` |
 | Module folders | Plural taxon name | `vascular_plants/`, `soil_mites/` |
 

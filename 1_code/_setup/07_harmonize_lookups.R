@@ -3,7 +3,7 @@
 # author: Brendan Casey
 # created: 2026-10-03
 # inputs:
-#   in 0_data/test_dataset/lookup/ (all written by 01 and 06):
+#   in 0_data/test_dataset/lookup/ (all written by 01 and 04):
 #     - modelled_species.csv, mammal_modelled_species.csv,
 #       bird_modelled_species.csv
 #     - bird_factor_levels.csv
@@ -57,7 +57,7 @@ read_lookup <- function(name) {
   if (!file.exists(path)) {
     stop(
       "Missing ", path, ". Run 01_harmonize_model_ready_v2.R ",
-      "(and 06 for the bird matrix) first.",
+      "(and 04 for the bird matrix) first.",
       call. = FALSE
     )
   }

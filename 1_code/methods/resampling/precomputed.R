@@ -13,7 +13,7 @@
 #   - Replays v2's stored draws, so parity can be numerical rather
 #     than distributional. Birds: one table keyed on `surveyid`.
 #     Plant groups: per species, as v2 drew them (written by
-#     _setup/07_harmonize_v2_plant_bootstrap_ids.R).
+#     _setup/05_harmonize_v2_plant_bootstrap_ids.R).
 #   - The seed is ignored.
 # ---
 
@@ -125,7 +125,7 @@ read_stored_draws <- function(data_dir, taxon, species, per_species) {
       stop(
         "No stored v2 bootstrap ids for ", taxon, " ",
         species, ":\n  ", path,
-        "\nRun 1_code/_setup/07_harmonize_v2_plant_bootstrap_ids.R",
+        "\nRun 1_code/_setup/05_harmonize_v2_plant_bootstrap_ids.R",
         " for this species, or use the spatial_block scheme.",
         call. = FALSE
       )

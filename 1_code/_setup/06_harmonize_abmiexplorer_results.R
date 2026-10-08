@@ -30,23 +30,24 @@
 #     models the harness reproduces). Only the data file is
 #     downloaded, not the package and its dependencies.
 #
-#   - Checked against 05's reference on 2026-10-02, at the pinned
-#     commit:
+#   - Checked against the retired 05's reference on 2026-10-02,
+#     at the pinned commit:
 #     - Plants and birds are the same models. Every shared
 #       species and term matches to ~1e-15, except species where
-#       some v2 draws failed. 05 drops the failed draws (v2_n
+#       some v2 draws failed. Old 05 drops the failed draws (v2_n
 #       below 100); the package holds 100 finite draws for every
 #       cell, so its median moves slightly for those species.
 #     - The package is the published subset: about 10% fewer
 #       plant species than COEFS.RData, and 124 of 133 birds.
 #       Bryum.All, AMRO and YEWA, in the parity_check set, are
 #       not in it.
-#     - Mammals are the same models as 05's 2024 coefficient
-#       tables, presence, abundance and total, north and south,
-#       to ~1e-16 once back-transformed. The package stores them
-#       on the link scale (logit for presence, log for the other
-#       two) where the tables are on the response scale, which
-#       the harness writes, so they are back-transformed here.
+#     - Mammals are the same models as old 05's 2024
+#       coefficient tables, presence, abundance and total, north
+#       and south, to ~1e-16 once back-transformed. The package
+#       stores them on the link scale (logit for presence, log for
+#       the other two) where the tables are on the response scale,
+#       which the harness writes, so they are back-transformed
+#       here.
 #       Its 100 draws are one fit repeated, as v2 fits mammal
 #       habitat once, so they are written as v2_n 1 and the
 #       comparison reads iteration 1, as it does against 05.
@@ -115,7 +116,7 @@ for (one in c(source_dir, results_dir)) {
 }
 
 ## 1.4 Name the output columns ----
-# Identical to 05, so the comparison reads either file.
+# Identical to old 05, so the comparison reads either file.
 result_columns <- c(
   "taxon", "region", "stage", "part", "season",
   "species", "species_v2", "term",
@@ -191,7 +192,7 @@ mammal_parts <- c(
 
 # The package stores mammal habitat on the link scale; v2's
 # tables, and the harness, are on the response scale. Verified
-# exact against 05 on 2026-10-02. Mammal climate is on the link
+# exact against old 05 on 2026-10-02. Mammal climate is on the link
 # scale in both, so it is left alone.
 mammal_inverse_links <- list(
   presence = stats::plogis, abundance = exp, total = exp
@@ -213,7 +214,8 @@ part_of <- function(slug, stage, hurdle = NA) {
 
 #' Package Terms Under the Names the Harness Writes
 #'
-#' Each pair was checked on 2026-10-02 against 05's reference:
+#' Each pair was checked on 2026-10-02 against old 05's
+#' reference:
 #' the package term's medians equal the v2 term's for every
 #' shared species in the north. The package collapsed the fen
 #' age classes and renamed the human-footprint classes; birds

@@ -19,8 +19,9 @@ parity gate); those are not edited without separate approval.
   matches the repo's base-R/data.table, no-pipe convention, so
   nothing is flagged.
 - Sequenced naming: `_setup/` runs 00–03 and 06–10. The 04/05 gap is
-  deliberate history, since 08 says it replaced the old 04/05. There
-  are no prefix collisions and no `MM_NN_` staging in use.
+  deliberate history, since 08 says it replaced the old 04/05.
+  (Renumbered 00–08 on 2026-10-08; references below use the new
+  numbers.) There are no prefix collisions and no `MM_NN_` staging in use.
 - Errors: **0 high, 1 medium, 7 low**, plus 4 informational items
   that need no change.
 - Deprecated candidates: **1** (`1_code/_scratch.R`, low
@@ -30,18 +31,18 @@ parity gate); those are not edited without separate approval.
 
 | # | file | line | issue | severity | proposed fix |
 |---|------|------|-------|----------|--------------|
-| E1 | `1_code/_setup/run.R` | 49–59 | Step defaults contradict the header (lines 21–29: "defaults rebuild everything local and publish nothing"; 00, 03 and 10 off). In the code every step is `FALSE` except `10_publish_datasets.R = TRUE`, so sourcing `run.R` publishes whatever is in `0_data/` as today's version, with no rebuild and no 02 tally. 10 refuses to overwrite an existing version, which limits the damage. | medium | Set the defaults to match the header: 01, 06, 09, 02, 07 and 08 `TRUE`; 00, 03 and 10 `FALSE`. (Alternative: only set 10 to `FALSE`. See J1.) |
+| E1 | `1_code/_setup/run.R` | 49–59 | Step defaults contradict the header (lines 21–29: "defaults rebuild everything local and publish nothing"; 00, 03 and 08 off). In the code every step is `FALSE` except `08_publish_datasets.R = TRUE`, so sourcing `run.R` publishes whatever is in `0_data/` as today's version, with no rebuild and no 02 tally. 08 refuses to overwrite an existing version, which limits the damage. | medium | Set the defaults to match the header: 01, 04, 07, 02, 05 and 06 `TRUE`; 00, 03 and 08 `FALSE`. (Alternative: only set 08 to `FALSE`. See J1.) |
 | E2 | `1_code/experiments/exp_000_parity_v2/02_plot_parity.R` ⚠ exp_000 | 399 | A runtime `message()` tells the user to "rerun `02_compare_to_v2.R`", but the script is `01_compare_to_v2.R`. | low | Change the string to `01_compare_to_v2.R`. Message text only; no change to outputs. |
 | E3 | `1_code/experiments/exp_000_parity_v2/v2_self_agreement.R` ⚠ exp_000 | 29 | Header comment says "Scored exactly as `02_compare_to_v2.R`"; the file is `01_`. | low | Fix the comment. |
 | E4 | `1_code/_setup/01_harmonize_model_ready_v2.R` | 2384 | Comment cites `check_prediction_terms()`, which no longer exists anywhere in the repo. | low | Reword to "found later, at prediction time" without naming a function (the successor is not certain). |
 | E5 | `1_code/harness/result.R` | 1–10 | The header has no `inputs:` field (template §5.1). | low | Add `# inputs: none; writes to the store directory it is given`. |
-| E6 | `1_code/_setup/07_harmonize_v2_plant_bootstrap_ids.R:147`, `harness/spec.R:590`, `modules/birds/standardize.R:234`, `experiments/exp_000_parity_v2/utils/parity_targets.R:167` ⚠ exp_000 | — | Single lines over the 70-character limit. | low | Re-wrap each line. Line breaks only; no change to the code's logic. |
+| E6 | `1_code/_setup/05_harmonize_v2_plant_bootstrap_ids.R:147`, `harness/spec.R:590`, `modules/birds/standardize.R:234`, `experiments/exp_000_parity_v2/utils/parity_targets.R:167` ⚠ exp_000 | — | Single lines over the 70-character limit. | low | Re-wrap each line. Line breaks only; no change to the code's logic. |
 | E7 | `1_code/tests/testthat/test-*.R` (5 files) | 1 | No standard header and no `# End of script ----`. | low | See J5. Testthat files commonly omit headers, so this needs a decision. |
 | E8 | `1_code/_scratch.R` | 30–33 | Code sits *after* `# End of script ----`. It holds a hard-coded UNC path to the old `science\sc\sdmMethodsDev\...` share and a line over 70 characters. | low | See J6 and the deprecated table. |
 | I1 | `0_data/v2_scripts/mammals/north-models/archive/04 Basic Models Figures Maps.R` | 1465 | Parse error: unexpected `}`. | info | **No change** (`v2_scripts/` is off-limits). Recorded for taxon leads. |
 | I2 | `1_code/harness/model_sets.R` | 154–200 (57 lines) | Lines over 70 characters. These are v2 habitat formula strings, spliced verbatim. | info | No change. Splitting them hurts the line-by-line match with v2. |
 | I3 | `1_code/harness/model_sets.R` | 156 | `TreedFen + + NonTreedFen`. The doubled `+` is copied from v2 (`02a/b/c/d_hierarchical-models-*.R:102`) and is a harmless unary plus. | info | No change, to keep fidelity with v2. |
-| I4 | `%||%` defined in `harness/spec.R:683`, `harness/new_experiment.R:345` (guarded), `_setup/07…:82`, `tests/compare_stores.R:166` | — | Duplicate definitions. All four are identical, and base R ≥ 4.4 also provides `%||%`. The other duplicated names (`combine`, `failed`, `table_of`, `take_block`, `rows`) are local to their functions, so they never collide. | info | No change. |
+| I4 | `%||%` defined in `harness/spec.R:683`, `harness/new_experiment.R:345` (guarded), `_setup/05…:82`, `tests/compare_stores.R:166` | — | Duplicate definitions. All four are identical, and base R ≥ 4.4 also provides `%||%`. The other duplicated names (`combine`, `failed`, `table_of`, `take_block`, `rows`) are local to their functions, so they never collide. | info | No change. |
 
 ## Deprecated candidates
 
@@ -62,7 +63,7 @@ Nothing else qualifies:
 
 - **J1. `_setup/run.R` defaults (E1).** Should the defaults restore
   the header's stated behaviour (rebuild everything local), or just
-  turn 10 off? The current state looks like a leftover from the
+  turn 08 off? The current state looks like a leftover from the
   2026-10-05 publish.
 - **J2. Committed exp_000 summaries are from a 5-draw plumbing run.**
   `3_output/exp_000_parity_v2/run_record.md` records
@@ -78,7 +79,7 @@ Nothing else qualifies:
     v2 runs of the same code on the same data give different
     coefficients. `v2_self_agreement.R` measures how far apart two
     such runs are. The first is v2's original bryophyte climate
-    stage, as published in ABMIexploreR (from `_setup/08`). The
+    stage, as published in ABMIexploreR (from `_setup/06`). The
     second is `_setup/03`'s re-run of the frozen v2 functions, in
     `2_pipeline/v2_reference/`. It scores them against each other
     with the gate's own statistics, in both directions:
@@ -104,18 +105,18 @@ Nothing else qualifies:
   - *Limits.* It covers only the bryophyte climate stage; applying
     the same thresholds to the habitat and bird stages is an
     assumption. Re-running it needs `_setup/03` (hours) and the
-    gitignored `2_pipeline/v2_reference/`. `_setup/07`'s `v2_ids`
+    gitignored `2_pipeline/v2_reference/`. `_setup/05`'s `v2_ids`
     option also depends on 03.
   - *Where it runs.* By hand, from the repo root:
     `source("1_code/experiments/exp_000_parity_v2/v2_self_agreement.R")`.
-    Its header says "Run once … after _setup/03 and 08. Not part of
+    Its header says "Run once … after _setup/03 and 06. Not part of
     run.R's sequence". It is not one of `run.R`'s `script_step()`s
     (compare, plot, report).
   - *Should it join the exp_000 pipeline?* No. Its folder is right
     (it calibrates exp_000's gate), but it should not be a
     `run.R` step:
     1. It reads no harness result. Its output changes only when
-       the v2 reference changes (`_setup/03` or `08`), not when
+       the v2 reference changes (`_setup/03` or `06`), not when
        exp_000 runs, so every run would recompute an identical
        table.
     2. Its key input, `2_pipeline/v2_reference/…Rdata`, is local
@@ -126,7 +127,7 @@ Nothing else qualifies:
     3. Moving it to `_setup/` breaks the rule that `_setup` is
        fixed and that experiments own their scripts.
     A cleaner long-term option, if wanted, is outside this audit.
-    `_setup/10` could publish 03's re-run inside `v2_results/`, and
+    `_setup/08` could publish 03's re-run inside `v2_results/`, and
     the script could read it via `v2_results_dir()`. It could then
     become an optional step that anyone can run.
   - *Recommendation.* No code change. Either run it once and commit
@@ -175,11 +176,11 @@ the `setup_inputs` mirror via `_setup/utils/input_paths.R`.
 | `_setup/01_harmonize_model_ready_v2.R` | v2 snapshot → harmonized CSVs | SI → `0_data/test_dataset/` |
 | `_setup/02_validate_test_dataset.R` | Pass/fail tally of the dataset | `0_data/test_dataset/`, SI → console |
 | `_setup/03_rerun_bryophyte_v2_reference.R` | Re-run the v2 bryophyte models (sources `v2_scripts/plants/*functions.R`) | SI → `2_pipeline/v2_reference/` |
-| `_setup/06_…bird_translation_lookup.R` | Bird coefficient translation lookup | SI → `test_dataset/lookup/` |
-| `_setup/07_…plant_bootstrap_ids.R` | v2's stored plant bootstrap ids | SI, v2_reference → `lookup/v2_bootstrap_ids/` |
-| `_setup/08_…abmiexplorer_results.R` | ABMIexploreR coefficients at a pinned commit | GitHub → `0_data/v2_results/abmiexplorer/` |
-| `_setup/09_harmonize_lookups.R` | Cross-taxa lookups | 01/06 outputs → `lookup/` |
-| `_setup/10_publish_datasets.R` | Publish a versioned copy with checksums | `0_data/` → ABMI-DATA2 |
+| `_setup/04_…bird_translation_lookup.R` | Bird coefficient translation lookup | SI → `test_dataset/lookup/` |
+| `_setup/05_…plant_bootstrap_ids.R` | v2's stored plant bootstrap ids | SI, v2_reference → `lookup/v2_bootstrap_ids/` |
+| `_setup/06_…abmiexplorer_results.R` | ABMIexploreR coefficients at a pinned commit | GitHub → `0_data/v2_results/abmiexplorer/` |
+| `_setup/07_harmonize_lookups.R` | Cross-taxa lookups | 01/04 outputs → `lookup/` |
+| `_setup/08_publish_datasets.R` | Publish a versioned copy with checksums | `0_data/` → ABMI-DATA2 |
 | `_setup/utils/input_paths.R` | `setup_input()` resolver | — |
 | `harness/harness.R` | `load_framework()`: sources harness, then methods, then modules, then experiments/_shared | all of those |
 | `harness/{registry,cache,data_source,spec,data_load,covariate_sets,species,model_sets,resample,engines,selection,eval_metrics,predict_grid,result,run_record,run_model,summarise,compare,experiment,new_experiment}.R` | Taxon-agnostic pipeline (loaded in this order) | TD/V2R → `2_pipeline/<exp>/`, `3_output/<exp>/` |
@@ -224,9 +225,9 @@ the `setup_inputs` mirror via `_setup/utils/input_paths.R`.
   `run_model.R:555` (`load_worker`). exp_000's 01–03 run through
   `experiment.R:556` (`sys.source`).
 - **Other `source()` edges**:
-  - `_setup/{01,02,03,06,07,08}` → `_setup/utils/input_paths.R`
+  - `_setup/{01,02,03,04,05,06}` → `_setup/utils/input_paths.R`
   - `00` → `input_paths.R` (via `helper`)
-  - `10` → `harness/data_source.R` (via `resolver`)
+  - `08` → `harness/data_source.R` (via `resolver`)
   - `03` → `0_data/v2_scripts/plants/{hierarchical-model_functions,bootstrapping_functions}.R`
   - `v2_self_agreement.R` → `parity_targets.R` and `data_source.R`
   - `exp_002/run.R` → `exp_002/01_…R`

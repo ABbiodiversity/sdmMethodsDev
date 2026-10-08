@@ -7,7 +7,7 @@
 #     from 1_code/_setup/03_rerun_bryophyte_v2_reference.R
 #   - abmiexplorer/v2_results.csv from the published v2 results
 #     (see 1_code/harness/data_source.R), the bryophyte climate
-#     rows, from _setup/08. These are v2's original run: they
+#     rows, from _setup/06. These are v2's original run: they
 #     match v2's COEFS.RData to ~1e-15
 # outputs:
 #   in 3_output/exp_000_parity_v2/tables/:
@@ -40,7 +40,7 @@
 #   - Climate only: the regenerated reference has no habitat
 #     stage. The rate is assumed to carry to the plant habitat
 #     stage; that is an assumption, stated in the README.
-#   - Run once, from the repository root, after _setup/03 and 08.
+#   - Run once, from the repository root, after _setup/03 and 06.
 #     Not part of run.R's sequence.
 # ---
 

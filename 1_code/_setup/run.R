@@ -7,11 +7,11 @@
 #     (see their headers); most read the input mirror on
 #     ABMI-DATA2 through utils/input_paths.R
 # outputs:
-#   - 0_data/test_dataset/, from 01, 06 and 09
-#   - 0_data/test_dataset/lookup/v2_bootstrap_ids/, from 07
-#   - 0_data/v2_results/abmiexplorer/, from 08
+#   - 0_data/test_dataset/, from 01, 04 and 07
+#   - 0_data/test_dataset/lookup/v2_bootstrap_ids/, from 05
+#   - 0_data/v2_results/abmiexplorer/, from 06
 #   - 2_pipeline/v2_reference/, from 03
-#   - a new published version on ABMI-DATA2, from 10, only if
+#   - a new published version on ABMI-DATA2, from 08, only if
 #     switched on
 #   - 2_pipeline/_setup/run_log.csv: per step, start, end,
 #     minutes and whether it finished
@@ -24,7 +24,7 @@
 #       someone who can reach the original drives.
 #     - 03 re-runs the v2 bryophyte models: hours, and its
 #       output only changes if its sources do.
-#     - 10 publishes a new version. Run it deliberately, after
+#     - 08 publishes a new version. Run it deliberately, after
 #       checking 02's tally, then move the pin in
 #       1_code/harness/data_source.R.
 #   - Each script runs in its own environment; an error stops
@@ -41,18 +41,18 @@
 # Base R only; each script loads its own.
 
 ## 1.2 Choose the steps ----
-# In run order: 09 reads 01's and 06's lookups, 02 checks the
-# finished dataset, 07 reads 03's bryophyte draws.
+# In run order: 07 reads 01's and 04's lookups, 02 checks the
+# finished dataset, 05 reads 03's bryophyte draws.
 steps <- c(
   "00_mirror_setup_inputs.R" = FALSE,
   "01_harmonize_model_ready_v2.R" = TRUE,
-  "06_harmonize_bird_translation_lookup.R" = TRUE,
-  "09_harmonize_lookups.R" = TRUE,
+  "04_harmonize_bird_translation_lookup.R" = TRUE,
+  "07_harmonize_lookups.R" = TRUE,
   "02_validate_test_dataset.R" = TRUE,
   "03_rerun_bryophyte_v2_reference.R" = FALSE,
-  "07_harmonize_v2_plant_bootstrap_ids.R" = TRUE,
-  "08_harmonize_abmiexplorer_results.R" = TRUE,
-  "10_publish_datasets.R" = FALSE
+  "05_harmonize_v2_plant_bootstrap_ids.R" = TRUE,
+  "06_harmonize_abmiexplorer_results.R" = TRUE,
+  "08_publish_datasets.R" = FALSE
 )
 
 ## 1.3 Check the paths ----
@@ -96,7 +96,7 @@ log_path <- file.path(log_dir, "run_log.csv")
 #' @return TRUE, invisibly; stops if the script errors.
 #'
 #' @example # Example usage of the function
-#' # run_step("09_harmonize_lookups.R", setup_dir, log_path)
+#' # run_step("07_harmonize_lookups.R", setup_dir, log_path)
 run_step <- function(script, setup_dir, log_path) {
   # Step 1: Announce and time the step
   message("\n== ", script, " (", format(Sys.time(), "%H:%M"), ")")

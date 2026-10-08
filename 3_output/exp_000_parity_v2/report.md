@@ -43,7 +43,7 @@ stated. Change it there, not here.
 
 ## v2 references
 
-Scored against `abmiexplorer`, built by `1_code/_setup/08_harmonize_abmiexplorer_results.R`. What it holds, from `v2_results_coverage.csv`:
+Scored against `abmiexplorer`, built by `1_code/_setup/06_harmonize_abmiexplorer_results.R`. What it holds, from `v2_results_coverage.csv`:
 
 | source_label | reachable | rows | species | note |
 | --- | --- | --- | --- | --- |

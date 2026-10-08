@@ -13,7 +13,7 @@
 # outputs: none; returns the folder to read
 # notes:
 #   - Runs read the copies published by
-#     _setup/10_publish_datasets.R, so only maintainers run
+#     _setup/08_publish_datasets.R, so only maintainers run
 #     _setup/. sdm_published$versions pins the version read;
 #     published versions are never overwritten.
 #   - The environment variables redirect to a local copy or to
@@ -110,7 +110,7 @@ test_dataset_dir <- function(data_dir = NULL, check = TRUE) {
 
 #' Resolve the v2 Results Folder
 #'
-#' The parity reference, from _setup/08, is in abmiexplorer/.
+#' The parity reference, from _setup/06, is in abmiexplorer/.
 #' Files at the top level of the 2026-10-05 version are the
 #' retired network-drive build; nothing reads them.
 #'

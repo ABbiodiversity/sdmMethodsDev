@@ -35,7 +35,7 @@ the gate, set `species = NULL` and `n_bootstraps = 100`.
 
 `utils/parity_targets.R` holds the targets the compare step reads.
 `v2_self_agreement.R` is not part of `run.R`: run it once, after
-`_setup/03` and `_setup/08`, to write
+`_setup/03` and `_setup/06`, to write
 `tables/v2_self_agreement.csv` and `v2_self_agreement_summary.csv`.
 
 ## Inputs and outputs
@@ -69,7 +69,7 @@ If this table and the specs disagree, the specs are right.
 
 ## The v2 reference
 
-`v2_results.csv` is built by `_setup/08` from ABMIexploreR's published
+`v2_results.csv` is built by `_setup/06` from ABMIexploreR's published
 coefficients (`data/species-coefs.RData`), pinned to commit `848eeed`.
 On 2026-10-02 it matched the retired by-hand build from the network
 drives to about 1e-15 on every shared species and term. Gaps:
