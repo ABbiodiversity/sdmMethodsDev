@@ -9,8 +9,7 @@ mammals, and birds.
 It uses the `specs` lever: build the standard specs, change a
 stage, and pass the specs in. No new data is needed. For an
 experiment that adds covariates instead, see the
-[SoilGrids worked example](example_experiment.md). Steps that are
-the same in both point there rather than repeat.
+[SoilGrids worked example](example_experiment.md). 
 
 Read [Getting started](getting_started.md) first. Run every code
 block from the repository root.
@@ -72,10 +71,6 @@ And the reasoning behind it:
 - **Why one formula.** A tree chooses its own variables, splits,
   and interactions. So it is given every candidate covariate once,
   as main effects, instead of v2's competing formulas.
-- **Why mammals keep the hurdle.** The hurdle's structure
-  (presence on every deployment, then abundance where the species
-  was found) is a property of the data, not of the GLM. The trees
-  fit both halves.
 - **What is dropped, and why.** v2's post-processing of habitat
   coefficients: the plant stand-age splines, cutblock convergence,
   pAspen, and footprint pooling, and the mammal tables,
@@ -113,8 +108,7 @@ Then v2 steps that read coefficients have to go too.
 `replace_stage_method()` makes all of those changes in one call.
 For a spec, it:
 
-1. Finds the stage to change: the spec's `habitat_stage` unless
-   you pass `stage`.
+1. Finds the stage to change: the spec's `habitat_stage`.
 2. Replaces the candidate set with **one formula holding every
    covariate the v2 candidates use** (`union = TRUE`, the
    default).
@@ -286,30 +280,14 @@ Two things are specific to a method without coefficients:
   prediction on the grid, in `grid_predictions.csv` and
   `grid_summary.csv`.
 - **`coefficients.csv` changes shape.** For plants and birds it
-  holds only the climate stage. For mammals, the hurdle writes its
-  per-habitat-type values there as three stages:
-  `habitat_presence`, `habitat_abundance`, and `habitat_total`
-  (their product). The mammal grid predictions are presence, as in
-  exp_000, so compare abundance and total through those rows.
+  holds only the climate stage.
 
 ## Step 8: Read the comparison
 
 The comparison table and its columns are described in
 [Step 8 of the SoilGrids example](example_experiment.md#step-8-read-the-comparison).
-Changing the method adds four cautions.
+Keep in mind:
 
-- **Read the out-of-bag metrics only.** A tree fits the units it
-  trained on far more closely than a GLM does, so in-sample
-  metrics flatter it. `comparison_metrics.csv` uses the `oob_`
-  metrics for this reason.
-- **Read calibration with discrimination.** Untuned trees can
-  rank units well (higher AUC) while being overconfident
-  (calibration slope below 1). Report both.
-- **The grid compares like with like only roughly.** Each grid row
-  is a pure stand of one habitat type at `Climate` 0. A GLM
-  extrapolates to that linearly; a tree holds the value of its
-  nearest split. Where a type is rare among the survey units, the
-  two can differ for that reason alone.
 - **The baseline still has v2's post-processing**, and this run
   does not. Differences in aged, cutblock, or footprint habitat
   types partly reflect that. exp_000's mammal tables are v2's
@@ -321,15 +299,13 @@ not a result.
 
 ## Step 9: Tune, run at 100 draws, and write it up
 
-1. **Tune the settings** before judging the method, ideally per
-   taxon. The defaults' learning rate is higher than the usual
-   advice for boosted trees (see the engine's header).
+1. **Tune the settings** before judging the method/
 2. Set `n_bootstraps = 100` and run again. Compare with a
    100-draw exp_000 of the same species.
 3. Fill in the README's **Result** and **Assumptions and
    caveats** sections. exp_001's caveats are a model: untuned
-   settings, the grid comparison, the post-processing the baseline
-   keeps, and what the mammal predictions are.
+   settings, the grid comparison, and the post-processing the baseline
+   keeps.
 4. Commit only runs that count, as in
    [Step 9 of the SoilGrids example](example_experiment.md#step-9-run-at-100-draws-and-write-it-up).
 
