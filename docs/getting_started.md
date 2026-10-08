@@ -1,14 +1,8 @@
 # Getting started with sdmMethodsDev
 
-This guide takes you from a fresh clone to a run of the v2
-baseline, and then to your first experiment or module change. It
-assumes you know R, species distribution models, and spatial
-analysis. It does not assume you know this repository or how the
-v2.0 models were built. Work through it in order; it takes under
-an hour, plus run time.
+Starting guide to the `sdmMethodsDev` R&D repository.
 
-Run every code block from the repository root. Lines starting
-`#>` are the output the block printed when this guide was written.
+
 
 - [What this repository is for](#what-this-repository-is-for)
 - [Setup](#setup)
@@ -23,15 +17,13 @@ Run every code block from the repository root. Lines starting
 ## What this repository is for
 
 `sdmMethodsDev` is the Science Centre's shared R&D repository for
-Species Models 3.0. It holds a frozen cross-taxa test dataset, one
+Species Models 3.0. It generates and calls a frozen cross-taxa test dataset from `ABMI-DATA2\science\`, one
 pipeline that runs every taxon's v2.0 model as configuration, and
 a v2 parity check (`exp_000_parity_v2`) that every later
-experiment is compared against. A methods question is asked once
-and answered for every taxon.
+experiment is compared against. A methods question can be asked and answered for every taxon.
 
 It is for testing methods. It does not produce the final species
-models or reporting products. The status, structure, and design
-summary are in the [root README][readme].
+models or reporting products.
 
 ### Words used throughout
 
@@ -45,7 +37,7 @@ summary are in the [root README][readme].
 | **Method** | A named, registered piece: an engine (`glm`, `bayesglm`, `xgboost`), a selection rule (`aic_average`, `staged_bic`, `ivw_grid`), a resampling scheme, or a metric. |
 | **Draw** | One bootstrap resample of the survey units. v2 uses 100. Draw 1 is the full data. |
 | **Store** | The results for one run and region: `coefficients.csv`, `metrics.csv`, `grid_predictions.csv`, `meta.json`. |
-| **Grid** | A prediction matrix with one row per habitat type, each row a pure stand of that type. Predicting onto it lets methods without coefficients be compared. |
+| **Grid** | A prediction matrix with one row per habitat type, each row a pure stand of that type. Predicting onto it lets methods be compared. |
 | **Out-of-bag (oob)** | Scored on the survey units a draw left out. `insample` scores the units the draw fitted. |
 | **Parity** | Whether a run reproduces v2. Distributional, not numerical: v2 sets no seed, so two v2 runs differ. |
 
@@ -53,31 +45,10 @@ summary are in the [root README][readme].
 
 ### Prerequisites
 
-You need R 4.4 or later. Open the repository in RStudio or
+You need R 4.4 or later. Open the repository in VS Code, RStudio or
 Positron so the working directory is the repository root. Every
 path in this guide, and every script, assumes that.
 
-The repository has no `renv.lock` or `DESCRIPTION`, so packages
-are installed by hand. These are the packages the
-[root README][readme-prereq] lists:
-
-```r
-install.packages(c(
-  "data.table", "arm", "mgcv", "MuMIn", "pROC", # harness, methods
-  "jsonlite", "ggplot2",                        # summaries, figures
-  "xgboost",                                    # xgboost engine
-  "testthat", "withr"                           # 1_code/tests/
-))
-```
-
-`exp_002_soilgrids` also needs `sf`, `terra`, and
-[sciSpatialR](https://github.com/ABbiodiversity/sciSpatialR).
-Maintainers rebuilding the dataset with `_setup/03` also need
-`foreach`, `AICcmodavg`, `binom`, `mapproj`, and `RcmdrMisc`.
-
-> **TODO:** confirm with Brendan Casey whether package versions
-> will be pinned (for example with `renv`). Until then, the version
-> comments in each script's `library()` calls are the only record.
 
 ### Getting the data
 
@@ -97,10 +68,7 @@ the test dataset's file index is `lookup/dataset_manifest.csv`.
 The harness reads file locations only from that manifest.
 
 So the one requirement is **read access to the share**, on the
-ABMI network or VPN.
-
-> **TODO:** confirm with Brendan Casey how new staff request read
-> access to `//ABMI-DATA2/science/sdmMethodsDev/` and the VPN.
+ABMI network or VPN.0000
 
 Off the network, copy the two published folders to your machine
 and point the harness at them. The variables can also go in your
@@ -147,19 +115,9 @@ file.exists(c(
 is slow over the network (about 0.9 GB), so use it only when a
 copy is in doubt.
 
-Last, run the contract tests from a terminal at the repository
-root. They take seconds, and skip the dataset checks if the share
-cannot be reached.
-
-```sh
-Rscript 1_code/tests/run_tests.R
-```
-
-If the tests pass and both files exist, you are ready to run.
-
 ## How the pipeline fits together
 
-The v2.0 pipelines share one sequence: pick survey units, fit
+The v2.0 pipelines share one sequence: choose response, fit
 candidate models, choose among or average them, then predict and
 score. What differs between taxa is the contents of each step.
 Here, those contents are data in a **spec**, and one **harness**
@@ -262,9 +220,11 @@ The full argument list and output file definitions are in the
 `exp_000_parity_v2` runs each taxon's v2 spec and compares the
 result with the published v2 coefficients. It is the baseline for
 every other experiment. It is intended as the gate before
-iterative R&D, but it is **not yet a gate**: the parity targets
-are proposals, and no full run has been committed. See the
-[exp_000 README][exp000] for what must happen first.
+iterative R&D (i.e. results should be in parity with v2 results)
+
+> [!IMPORTANT]
+> The baseline run has already been done and the results .git tracked. It does not need to be redone for each experiment. The below steps are intended for future repo maintainers an those who want to understand how `exp_000_parity_v2` works. 
+>
 
 ### Step 1: Check the settings
 
@@ -374,9 +334,8 @@ same unless it is the question.
 
 For a step-by-step build of a real experiment, from scaffolding to
 write-up, see the worked examples:
-[new covariates](example_experiment.md) (`exp_002_soilgrids`, lever
-1) and [a different method](example_experiment_xgboost.md)
-(`exp_001_xgboost`, lever 2).
+[new covariates](example_experiment.md) (`exp_002_soilgrids`) and [a different method](example_experiment_xgboost.md)
+(`exp_001_xgboost`).
 
 ### Scaffold an experiment
 
@@ -410,14 +369,12 @@ Leave `id` in `run.R` as it is. Write the question and design in
 the experiment's `README.md` before you run anything.
 
 `run.R` loads the framework, calls `experiment_config()`, then
-`run_experiment()`. Change one thing, using one of three levers,
-from least to most invasive.
+`run_experiment()`.
 
 ### 1. Different candidate formulas: `stage_models`
 
 The covariates a run loads are read off its formulas, so this is
-also how you try new covariates. Keys are `stage` (every taxon in
-the run) or `taxon.stage` (one taxon).
+also how you try new covariates.
 
 ```r
 config <- experiment_config(
@@ -441,7 +398,7 @@ config <- experiment_config(
 A covariate the dataset does not hold comes from the experiment.
 Write a script in the experiment's folder that saves a CSV to
 `2_pipeline/<id>/inputs/`, one row per `survey_unit_id`, and name
-it in `covariate_files`. Never add columns to `0_data/` or change
+it in `covariate_files`. Never add to `0_data/` or change
 `_setup/`: those hold the v2 data every experiment is compared
 against. [`exp_002_soilgrids`][exp002] is the worked example.
 
@@ -479,14 +436,14 @@ example.
 Copy the matching template from `1_code/methods/_templates/` into
 the right folder of `1_code/methods/`, fill it in, and register
 it. Check an engine with `check_engine()`, confirm it appears in
-`list_methods()`, then name it in a spec as in lever 2:
+`list_methods()`, then name it in a spec:
 
 ```r
 check_engine("glm")    # or check_engine(engine_mine())
 list_methods("engine")
 ```
 
-The engine, selection, resampler, and metric contracts, and a
+The engine, selection, resampler, and metrics, and a
 checklist, are in the [methods README][methods].
 
 ### Run it and read the comparison
@@ -667,8 +624,7 @@ Rscript 1_code/tests/compare_stores.R \
   2_pipeline/exp_000_parity_v2 2_pipeline/<scratch> 5
 ```
 
-Every coefficient file should match to 1e-10. A change meant to
-alter results should alter only what it says it does. More on both
+Every coefficient file should match to 1e-10. More on both
 tools is in the [tests README][tests].
 
 ## Working conventions
@@ -691,22 +647,11 @@ tools is in the [tests README][tests].
   result.
 - **Commits from `3_output/`:** commit only runs that count, every
   species at 100 draws, and check `run_record.md` says so.
-- **Branching and pull requests:**
-
-  > **TODO:** confirm with Brendan Casey. Neither this repository
-  > nor `code_standards` documents a branching or pull request
-  > workflow.
 
 ## Where to get help
 
 - **Repository and data access:** Brendan Casey,
-  brendan.casey@ualberta.ca (contact in the
-  [root README][readme-contact]).
-- **Taxon-specific v2 questions:**
-
-  > **TODO:** confirm with Brendan Casey who owns each taxon
-  > (bryophytes, lichens, soil mites, vascular plants, mammals,
-  > birds).
+  brendan.casey@ualberta.ca 
 
 - **Design and contracts:** [`docs/framework_design.md`][design].
 - **Every taxon-specific v2 behaviour:**
