@@ -91,7 +91,7 @@ prediction for plants, and a calibrated probability for mammals.
 | Factor levels | `vegc` 22, `soilc` 17, `method` 4, `block` 60. Stored order matters, since a level absent from one bootstrap sample must not renumber the rest | OK. Until 2026-09-29 `method` was loaded as `method_veg` and `method_soil` and missed the lookup, so it fell back to alphabetical order with `1SPM` as reference instead of `PC`; `apply_factor_levels()` now follows the suffixes |
 | Column suffixes | Six columns arrive suffixed `_veg` or `_soil` and are rewritten by `term_map()` | OK |
 | No coordinates | 0 of 215,758 rows in `sites.csv` carry latitude or longitude | GAP blocks spatial resampling and every spatial term |
-| Reference output | The packaged `Birds2024.RData` is absent from the drive's `Results/`; only the per-draw CSVs and an archived copy survive. The parity reference is ABMIexploreR's packaged bird coefficients (`_setup/08`), which match it to ~1e-15 | OK compared. `modules/birds/standardize.R` ports the translation onto the standardized template and reproduces the packaged values exactly. Note the package labels draws 2 to 100 in file-listing order (`b2` is draw 10) |
+| Reference output | The packaged `Birds2024.RData` is absent from the drive's `Results/`; only the per-draw CSVs and an archived copy survive. The parity reference is ABMIexploreR's packaged bird coefficients (`_setup/06`), which match it to ~1e-15 | OK compared. `modules/birds/standardize.R` ports the translation onto the standardized template and reproduces the packaged values exactly. Note the package labels draws 2 to 100 in file-listing order (`b2` is draw 10) |
 
 **The published bird results come from a different data vintage.**
 Run on the current `Stratified.Rdata`, v2's own climate code gives
@@ -219,7 +219,7 @@ recomputed on load instead.
 
 **The published plant models were not fitted on the stored draws.**
 Replaying v2's stored bootstrap ids (`bootstrap = "v2_ids"`, from
-`_setup/07`) reproduces v2 exactly when the reference was fitted on
+`_setup/05`) reproduces v2 exactly when the reference was fitted on
 them: the regenerated bryophyte reference matches to 4e-11 on every
 draw tested. Against the published lichen models only draw 1, the
 full data, matches (5e-12); for draws 2 to 6 no row among the 100
@@ -238,7 +238,7 @@ cannot be salvaged, only regenerated.
 `1_code/_setup/03_rerun_bryophyte_v2_reference.R` does that for the
 climate stage, and has been run: 134 of 134 species, 100 draws each,
 no failures. Separately, ABMIexploreR publishes complete bryophyte
-arrays (matching v2's `COEFS.RData` to ~1e-15), and `_setup/08` builds
+arrays (matching v2's `COEFS.RData` to ~1e-15), and `_setup/06` builds
 the bryophyte rows of `v2_results.csv` from them, so the gate compares
 bryophytes.
 

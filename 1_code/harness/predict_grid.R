@@ -11,7 +11,7 @@
 #     predicting onto it gives the per-habitat effect v2 reports.
 #     Every engine can predict (a tree has no coefficients), so
 #     grids are how engines are compared. Bird grids are rebuilt
-#     by _setup/09 from v2's coefficient translation matrix.
+#     by _setup/07 from v2's coefficient translation matrix.
 #   - v2's later coefficient adjustments (e.g. plant stand-age
 #     splines) are in the coefficients, not the grid.
 # ---

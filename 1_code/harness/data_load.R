@@ -12,7 +12,7 @@
 # outputs: none; returns objects in memory
 # notes:
 #   - Taxon-agnostic: file locations and covariate keys come from
-#     lookup/dataset_manifest.csv (_setup/09). The key is
+#     lookup/dataset_manifest.csv (_setup/07). The key is
 #     `<taxon>_<region>` for mammals, whose north and south files
 #     hold different values for the same deployment.
 #   - Reads are column-selective (covariates.csv is ~218 MB, 457
@@ -50,7 +50,7 @@ dataset_manifest <- function(data_dir) {
       "Dataset manifest not found:
   ", path,
       "
-Run 1_code/_setup/09_harmonize_lookups.R first.",
+Run 1_code/_setup/07_harmonize_lookups.R first.",
       call. = FALSE
     )
   }

@@ -14,21 +14,30 @@ Institute (ABMI). It is intended for internal use.
 
 The ABMI Science Centre's shared R&D repository for Species Models 3.0.
 It holds a frozen cross-taxa test dataset, one modelling pipeline that
-runs every taxon's v2.0 model as configuration, and a v2 parity check
-(`exp_000`) that every later experiment is compared against. A methods
-question is asked once and answered for every taxon. It is for
-Science Centre modellers testing methods; it does not produce the
-final species models or reporting products.
+runs every taxon's v2.0 model as a configuration, and a v2 parity check
+(`exp_000`) that later experiments are compared against.
 
-## Status
 
-| Component | State |
-| --- | --- |
-| Test dataset | Built for bryophytes, lichens, soil mites, vascular plants, mammals and birds. Validated by `_setup/02`. Published to ABMI-DATA2, version 2026-10-05 |
-| v2 reference | ABMIexploreR's published coefficients, harmonized by `_setup/08` |
-| Pipeline | Built: plug-in methods, parallel species, final-model metrics and habitat grids for every taxon, experiment runner, contract tests |
-| Taxon specs | Every stage of every taxon runs. Each spec's `v2_coverage` states what it reproduces; `report.md` prints it |
-| exp_000 (v2 parity) | A 100-draw run on the `parity_check` species passed all 22 taxon × region × stage rows on 2026-10-03 (see the [exp_000 README](1_code/experiments/exp_000_parity_v2/README.md)). The committed tables are from a later 5-draw trial. Not yet a gate: see [Parity gate](#parity-gate) |
+
+
+
+## Contents
+
+- [Why this exists](#why-this-exists)
+- [Repository structure](#repository-structure)
+- [How it works](#how-it-works)
+- [Getting started](#getting-started)
+- [Related resources](#related-resources)
+- [Contact](#contact)
+
+## Why this exists
+
+Species Models are produced one taxon at a time, each by its taxon lead. That
+works for production, but it confines R&D to one taxon: a method that improves
+plant models may or may not improve bird models, and testing it three times in
+three codebases duplicates effort.
+
+This R&D repository is designed to streamline model R&D accross all taxa. It is for testing new methods; it does not produce the final species models or reporting products.
 
 ## Repository structure
 
@@ -36,34 +45,34 @@ final species models or reporting products.
 sdmMethodsDev/
 ├── 0_data/                 # gitignored except v2_scripts/ and *.R
 │   ├── test_dataset/       # _setup/ output; runs read the published copy
-│   ├── v2_results/         # the v2 parity reference, from _setup/08
-│   ├── external/           # downloaded sources (ABMIexploreR), from _setup/08
+│   ├── v2_results/         # the v2 parity reference, from _setup/06
+│   ├── external/           # downloaded sources (ABMIexploreR), from _setup/06
 │   ├── covariates/         # reserved; empty
-│   └── v2_scripts/         # v2 scripts as received; reference only
+│   └── v2_scripts/         # v2 scripts as received by toxon leads; reference only
 ├── 1_code/
 │   ├── harness/            # the shared pipeline; names no taxon or method
 │   ├── methods/            # engines, selection rules, resampling, metrics
 │   ├── modules/            # one v2 spec per taxon; _shared/ for common code
 │   ├── experiments/        # one folder per question; _template/, _shared/
-│   ├── _setup/             # 00-10: build, check and publish the dataset
+│   ├── _setup/             # 00-08: build, check and publish the dataset
 │   ├── tests/              # contract tests and the store comparison
 │   └── _scratch.R          # dated workspace for exploration
 ├── 2_pipeline/             # result stores and intermediates; gitignored
 ├── 3_output/<exp_id>/      # per-experiment outputs; summaries committed
-└── docs/                   # getting started, design, taxon quirks, reviews
+└── docs/                   # getting started, design, taxon quirks, vignettes
 ```
-
-What each folder is for, and what an edit there affects, is in
-[`docs/getting_started.md`](docs/getting_started.md#where-things-are).
 
 ## How it works
 
-The v2.0 pipelines share one sequence: pick survey units, fit candidate
-models, choose among or average them, predict and score. Here each
-taxon's contents of those steps are data, in a **spec**
-(`1_code/modules/<taxon>/spec.R`). One **harness** runs any spec, and
-looks up each **method** (engine, selection rule, resampling scheme,
-metric) by the name the spec gives.
+**One pipeline, taxon as configuration**
+
+The three v2.0 pipelines differ in nearly every detail but share one sequence:
+pick survey units, fit candidate models, choose among or average them,
+predict and score. What differs is the contents of each step. Here those
+contents are data, in a **spec** per taxon, and one **harness** runs any spec.
+How a model is fitted, selected, resampled or scored is a **method**, looked
+up by the name the spec gives.
+
 
 ```mermaid
 %% ----------------------------
@@ -105,7 +114,14 @@ flowchart TD
     style R fill:#E8A396,stroke:#2D415B,stroke-width:4px
 ```
 
-### Everything is compared with one v2 baseline
+**Everything is compared with one v2 baseline**
+
+`1_code\experiments\exp_000_parity_v2` runs taxon specs that mirror the v2 modelling methods and produce coeefients in parity with the v2 modelling outputs. Results from the `exp_000_parity_v2` thus serve as a baseline that future experiments can be compared to. I.e.:
+
+exp_000 runs every taxon's v2 spec and checks it against the published
+v2.0 output. Every later experiment changes one thing and is compared
+with exp_000, so a difference is a difference in method rather than in
+plumbing. Because the dataset is frozen, results stay comparable.
 
 ```mermaid
 %% ----------------------------
@@ -150,136 +166,20 @@ flowchart TD
     style C fill:#E8A396,stroke:#2D415B,stroke-width:4px
 ```
 
-exp_000 runs every taxon's v2 spec and checks it against the published
-v2.0 output. Every later experiment changes one thing and is compared
-with exp_000, so a difference is a difference in method rather than in
-plumbing. Because the dataset is frozen, results stay comparable.
-
-The design, the spec and result contracts, and the parity ledger are in
-[`docs/framework_design.md`](docs/framework_design.md). Every
-taxon-specific v2 behaviour is in
-[`docs/taxon_quirks.md`](docs/taxon_quirks.md).
 
 ## Getting started
 
-New to the repository? Read
-[`docs/getting_started.md`](docs/getting_started.md) first: vocabulary,
-running the baseline, reading the outputs, and testing a change.
+New to the repository? Work through the
+[getting-started guide](https://abbiodiversity.github.io/sdmMethodsDev/getting_started.html):
+prerequisites and data access, running the v2 baseline (exp_000),
+starting an experiment, adding a taxon module, and checking that a
+change broke nothing.
 
-### Prerequisites
-
-R 4.4 or later, and these packages:
-
-```r
-install.packages(c(
-  "data.table", "arm", "mgcv", "MuMIn", "pROC", # harness, methods
-  "jsonlite", "ggplot2",                        # summaries, figures
-  "xgboost",                                    # xgboost engine
-  "testthat", "withr"                           # 1_code/tests/
-))
-```
-
-`_setup/03` also needs `foreach`, `AICcmodavg`, `binom`, `mapproj` and
-`RcmdrMisc` (v2's functions). `exp_002_soilgrids` also needs `sf`,
-`terra` and [sciSpatialR](https://github.com/ABbiodiversity/sciSpatialR).
-
-Runs need read access to `//ABMI-DATA2/science/sdmMethodsDev/` (ABMI
-network or VPN). They read the published test dataset and v2 results
-from there, at the versions pinned in
-[`1_code/harness/data_source.R`](1_code/harness/data_source.R); nothing
-in `_setup/` has to be run. To read another copy, such as a local one,
-set `SDM_TEST_DATASET` and `SDM_V2_RESULTS` to its folders.
-
-### Run the v2 baseline (exp_000)
-
-From the repository root:
-
-```r
-source("1_code/harness/harness.R")
-load_framework()          # the harness, every method, every taxon module
-list_methods()            # engines, selection rules, resampling, metrics
-names(standard_specs())   # the runs an experiment can choose
-
-# Check species, n_bootstraps and workers in run.R first
-source("1_code/experiments/exp_000_parity_v2/run.R")
-```
-
-### Check that a change broke nothing
-
-```sh
-Rscript 1_code/tests/run_tests.R
-```
-
-Then compare stores at 5 draws with `1_code/tests/compare_stores.R`, as
-in [`docs/getting_started.md`](docs/getting_started.md#check-that-nothing-broke).
-
-## Outputs: `2_pipeline/` and `3_output/`
-
-Each run writes result stores to `2_pipeline/<exp_id>/<run>/<region>/`
-(`coefficients.csv`, `metrics.csv`, `grid_predictions.csv`,
-`meta.json`) and `2_pipeline/<exp_id>/run_log.csv`. It then writes
-summary tables and `run_record.md` to `3_output/<exp_id>/`. Every
-experiment except exp_000 also writes `tables/comparison_metrics.csv`
-against exp_000. The file and column definitions are in
-[`1_code/harness/`](1_code/harness/).
-
-Committed per experiment, by `.gitignore`: `run_record.md`, `report.md`,
-and `tables/` `coverage.csv`, `metric_summary.csv`, `grid_summary.csv`,
-`parity_summary.csv` and `v2_self_agreement_summary.csv`. Everything else
-is rebuilt from the stores with `run_experiment(config, fit = FALSE)`.
-
-**Commit only runs that count:** every species at `n_bootstraps = 100`.
-Check that `run_record.md` says so.
-
-## Parity gate
-
-exp_000 runs every taxon's v2 configuration and compares it with the
-published v2 coefficients. v2 sets no seed, so parity is distributional:
-a term passes when the v2 median falls inside the run's 10–90% band.
-Mammals, which v2 fits once, are compared on the full-data fit. The
-proposed targets are in
-`1_code/experiments/exp_000_parity_v2/utils/parity_targets.R`.
-
-Before the gate is closed:
-
-- Agree the parity targets, per taxon, or change them.
-- Run the full species queues at 100 draws and commit the report and
-  record. Only a full run is gated.
-
-Known gaps: published lichen, mite and vascular plant models were
-fitted on draws v2 did not keep, so parity against them stays
-distributional; and no parity target has been agreed. Each spec's
-`v2_coverage` is the authoritative statement per stage. Details are in
-the [exp_000 README](1_code/experiments/exp_000_parity_v2/README.md).
-
-## Extending the repository
-
-| To | See |
-| --- | --- |
-| Add an experiment | `new_experiment("short description")` in `1_code/harness/new_experiment.R`; then [`1_code/experiments/`](1_code/experiments/) and [`docs/getting_started.md`](docs/getting_started.md#test-a-change) |
-| Add an engine, selection rule, resampling scheme or metric | [`1_code/methods/README.md`](1_code/methods/README.md) |
-| Add a taxon module | [`1_code/modules/`](1_code/modules/) |
-| Rebuild or republish the dataset | [`1_code/_setup/`](1_code/_setup/); only maintainers need this |
-
-## Conventions
-
-Code follows [code_standards](https://github.com/bgcasey/code_standards):
-`snake_case` names, a standard header and numbered sections in every
-script, ≤70-character lines, and tidyverse style.
-
-| Item | Convention | Example |
-| --- | --- | --- |
-| Experiments | `exp_NNN_short_description`, the same in `1_code/experiments/`, `2_pipeline/` and `3_output/` | `exp_001_xgboost` |
-| Sequenced scripts | `NN_` run order; entry points are `run.R` | `08_harmonize_abmiexplorer_results.R` |
-| Taxon slugs | As the data files name them | `vascular_plant`, `mite`, `bird` |
-| Module folders | Plural taxon name | `vascular_plants/`, `soil_mites/` |
 
 ## Related resources
 
-- [sciCentRverse](https://github.com/ABbiodiversity/sciCentRverse):
-  Science Centre R functions.
-- [sciSpatialR](https://github.com/ABbiodiversity/sciSpatialR):
-  Science Centre spatial catalogue.
+- [sciCentRverse](https://github.com/ABbiodiversity/sciCentRverse): Science Centre R functions
+- [sciSpatialR](https://github.com/ABbiodiversity/sciSpatialR): Science Centre spatial catalogue
 
 ## Contact
 

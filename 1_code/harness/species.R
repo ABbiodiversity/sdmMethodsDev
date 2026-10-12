@@ -4,11 +4,11 @@
 # created: 2026-09-09
 # inputs:
 #   in the test dataset's lookup/ (see data_source.R):
-#     - species_queue.csv, from _setup/09_harmonize_lookups.R
+#     - species_queue.csv, from _setup/07_harmonize_lookups.R
 # outputs: none; returns objects in memory
 # notes:
 #   - One queue for every taxon, flattened from the taxon leads'
-#     lookups by _setup/09. `tier` separates model classes where a
+#     lookups by _setup/07. `tier` separates model classes where a
 #     taxon has them (mammals) and is "modelled" elsewhere;
 #     `season` is empty except for mammals; `order` keeps v2's
 #     species order.
@@ -36,7 +36,7 @@ species_catalogue <- function(data_dir, taxon = NULL) {
   if (!file.exists(path)) {
     stop(
       "Species queue not found:\n  ", path,
-      "\nRun 1_code/_setup/09_harmonize_lookups.R first.",
+      "\nRun 1_code/_setup/07_harmonize_lookups.R first.",
       call. = FALSE
     )
   }

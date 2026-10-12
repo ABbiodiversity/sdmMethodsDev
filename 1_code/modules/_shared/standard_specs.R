@@ -24,7 +24,7 @@
 #' @param plant_bootstrap Character. "spatial_block" draws v2's
 #'   plant bootstrap afresh, so parity is distributional;
 #'   "v2_ids" replays the draws v2 stored (needs
-#'   _setup/07_harmonize_v2_plant_bootstrap_ids.R run for every
+#'   _setup/05_harmonize_v2_plant_bootstrap_ids.R run for every
 #'   species in the run).
 #' @return A named list of specs, one per run.
 #'

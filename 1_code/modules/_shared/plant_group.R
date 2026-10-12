@@ -32,7 +32,7 @@
 #'   this taxon's v2 reference comes from, appended to the spec
 #'   notes. Bryophytes differ from the other three.
 #' @param bootstrap Character. "spatial_block" draws afresh;
-#'   "v2_ids" replays v2's stored draws (_setup/07), making
+#'   "v2_ids" replays v2's stored draws (_setup/05), making
 #'   parity numerical.
 #' @return A spec list, as run_spec() consumes.
 #'

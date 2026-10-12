@@ -1258,8 +1258,8 @@ if (file.exists(bird_data_file)) {
 }
 
 ## 3.6.4 Harmonized lookups ----
-# _setup/09's outputs against the files checked above, so a
-# lookup left stale by a rebuild of 01 or 06 fails
+# _setup/07's outputs against the files checked above, so a
+# lookup left stale by a rebuild of 01 or 04 fails
 lookup_dir <- file.path(data_dir, "lookup")
 harmonized <- c(
   "species_queue.csv", "factor_levels.csv", "dataset_manifest.csv",
@@ -1272,7 +1272,7 @@ note(
   "lookups", "harmonized lookups written", all(present),
   if (all(present)) "" else paste0(
     "missing ", paste(harmonized[!present], collapse = ", "),
-    "; run 09_harmonize_lookups.R"
+    "; run 07_harmonize_lookups.R"
   )
 )
 

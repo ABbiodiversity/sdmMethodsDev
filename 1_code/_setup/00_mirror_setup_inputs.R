@@ -29,9 +29,9 @@
 #   - Not mirrored, deliberately:
 #     - the v2 coefficient outputs on the drives (the bird
 #       coefficient CSVs, COEFS.RData, the mammal coefficient
-#       tables). Parity is scored against ABMIexploreR (08), so
+#       tables). Parity is scored against ABMIexploreR (06), so
 #       nothing in _setup/ reads them.
-#     - _setup/08's species-coefs.RData, which 08 downloads from
+#     - _setup/06's species-coefs.RData, which 06 downloads from
 #       the public ABMIexploreR repository at a pinned commit.
 #     - 0_data/v2_scripts/, which is tracked in git.
 #   - Run once, from the repository root, by someone who can
@@ -259,7 +259,7 @@ writeLines(c(
   "- `inputs_manifest.csv` gives each file's original location,",
   "  size, md5 and the date it was copied.",
   "- The originals were left in place; the manifest names them.",
-  "- 04 and 05's inputs are not here: their output,",
+  "- The retired 04 and 05's inputs are not here: their output,",
   "  `v2_results/`, is published frozen under `../v2_results/`."
 ), setup_input("README.md"))
 

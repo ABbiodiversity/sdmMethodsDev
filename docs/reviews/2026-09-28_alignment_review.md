@@ -8,6 +8,10 @@ and the v2 reference code in `0_data/v2_scripts/`.
 **Method:** Static reading of the code and comparison with the v2
 source, the committed outputs in `3_output/exp_000_parity_v2/`, and
 `2_pipeline/exp_000_parity_v2/run_log.csv`. Nothing was re-run.
+**Note (2026-10-08):** `_setup/` was renumbered 00–08. The "Done"
+cells in the action table use the new numbers; every other
+`_setup/05` below is the retired v2-reference script, since
+replaced by `_setup/06_harmonize_abmiexplorer_results.R`.
 
 ---
 
@@ -281,7 +285,7 @@ step has an acceptance check.
 | 1.2 | Point `02_compare_to_v2.R` at `0_data/v2_results/v2_results.csv` only; drop the network paths (C5). | The gate runs with the network drives unmounted. | Done |
 | 1.3 | Join on `taxon × region × stage × species × term`. Score plant **climate** against the `region = "all"` rows. | The climate-stage parity table exists for all four plant taxa. | Done; plant habitat terms also relabelled as v2's `04a` does |
 | 1.4 | Mammals: run both seasons, average them, and compare against `.all`. Gate on `boot == 1` (M4). | Mammal rows are like-for-like. | Done, with season filtering fixed in `list_species()`; mammal habitat joins only terms named alike (new item) |
-| 1.5 | Birds: port the `08.PackageCoefficients.R` term translation (C4). | Bird habitat terms join on the standardized template. | Done; exact against `Birds2024.RData`. Needs `_setup/06`. Found and fixed a `method` reference-level bug |
+| 1.5 | Birds: port the `08.PackageCoefficients.R` term translation (C4). | Bird habitat terms join on the standardized template. | Done; exact against `Birds2024.RData`. Needs `_setup/04`. Found and fixed a `method` reference-level bug |
 | 1.6 | Build the non-reachable-term list from v2's code, including `CC*2` (M5). | `reachable_terms` excludes every spline- or convergence-overwritten term. | Done, for plants, mammals and bird placeholders |
 
 ### Phase 2: Match v2 behaviour where the harness departs from it
@@ -290,7 +294,7 @@ step has an acceptance check.
 | --- | --- | --- | --- |
 | 2.1 | Fit the climate stage on the full province draw; apply the region filter only for habitat (C1). | The plant climate coefficients for north and south runs are identical per draw. | Done; north and south climate identical per draw (difference 0) |
 | 2.2 | Draw the bootstrap once per species over the province, with v2's redraw rule (C2, M6). | Draw sizes match `bootstrap_data()`; a rare species logs and skips instead of aborting. | Done; draws are the full province size, and a species whose draws cannot be made is logged `resample_failed` |
-| 2.3 | **Strongly recommended:** harmonize v2's own stored plant bootstrap ids (`<taxon>-bootstrap-ids.Rdata`: 100 draws for lichen, mite and vascular plant, regenerated for bryophyte) into `lookup/`, and extend `resample_precomputed()` to per-species ids. This turns parity from **distributional** into **numerical, draw by draw**, as birds already allow. | Per-draw climate coefficients match v2 to numerical tolerance (e.g. relative difference < 1e-6), or each deviation is explained. | Done (`_setup/07`, `bootstrap = "v2_ids"`). Exact to 4e-11 per draw against the regenerated bryophyte reference; the published lichen models were not fitted on the stored draws, so only draw 1 matches there |
+| 2.3 | **Strongly recommended:** harmonize v2's own stored plant bootstrap ids (`<taxon>-bootstrap-ids.Rdata`: 100 draws for lichen, mite and vascular plant, regenerated for bryophyte) into `lookup/`, and extend `resample_precomputed()` to per-species ids. This turns parity from **distributional** into **numerical, draw by draw**, as birds already allow. | Per-draw climate coefficients match v2 to numerical tolerance (e.g. relative difference < 1e-6), or each deviation is explained. | Done (`_setup/05`, `bootstrap = "v2_ids"`). Exact to 4e-11 per draw against the regenerated bryophyte reference; the published lichen models were not fitted on the stored draws, so only draw 1 matches there |
 | 2.4 | Birds: use the 25-model climate set, `vegw`/`soilw` weights, climate carried on the response scale, and v2's advance rule (C4). | The bird climate stage matches `Birds2024.RData` per draw with precomputed ids. | Done; matches v2's own code to 4e-13 (climate and landcover). Also fixed: landcover lacked `Climate`. The published `Birds2024` differs because it came from a different data vintage |
 | 2.5 | Take the AICc degrees of freedom from `logLik` (M7). Fit once per candidate (M8). | Akaike weights match `MuMIn::model.avg` on a test case. | Done; matches `MuMIn::model.avg` (≤ 6e-17), including aliased terms |
 | 2.6 | Seed per species, with RNG state restored (M1, M2). | Two runs of the same configuration give identical stores. | Done (earlier); two runs give identical stores |

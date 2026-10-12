@@ -47,7 +47,7 @@ bird_spec <- function() {
     regions = list(
       north = list(
         filter = ~ useNorth == 1,
-        # One row per habitat type, rebuilt by _setup/09 from
+        # One row per habitat type, rebuilt by _setup/07 from
         # v2's coefficient translation matrix
         grid = "bird_north",
         term_block = "veg",
@@ -57,7 +57,7 @@ bird_spec <- function() {
       ),
       south = list(
         filter = ~ useSouth == 1,
-        # One row per habitat type, rebuilt by _setup/09 from
+        # One row per habitat type, rebuilt by _setup/07 from
         # v2's coefficient translation matrix
         grid = "bird_south",
         term_block = "soil",

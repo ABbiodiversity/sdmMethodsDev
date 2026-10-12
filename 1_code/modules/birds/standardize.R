@@ -6,7 +6,7 @@
 #   in the test dataset (see harness/data_source.R):
 #     - covariates.csv, the bird rows
 #     - lookup/bird_veg_age_matrix.csv, from
-#       1_code/_setup/06_harmonize_bird_translation_lookup.R
+#       1_code/_setup/04_harmonize_bird_translation_lookup.R
 #     - lookup/covariate_columns.csv, lookup/bird_factor_levels.csv
 # outputs: none; returns objects in memory
 # notes:

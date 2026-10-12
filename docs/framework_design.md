@@ -137,7 +137,7 @@ be carried into a later stage, and be projected onto the grid.
 ### The data is described, not assumed
 
 `0_data/test_dataset/lookup/dataset_manifest.csv`, written by
-`_setup/09`, names each taxon's response, offset and grid files, its
+`_setup/07`, names each taxon's response, offset and grid files, its
 key in `covariates.csv`, and its stored draws. The species queue and
 factor levels are one table each for every taxon. The harness reads
 file locations from the manifest and nowhere else, so a new taxon is
@@ -228,7 +228,7 @@ makes a GLM run and a BRT run comparable.
 projected onto the grid: the averaged or combined one where a rule
 combines candidates, not the best single candidate. Every taxon has a
 grid; the bird grids are v2's coefficient translation matrix rebuilt
-in covariate space by `_setup/09`. Coefficients cannot compare a GLM to
+in covariate space by `_setup/07`. Coefficients cannot compare a GLM to
 a boosted tree — a tree has no `Peatland` coefficient — but every engine
 can predict onto the 43 rows of the vegetation prediction matrix or the
 16 of the soil matrix. Comparing there keeps the comparison on the
@@ -477,7 +477,7 @@ It sits on a regularization axis. A Bayesian framework comparison needs
 5a. **Built (2026-10-03).** The plug-in method layer
    (`1_code/methods/`, the registry, `validate_spec()`,
    `check_engine()`); the dataset manifest and harmonized lookups
-   (`_setup/09`); parallel species with byte-identical shards;
+   (`_setup/07`); parallel species with byte-identical shards;
    metrics and grids from each stage's final model, and grids for
    every taxon; `experiment_config()` and `run_experiment()`; the
    experiment template and `compare_experiments()`; contract tests.
