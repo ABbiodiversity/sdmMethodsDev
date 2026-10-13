@@ -432,6 +432,91 @@ models_union <- function(models, sets = model_sets()) {
   paste0(". ~ . + ", paste(terms, collapse = " + "))
 }
 
+## 3.4 drop_candidates() ----
+
+#' Drop Every Candidate That Uses Any of the Given Terms
+#'
+#' The opposite of extend_models(), one of two ways: the remaining
+#' candidates stay as written, so the set is smaller. A term
+#' counts as used wherever it appears in a formula, including
+#' inside an interaction or I(). The intercept-only candidate
+#' (". ~ .") is kept when the set has it. A staged set (a list of
+#' groups, e.g. bird landcover) is reduced group by group; check
+#' the result with lengths(), as an empty group leaves a staged
+#' rule nothing to step through.
+#'
+#' @param models A model_sets() name, formulas as text, or a list
+#'   of groups of them (a staged set).
+#' @param terms Character vector of covariate names.
+#' @param sets Named list of model sets.
+#' @return The candidates that use none of `terms`, in the same
+#'   shape as `models`.
+#'
+#' @example # Example usage of the function
+#' # drop_candidates("climate_plant_v2_full",
+#' #                 c("Easting", "Northing"))
+drop_candidates <- function(models, terms, sets = model_sets()) {
+  models <- get_model_set(models, sets)
+
+  # Staged sets: each group on its own
+  if (is.list(models)) {
+    return(lapply(models, drop_candidates, terms = terms,
+                  sets = sets))
+  }
+
+  uses <- vapply(models, function(formula) {
+    any(all.vars(stats::as.formula(formula)) %in% terms)
+  }, logical(1))
+
+  unname(models[!uses])
+}
+
+## 3.5 strip_terms() ----
+
+#' Remove the Given Terms from Every Candidate
+#'
+#' The other way to reduce a set: every candidate stays, less the
+#' terms. Interactions and I() terms that use a removed covariate
+#' go too. Candidates left identical are merged, and a candidate
+#' left with no terms becomes the intercept-only ". ~ .". Staged
+#' sets are reduced group by group.
+#'
+#' @param models A model_sets() name, formulas as text, or a list
+#'   of groups of them (a staged set).
+#' @param terms Character vector of covariate names.
+#' @param sets Named list of model sets.
+#' @return The reduced candidates, in the same shape as `models`.
+#'
+#' @example # Example usage of the function
+#' # strip_terms("climate_plant_v2_full", "bio15")
+strip_terms <- function(models, terms, sets = model_sets()) {
+  models <- get_model_set(models, sets)
+
+  # Staged sets: each group on its own
+  if (is.list(models)) {
+    return(lapply(models, strip_terms, terms = terms, sets = sets))
+  }
+
+  reduced <- vapply(models, function(formula) {
+    labels <- setdiff(attr(
+      stats::terms(stats::as.formula(formula), allowDotAsName = TRUE),
+      "term.labels"
+    ), ".")
+
+    keep <- labels[!vapply(labels, function(label) {
+      any(all.vars(stats::as.formula(paste("~", label))) %in% terms)
+    }, logical(1))]
+
+    if (length(keep) == 0) {
+      ". ~ ."
+    } else {
+      paste0(". ~ . + ", paste(keep, collapse = " + "))
+    }
+  }, character(1))
+
+  unique(unname(reduced))
+}
+
 # 4. get_model_set() ----
 
 #' Look Up One Model Set

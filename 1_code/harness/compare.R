@@ -163,11 +163,15 @@ compare_experiments <- function(
     default = NA
   )]
 
-  # Step 2: Per taxon, region and metric
+  # Step 2: Per taxon, region and metric. Draw counts as doubles:
+  # median() keeps an odd-sized group's integer, and data.table
+  # needs one type across groups.
   summary <- joined[, list(
     species = .N,
-    draws_baseline = stats::median(n_baseline, na.rm = TRUE),
-    draws_candidate = stats::median(n_candidate, na.rm = TRUE),
+    draws_baseline = as.numeric(stats::median(n_baseline,
+                                              na.rm = TRUE)),
+    draws_candidate = as.numeric(stats::median(n_candidate,
+                                               na.rm = TRUE)),
     median_baseline = stats::median(median_baseline, na.rm = TRUE),
     median_candidate = stats::median(median_candidate, na.rm = TRUE),
     median_difference = stats::median(difference, na.rm = TRUE),

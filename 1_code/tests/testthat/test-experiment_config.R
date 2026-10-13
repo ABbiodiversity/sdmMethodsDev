@@ -189,6 +189,36 @@ test_that("modify_region() and modify_resample() change and record", {
   )
 })
 
+test_that("drop_candidates() and strip_terms() reduce a set", {
+  models <- c(". ~ .", ". ~ . + a", ". ~ . + a + b",
+              ". ~ . + b + I(b^2)", ". ~ . + a:b + c")
+
+  # Dropping removes every candidate that names the term
+  expect_equal(drop_candidates(models, "b"), c(". ~ .", ". ~ . + a"))
+
+  # Stripping keeps each candidate, less the term, and merges
+  # the duplicates it makes
+  expect_equal(
+    strip_terms(models, "b"),
+    c(". ~ .", ". ~ . + a", ". ~ . + c")
+  )
+
+  # Staged sets keep their groups
+  staged <- list(c(". ~ . + a", ". ~ . + b"), ". ~ . + c")
+  expect_equal(drop_candidates(staged, "b"),
+               list(". ~ . + a", ". ~ . + c"))
+
+  # A v2 set by name: no spatial term survives, the null stays
+  spatial <- c("Easting", "Northing", "Easting2", "Northing2",
+               "EastingNorthing")
+  reduced <- drop_candidates("climate_plant_v2_full", spatial)
+  expect_false(any(grepl("Easting|Northing", reduced)))
+  expect_true(". ~ ." %in% reduced)
+  expect_lt(length(reduced), length(get_model_set(
+    "climate_plant_v2_full"
+  )))
+})
+
 test_that("block cut points can be set and default to v2's", {
   long <- c(-120, -118, -114, -110)
   lat <- c(49, 52, 55, 58)

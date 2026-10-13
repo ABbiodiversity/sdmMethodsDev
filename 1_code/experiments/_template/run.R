@@ -34,7 +34,9 @@
 #     and seed, unless they are the question.
 #   - The levers, from least to most invasive:
 #     - `stage_models`: different candidate formulas for a stage
-#       (new covariates, a different model set).
+#       (new covariates, a different model set). extend_models()
+#       adds terms to a set; drop_candidates() and strip_terms()
+#       remove them (all in harness/model_sets.R).
 #     - `covariate_files`: covariates the dataset does not hold,
 #       from a CSV a script in this folder writes to
 #       2_pipeline/<id>/inputs/. Never add them to 0_data/ or
@@ -92,9 +94,17 @@ config <- experiment_config(
   seed = 20260909,
 
   # The change this experiment tests. For example, every climate
-  # candidate with elevation added:
+  # candidate with elevation added (extend_models()), or without
+  # the spatial terms (drop_candidates()):
   #   stage_models = list(
   #     climate = extend_models("climate_plant_v2_full", "elevation")
+  #   ),
+  #   stage_models = list(
+  #     climate = drop_candidates(
+  #       "climate_plant_v2_full",
+  #       c("Easting", "Northing", "Easting2", "Northing2",
+  #         "EastingNorthing")
+  #     )
   #   ),
   stage_models = NULL,
 
