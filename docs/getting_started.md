@@ -40,6 +40,8 @@ models or reporting products.
 | **Grid** | A prediction matrix with one row per habitat type, each row a pure stand of that type. Predicting onto it lets methods be compared. |
 | **Out-of-bag (oob)** | Scored on the survey units a draw left out. `insample` scores the units the draw fitted. |
 | **Parity** | Whether a run reproduces v2. Distributional, not numerical: v2 sets no seed, so two v2 runs differ. |
+| **Species list** | An experiment's `species.csv` (`taxon,species,note`): the species it fits. The rows also decide which runs it fits. |
+| **Hook** | A file in an experiment's `hooks/` folder that registers a method of the experiment's own, or defines a function a spec field names. |
 
 ## Setup
 
@@ -88,8 +90,7 @@ you.
 ### Check that the setup works
 
 First, load the framework. This sources the harness, every
-method, every taxon module, and the shared species sets. It reads
-no data.
+method, and every taxon module. It reads no data.
 
 ```r
 source("1_code/harness/harness.R")
@@ -204,10 +205,9 @@ The full argument list and output file definitions are in the
 | Folder | Holds | Edit it to |
 | --- | --- | --- |
 | `1_code/harness/` | The shared pipeline: configure, fit, store, summarize, compare. Names no taxon and no method | Change how every experiment runs (review as such) |
-| `1_code/methods/` | Engines, selection rules, resampling schemes, metrics; each file registers one method | Add a method |
+| `1_code/methods/` | Engines, selection rules, resampling schemes, metrics; each file registers one method | Add a method every experiment can use |
 | `1_code/modules/<taxon>/` | Each taxon's v2 spec; `_shared/` holds the plant-group builder and `standard_specs()` | Record what v2 does for a taxon |
-| `1_code/experiments/exp_NNN_*/` | One folder per question; `run.R` holds the decisions | Ask a question |
-| `1_code/experiments/_shared/` | Named focal-species sets | Add a reusable species set |
+| `1_code/experiments/exp_NNN_*/` | One folder per question: `run.R` holds the decisions, `species.csv` the species, `hooks/` any methods of its own | Ask a question. The only folder an experiment edits |
 | `1_code/tests/` | Contract tests and the store comparison | Add a check |
 | `1_code/_setup/` | One-off scripts that build and publish the dataset | Rebuild or extend the dataset (maintainers) |
 | `0_data/test_dataset/` | The dataset as `_setup/` builds it; runs read the published copy | Nothing; rebuilt by `_setup/` |
@@ -234,22 +234,19 @@ configuration. Check three settings:
 
 | Setting | Quick check | Full run |
 | --- | --- | --- |
-| `species` | `"one_each"` (one species per taxon) or `"parity_check"` (two per taxon; the committed value) | `NULL`, every species |
-| `n_bootstraps` | `5` (the committed value) | `100` |
+| `species` | A shorter vector, e.g. `c(lichen = "Physcia.adscendens", bird = "AMRO")` | `NULL`, every species. Committed: `file.path(exp_dir, "species.csv")`, two per taxon |
+| `n_bootstraps` | `5` | `100` (the committed value) |
 | `workers` | 4 | Up to the cores you can spare (committed: 12) |
 
-The named species sets are:
-
-```r
-names(focal_species_sets())
-#> [1] "full"         "parity_check" "plants_only"  "one_each"
-```
+exp_000's `species.csv` holds the two species per taxon the parity
+test is read on. Its `note` column says why each was chosen. Later
+experiments copy it for a like-for-like comparison.
 
 Shorten a trial by cutting species, not draws. A 10-90% band read
-from five draws is unstable. On a 24-core machine, the 14
-`parity_check` species at 5 draws took about 6 minutes on one
-worker and about 1.6 minutes on 12. A full run of every species
-at 100 draws is days of compute.
+from five draws is unstable. On a 24-core machine, exp_000's 14
+species at 5 draws took about 6 minutes on one worker and about 2
+minutes on 12. A full run of every species at 100 draws is days of
+compute.
 
 Parallel workers load the framework from disk when the run
 starts, so do not edit files in `1_code/` while one is starting.
@@ -275,7 +272,8 @@ in section 2 of `run.R`.
 | --- | --- |
 | `2_pipeline/exp_000_parity_v2/<run>/<region>/` | Result stores: `coefficients.csv`, `metrics.csv`, `grid_predictions.csv`, `meta.json` |
 | `2_pipeline/exp_000_parity_v2/run_log.csv` | Every species, region, and draw: `ok`, or why not |
-| `3_output/exp_000_parity_v2/run_record.md` | What ran: species, draws, seed, data versions |
+| `2_pipeline/exp_000_parity_v2/session_info.txt` | The full `sessionInfo()` of the run |
+| `3_output/exp_000_parity_v2/run_record.md` | What ran: species, draws, seed, data versions, every change from v2, and provenance (full commit, uncommitted code, packages, hooks) |
 | `3_output/exp_000_parity_v2/report.md` | What each spec reproduces of v2, parity by stage, and model fit |
 | `3_output/exp_000_parity_v2/tables/parity_summary.csv` | The gate table: one row per taxon, region, and stage |
 | `3_output/exp_000_parity_v2/tables/parity_terms.csv` | Term-by-term comparison (gitignored) |
@@ -360,31 +358,63 @@ new_experiment("covariate scale")
 It takes the next free number across `1_code/experiments/`,
 `2_pipeline/`, and `3_output/`, and creates:
 
-- `1_code/experiments/<id>/`: `run.R` and `README.md` from
-  `_template/`, with id, title, author, and date filled in.
+- `1_code/experiments/<id>/`: `run.R`, `README.md`, `species.csv`
+  and an empty `hooks/` from `_template/`, with id, title, author,
+  and date filled in.
 - `2_pipeline/<id>/logs/`: for intermediates (gitignored).
 - `3_output/<id>/`: `figures/`, `tables/`, and a stub `report.md`.
 
-Leave `id` in `run.R` as it is. Write the question and design in
-the experiment's `README.md` before you run anything.
+Leave `id` and `exp_dir` in `run.R` as they are. Write the question
+and design in the experiment's `README.md` before you run
+anything.
 
-`run.R` loads the framework, calls `experiment_config()`, then
-`run_experiment()`.
+`run.R` loads the framework and the experiment's hooks, makes any
+spec changes, calls `experiment_config()`, then `run_experiment()`.
+
+**Edit only the experiment's folder.** Every change below is made
+in its `run.R`, its `species.csv`, or its `hooks/`. The harness,
+methods and modules are shared by every experiment and are not
+edited for one.
+
+### Choose the species: `species.csv`
+
+The template's `species.csv` lists every species a run can fit,
+one row each, as `taxon,species,note`. Delete the rows you do not
+want; use `note` to say why a species is in. The rows left set
+both the species and the runs: with no `taxa` in `run.R`, only
+runs that fit a listed species are run, so a `Moose_Summer` row
+runs `mammal_summer` and not `mammal_winter`. Three species is
+three rows:
+
+```
+taxon,species,note
+lichen,Physcia.adscendens,
+bird,AMRO,
+mammal,Moose_Winter,
+```
+
+For a like-for-like comparison with exp_000, copy its rows from
+`1_code/experiments/exp_000_parity_v2/species.csv`. Names are
+checked against the dataset's species queue
+(`species_catalogue(test_dataset_dir())`); a misspelt one stops
+the run with close matches suggested.
+
+If `run.R` does give `taxa`, it wins: a run in `taxa` whose taxon
+has no rows fits every species of that taxon, and a note says so.
 
 ### 1. Different candidate formulas: `stage_models`
 
 The covariates a run loads are read off its formulas, so this is
-also how you try new covariates.
+also how you try new covariates, or drop them.
 
 ```r
 config <- experiment_config(
   id = "exp_003_covariate_scale",
-  taxa = c("bryophyte", "lichen", "mite", "vascular_plant"),
-  species = "parity_check",
+  species = file.path(exp_dir, "species.csv"),
   n_bootstraps = 5,
   stage_models = list(
-    # every v2 plant climate candidate, plus elevation
-    climate = extend_models("climate_plant_v2_full", "elevation"),
+    # every v2 plant climate candidate, plus AHM
+    climate = extend_models("climate_plant_v2_full", "AHM"),
     # mites only: a ladder built from three covariates
     mite.climate = models_from_covariates(
       c("MAP", "FFP", "CMD"),
@@ -394,6 +424,28 @@ config <- experiment_config(
   workers = 4
 )
 ```
+
+Keys are `stage` (every run with that stage) or `taxon.stage` (one
+taxon). To remove covariates from a set there are two helpers,
+which answer different questions:
+
+```r
+spatial <- c("Easting", "Northing", "Easting2", "Northing2",
+             "EastingNorthing")
+
+# Drop every candidate that uses a spatial term (58 -> 28)
+drop_candidates("climate_plant_v2_full", spatial)
+
+# Keep every candidate, less the spatial terms; duplicates merge
+strip_terms("climate_plant_v2_full", spatial)
+```
+
+Habitat candidates are set per region; change them with
+`modify_region(spec, "north", habitat_models = ...)`. See what a
+taxon holds with `available_covariates(test_dataset_dir(),
+"lichen", "north")`: availability differs by taxon, and
+`experiment_config()` stops on a covariate a run does not have,
+suggesting close matches.
 
 A covariate the dataset does not hold comes from the experiment.
 Write a script in the experiment's folder that saves a CSV to
@@ -417,13 +469,33 @@ specs <- lapply(
 config <- experiment_config(
   id = "exp_003_covariate_scale",
   specs = specs,
-  species = "parity_check",
+  species = file.path(exp_dir, "species.csv"),
   n_bootstraps = 5
 )
 ```
 
-To change one stage by hand instead, edit the spec list directly,
-for example `specs$bird$stages[[2]]$selection <- "single"`.
+Any other setting of a spec changes the same way, with a helper
+that validates the spec at once and records the change in the run
+record:
+
+```r
+specs <- standard_specs()
+
+# A stage's fields: engine, rule, ic, min_detections, scope,
+# weighting, carrying, grid_constants, ...
+specs$lichen <- modify_stage(specs$lichen, "climate", ic = "AIC")
+specs$lichen <- modify_stage(specs$lichen, "habitat",
+                             min_detections = 10L)
+
+# A region's fields: filter, grid, habitat_models, constants
+specs$lichen <- modify_region(specs$lichen, "north",
+                              filter = ~ nr == "Boreal")
+```
+
+Module arguments are set the same way, in `run.R`:
+`bryophyte_spec(use_protocol = FALSE)`,
+`mammal_spec(climate_source = "fitted")`. Never edit a module for
+an experiment.
 
 `validate_spec()` checks the combination before anything runs. A
 rule that needs what the engine cannot give, such as standard
@@ -431,20 +503,55 @@ errors for inverse-variance averaging, stops the run with a
 sentence that says so. [`exp_001_xgboost`][exp001] is the worked
 example.
 
-### 3. A new method
+### 3. A new method: `hooks/`
 
-Copy the matching template from `1_code/methods/_templates/` into
-the right folder of `1_code/methods/`, fill it in, and register
-it. Check an engine with `check_engine()`, confirm it appears in
-`list_methods()`, then name it in a spec:
+Put it in the experiment's `hooks/` folder. Copy the matching
+template from `1_code/methods/_templates/`, fill it in, and
+register it there with `register_engine()`, `register_selection()`,
+`register_resampler()` or `register_metric()`. `run.R` loads it:
 
 ```r
-check_engine("glm")    # or check_engine(engine_mine())
+load_framework(hooks = file.path(exp_dir, "hooks"))
+```
+
+Check an engine with `check_engine()`, confirm it appears in
+`list_methods()`, then name it in a spec like a built-in one:
+
+```r
+check_engine("my_engine")
 list_methods("engine")
 ```
 
-The engine, selection, resampler, and metrics, and a
-checklist, are in the [methods README][methods].
+Parallel workers load the hooks too, and the run record lists each
+hook file with its md5. A hook may not reuse a registered name.
+Give a metric a `direction` (`"lower"` for an error) so the
+comparison with exp_000 reads it the right way. A method that
+proves itself moves to `1_code/methods/` so every experiment can
+use it. The contracts and a checklist are in the
+[methods README][methods].
+
+### 4. Regions, resampling and metrics
+
+```r
+specs$lichen <- modify_resample(
+  specs$lichen, scheme = "spatial_cv", replace = TRUE,
+  lat_breaks = c(48, 50, 52, 54, 56, 58, 61)  # finer blocks
+)
+
+config <- experiment_config(
+  id = "exp_003_covariate_scale",
+  specs = specs,
+  species = file.path(exp_dir, "species.csv"),
+  n_bootstraps = 5,                 # with spatial_cv: the folds
+  regions = "north",                # fit one region
+  metrics = c("auc", "rmse"),       # scored per draw
+  compare_metrics = "oob_auc",      # compared with exp_000
+  unit_predictions = "oob"          # per-unit predictions too
+)
+```
+
+`replace = TRUE` drops the old scheme's settings, which the new one
+does not take. Block cut points default to the v2 plant grid.
 
 ### Run it and read the comparison
 
@@ -454,6 +561,11 @@ an exp_000 run at the same number of draws.
 ```r
 source("1_code/experiments/exp_003_covariate_scale/run.R")
 ```
+
+`experiment_config()` checks everything before anything is fitted
+and lists every problem at once: species names, runs, regions,
+metrics, each spec, and every covariate the formulas name. Fix the
+list, run again.
 
 Outputs go to `2_pipeline/<id>/` and `3_output/<id>/`, laid out as
 for exp_000. `run_experiment()` prints a headline per taxon,
@@ -615,9 +727,9 @@ Rscript 1_code/tests/run_tests.R
 
 **2. Confirm the v2 results are unchanged.** Draws are seeded per
 species and made in order, so draws 1-5 of a 5-draw run match
-draws 1-5 of a 100-draw run. Run the `parity_check` species at 5
-draws to a scratch folder (set `pipeline_dir` and `out_dir` in
-`experiment_config()`), then compare:
+draws 1-5 of a 100-draw run. Run exp_000's configuration with its
+`species.csv` at 5 draws to a scratch folder (set `pipeline_dir`
+and `out_dir` in `experiment_config()`), then compare:
 
 ```sh
 Rscript 1_code/tests/compare_stores.R \
@@ -645,6 +757,11 @@ tools is in the [tests README][tests].
   `harness/`, `methods/`, or `modules/` as a change to every
   experiment: include passing tests and a `compare_stores.R`
   result.
+- **Experiments edit only their own folder:** `run.R`,
+  `species.csv`, `hooks/`, and any scripts beside them. A change
+  that needs `harness/`, `methods/` or `modules/` is a change to
+  every experiment; make it separately, with tests and a
+  `compare_stores.R` result.
 - **Commits from `3_output/`:** commit only runs that count, every
   species at 100 draws, and check `run_record.md` says so.
 

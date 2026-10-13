@@ -74,7 +74,7 @@ load_framework(hooks = file.path(exp_dir, "hooks"))
 
 ## 1.2 Spec changes ----
 # The v2 specs, changed where this experiment tests something.
-# For example, every climate candidate with elevation added is a
+# For example, every climate candidate with AHM added is a
 # `stage_models` change (section 1.3); a habitat stage fitted with
 # a different engine is a spec change here.
 specs <- standard_specs()
@@ -94,10 +94,10 @@ config <- experiment_config(
   seed = 20260909,
 
   # The change this experiment tests. For example, every climate
-  # candidate with elevation added (extend_models()), or without
+  # candidate with AHM added (extend_models()), or without
   # the spatial terms (drop_candidates()):
   #   stage_models = list(
-  #     climate = extend_models("climate_plant_v2_full", "elevation")
+  #     climate = extend_models("climate_plant_v2_full", "AHM")
   #   ),
   #   stage_models = list(
   #     climate = drop_candidates(

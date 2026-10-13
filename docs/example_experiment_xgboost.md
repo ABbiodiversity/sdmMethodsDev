@@ -35,7 +35,9 @@ You need:
   not need it.
 - **The engine registered.** `xgboost` already is, in
   `1_code/methods/engines/xgboost.R`. To test a method that is not
-  registered yet, add it first; see the
+  registered yet, register it in the experiment's own `hooks/`
+  folder, loaded by `load_framework(hooks = )`; the experiment then
+  names it like a built-in one. See the
   [methods README][methods].
 - **exp_000 tables at the draw count you will run**, as in the
   [SoilGrids example](example_experiment.md#before-you-start).
@@ -64,7 +66,7 @@ exp_001's design table:
 | Climate stage | v2: GLM candidates, AICc model averaging (mammals: v2's precomputed prediction) | The same |
 | Habitat stage (each spec's `habitat_stage`; birds: landcover) | v2: GLM candidates; IVW averaging (plants), staged BIC (birds), or the hurdle with best-by-AICc halves (mammals); v2's post-processing | `xgboost` with the `single` rule, on every covariate v2's habitat candidates use, `Climate` included |
 | Climate → habitat | Carried as `Climate` | The same |
-| Species, draws, seed | `parity_check`, 20260909 | The same |
+| Species, draws, seed | exp_000's (`species.csv`, two per taxon), 20260909 | The same |
 
 And the reasoning behind it:
 
@@ -98,6 +100,10 @@ validate_spec(spec, stop_on_error = FALSE)
 #> coefficients, se, which engine `xgboost` does not provide.
 #> Choose a rule that does not, such as `single`."
 ```
+
+`modify_stage(lichen_spec(), "habitat", engine = "xgboost")`, the
+recorded way to change a stage in an experiment, stops with the
+same sentence straight away.
 
 So changing the method means changing three things together: the
 engine, the rule, and the candidate set the rule chooses from.
@@ -241,7 +247,7 @@ matches exp_000:
 config <- experiment_config(
   id = "exp_001_xgboost",
   taxa = names(specs),
-  species = "parity_check",   # exp_000's species
+  species = file.path(exp_dir, "species.csv"),  # exp_000's
   n_bootstraps = 5,           # 5 checks; 100 for a result
   seed = 20260909,            # exp_000's seed
   specs = specs,              # the change
@@ -257,7 +263,8 @@ step translates bird landcover coefficients onto v2's habitat
 template, and a tree has no coefficients to translate.
 
 To try the change on fewer taxa first, narrow `taxa`, for example
-`taxa = c("lichen", "bird")`.
+`taxa = c("lichen", "bird")`. In a new experiment, leave `taxa` out
+and cut `species.csv` instead: its rows decide the runs.
 
 Run the whole script:
 
@@ -294,8 +301,8 @@ Keep in mind:
   calibrated tables; this run's grid predictions are not
   calibrated.
 
-As always, a 5-draw run on `parity_check` is a pipeline check,
-not a result.
+As always, a 5-draw run on exp_000's two species per taxon is a
+pipeline check, not a result.
 
 ## Step 9: Tune, run at 100 draws, and write it up
 

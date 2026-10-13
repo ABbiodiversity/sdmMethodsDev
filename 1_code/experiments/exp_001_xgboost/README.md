@@ -20,7 +20,7 @@ draws with tuned settings.
 | Climate stage | v2: GLM candidates, AICc model averaging (mammals: v2's precomputed prediction) | The same |
 | Habitat stage (each spec's `habitat_stage`; birds: landcover) | v2: GLM candidates; IVW averaging (plants), staged BIC (birds), or the hurdle with best-by-AICc halves (mammals); v2's post-processing | `xgboost` with the `single` rule, on every covariate v2's habitat candidates use, `Climate` included |
 | Climate → habitat | Carried as `Climate` | The same |
-| Species, draws, seed | `parity_check`, 20260909 | The same |
+| Species, draws, seed | exp_000's (`species.csv`, two per taxon), 20260909 | The same |
 
 - **What changes:** the habitat stage's engine, selection rule and
   candidate set. `run.R` makes the change with one call for every run:

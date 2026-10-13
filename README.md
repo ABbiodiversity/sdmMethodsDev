@@ -53,7 +53,7 @@ sdmMethodsDev/
 │   ├── harness/            # the shared pipeline; names no taxon or method
 │   ├── methods/            # engines, selection rules, resampling, metrics
 │   ├── modules/            # one v2 spec per taxon; _shared/ for common code
-│   ├── experiments/        # one folder per question; _template/, _shared/
+│   ├── experiments/        # one folder per question; _template/
 │   ├── _setup/             # 00-08: build, check and publish the dataset
 │   ├── tests/              # contract tests and the store comparison
 │   └── _scratch.R          # dated workspace for exploration
@@ -122,6 +122,10 @@ exp_000 runs every taxon's v2 spec and checks it against the published
 v2.0 output. Every later experiment changes one thing and is compared
 with exp_000, so a difference is a difference in method rather than in
 plumbing. Because the dataset is frozen, results stay comparable.
+
+An experiment edits only its own folder: its species list, the spec
+changes in its `run.R`, and any methods of its own in `hooks/`. The
+harness, methods and taxon modules stay a fixed, tested back-end.
 
 ```mermaid
 %% ----------------------------

@@ -9,8 +9,16 @@ Load everything with:
 
 ```r
 source("1_code/harness/harness.R")
-load_framework()  # harness/, methods/, modules/, experiments/_shared/
+load_framework()  # harness/, methods/, modules/
+
+# An experiment also loads its own methods from hooks/
+load_framework(hooks = "1_code/experiments/<id>/hooks")
 ```
+
+Experiments never edit this folder. Everything an experiment
+changes is an `experiment_config()` argument, a spec change made in
+its `run.R`, or a function in its `hooks/` (see the
+[experiments README](../experiments/README.md)).
 
 `new_experiment.R` is the exception: it is base R and runs without
 `load_framework()`.
@@ -19,39 +27,41 @@ load_framework()  # harness/, methods/, modules/, experiments/_shared/
 
 | File | Holds |
 | --- | --- |
-| `harness.R` | `load_framework()`: sources the harness, methods, modules and `experiments/_shared/`, in that order |
-| `experiment.R` | `experiment_config()`, `run_experiment()`, `script_step()` |
+| `harness.R` | `load_framework()`: sources the harness, methods and modules, then an experiment's hooks (`load_hooks()`); workers load the same hooks |
+| `experiment.R` | `experiment_config()` (checks everything, lists every problem at once), `run_experiment()`, `script_step()`, `runs_for_species()` |
 | `new_experiment.R` | `new_experiment()`: scaffold an experiment's three folders |
 | `data_source.R` | The pinned published dataset versions; `test_dataset_dir()`, `v2_results_dir()`, `verify_published()` |
-| `data_load.R` | `lookup/dataset_manifest.csv`, loaders, `covariate_files` joins, model frames |
+| `data_load.R` | `lookup/dataset_manifest.csv`, loaders, `covariate_files` joins, model frames; `covariate_columns_needed()` |
 | `cache.R` | Session cache for dataset reads |
 | `covariate_sets.R` | Named covariate sets, derived columns, term renaming |
-| `model_sets.R` | v2 candidate formulas, spliced verbatim; `extend_models()`, `models_from_covariates()` |
-| `spec.R` | `validate_spec()`, `apply_stage_models()`, `replace_stage_method()` |
-| `registry.R` | `register_engine()` and the other `register_*()`; `list_methods()` |
+| `model_sets.R` | v2 candidate formulas, spliced verbatim; `extend_models()` and `models_from_covariates()` to add or build, `drop_candidates()` and `strip_terms()` to reduce |
+| `spec.R` | `validate_spec()`, `apply_stage_models()`, `replace_stage_method()`; `modify_stage()`, `modify_region()`, `modify_resample()` for an experiment's spec changes; `check_spec_covariates()` |
+| `registry.R` | `register_engine()` and the other `register_*()` (metrics take a `direction`); `list_methods()`. A hook may not reuse a registered name |
 | `engines.R` | Engine interface and `check_engine()` |
 | `selection.R` | Plumbing for selection rules: `fit_candidates()`, `combined_predictor()`, `selection_result()` |
-| `resample.R` | Per-species seeds, `with_seed()`, spatial blocks |
-| `species.R` | Species lists and focal-species resolution |
+| `resample.R` | Per-species seeds, `with_seed()`, spatial blocks; `v2_block_breaks()` |
+| `species.R` | Species lists; `read_species_file()` and `check_species_names()` for an experiment's `species.csv` |
 | `predict_grid.R` | Projects a final model onto a habitat grid |
 | `eval_metrics.R` | Scores a prediction with every registered metric |
-| `run_model.R` | `run_specs()`: prepare each spec, fit species in parallel, merge shards |
+| `run_model.R` | `run_specs()`: prepare each spec, fit species in parallel, merge shards; `region_request()` and `province_request()`, shared with the configuration check |
 | `result.R` | The result store: writes and reads its files |
 | `summarise.R` | `collect_results()`: stores to summary tables |
-| `compare.R` | `compare_experiments()`: one experiment against another |
-| `run_record.R` | `run_record()`: writes `run_record.md` |
+| `compare.R` | `compare_experiments()`: one experiment against another; `default_compare_metrics()` |
+| `run_record.R` | `run_record()`: writes `run_record.md`, with provenance |
 
 ## What `run_experiment()` does
 
 1. **Configure.** `experiment_config()` checks every decision before
-   anything is fitted.
+   anything is fitted, and stops once with every problem listed:
+   species names (with close matches), runs, draws, regions,
+   metrics, each spec, and every covariate the formulas name.
 2. **Fit.** Every spec is validated and each region's data and grid
    are loaded once. Each species is one job; with `workers` above 1,
    jobs run in parallel R sessions. Each species draws under its own
    seed, so results do not depend on the worker count. A failed
    species or draw is logged and the run continues.
 3. **Store.** Shards are merged into one store per run and region in
-   `2_pipeline/<id>/`, plus `run_log.csv`.
+   `2_pipeline/<id>/`, plus `run_log.csv` and `session_info.txt`.
 4. **Summarize.** `collect_results()` writes `3_output/<id>/tables/`.
 5. **Compare.** Every experiment except the baseline writes
    `tables/comparison_metrics.csv` against exp_000.
@@ -66,8 +76,8 @@ Nothing outside `2_pipeline/<id>/` and `3_output/<id>/` is written.
 | Argument | Default | Sets |
 | --- | --- | --- |
 | `id` | | Folder name under `2_pipeline/` and `3_output/` |
-| `taxa` | all | Runs, from `names(standard_specs())` |
-| `species` | every species | A `focal_species_sets()` name, or a vector named by taxon |
+| `taxa` | see note | Runs, from `names(standard_specs())`. Left out with a species list: only the runs that fit a listed species (a `Moose_Summer` row runs `mammal_summer`). Left out with no species list: every run |
+| `species` | every species | The experiment's `species.csv` (`taxon,species,note`), or a vector named by taxon. Names are checked against the dataset's species queue |
 | `n_bootstraps` | `100` | Draws per species; v2 used 100. 5 checks a run works |
 | `seed` | `20260909` | Base seed; `NULL` leaves draws unseeded, as v2 did |
 | `stage_models` | v2's | Replacement candidate sets, keyed `stage` or `taxon.stage` |
@@ -78,6 +88,9 @@ Nothing outside `2_pipeline/<id>/` and `3_output/<id>/` is written.
 | `unit_predictions` | `"none"` | `"oob"` or `"all"` writes per-unit predictions |
 | `baseline` | `"exp_000_parity_v2"` | Experiment to compare with; `NULL` skips |
 | `v2_bootstraps` | `100` | Draws a run needs to be gated |
+| `regions` | all | Regions to fit, e.g. `"north"` |
+| `metrics` | all registered | Metrics scored per draw |
+| `compare_metrics` | `default_compare_metrics()` | Prefixed metrics (e.g. `"oob_auc"`) compared with the baseline |
 | `project_root`, `data_dir`, `pipeline_dir`, `out_dir` | derived | Path overrides |
 
 ## Outputs
@@ -94,10 +107,18 @@ read), plus `mean`, `sd`, `n` and `boot1` (the draw-1 value).
 | `metrics.csv` | Metrics per species and draw |
 | `grid_predictions.csv` | The final model's prediction for each habitat type |
 | `unit_predictions.csv` | Only with `unit_predictions = "oob"` or `"all"`; several GB for birds |
-| `meta.json` | Stages, engines, rules, covariates, resampling, seed, overrides |
+| `meta.json` | Stages, engines, rules, covariates, resampling, seed, overrides, hook files |
 
 `2_pipeline/<id>/run_log.csv` records every species, region and draw:
-`ok`, or why not.
+`ok`, or why not. `2_pipeline/<id>/session_info.txt` holds the full
+`sessionInfo()` of the run.
+
+`3_output/<id>/run_record.md` is the committed record. Its
+Provenance section gives the full git commit, how many files under
+`1_code/` differ from it, R version, platform, modelling package
+versions, and each hook file with its md5. Its Configuration
+section gives every setting, the species file, the hooks, and each
+change from v2.
 
 ### Summary tables: `3_output/<id>/tables/`
 
