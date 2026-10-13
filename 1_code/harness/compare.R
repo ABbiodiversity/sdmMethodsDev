@@ -28,6 +28,9 @@ library(data.table) # keyed joins (version: 1.16.4)
 
 #' Which Way Is Better for a Metric
 #'
+#' A direction given at registration (register_metric()) wins;
+#' otherwise the built-in table below.
+#'
 #' @param metric Character vector of metric names, with or
 #'   without an `insample_` or `oob_` prefix.
 #' @return Character vector: "higher", "lower", "toward_one" or
@@ -38,12 +41,40 @@ library(data.table) # keyed joins (version: 1.16.4)
 better_direction <- function(metric) {
   base <- sub("^(insample_|oob_)", "", metric)
 
-  ifelse(
+  built_in <- ifelse(
     base %in% c("rmse"), "lower",
     ifelse(
       base %in% c("calibration_slope"), "toward_one",
       ifelse(base %in% c("prevalence", "n"), "none", "higher")
     )
+  )
+
+  registered <- vapply(base, function(one) {
+    if (!one %in% registered_names("metric")) {
+      return(NA_character_)
+    }
+    get_method("metric", one, entry = TRUE)$direction %||%
+      NA_character_
+  }, character(1), USE.NAMES = FALSE)
+
+  ifelse(is.na(registered), built_in, registered)
+}
+
+## 2.1 default_compare_metrics() ----
+
+#' The Metrics an Experiment Is Compared on by Default
+#'
+#' Out-of-bag fit metrics: in-sample metrics flatter flexible
+#' methods.
+#'
+#' @return A character vector of prefixed metric names.
+#'
+#' @example # Example usage of the function
+#' # default_compare_metrics()
+default_compare_metrics <- function() {
+  c(
+    "oob_auc", "oob_deviance_explained", "oob_rmse",
+    "oob_spearman", "oob_calibration_slope"
   )
 }
 
@@ -94,10 +125,7 @@ compare_experiments <- function(
   values <- c("n", "median", "p10", "p90")
 
   # Step 1: Model fit, per species and metric
-  metrics <- metrics %||% c(
-    "oob_auc", "oob_deviance_explained", "oob_rmse",
-    "oob_spearman", "oob_calibration_slope"
-  )
+  metrics <- metrics %||% default_compare_metrics()
 
   candidate <- read_summary(candidate_dir, "metric_summary")
   baseline <- read_summary(baseline_dir, "metric_summary")

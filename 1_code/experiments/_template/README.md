@@ -11,10 +11,24 @@ One sentence: what does this experiment ask?
 
 - **What changes relative to exp_000:** the one thing this
   experiment varies (a covariate, a model set, an engine, a
-  selection rule).
+  selection rule, a resampling scheme).
 - **What stays the same:** taxa, species, draws and seed, unless
   they are the question.
-- **How it is set:** `stage_models` or `specs` in `run.R`.
+- **How it is set:** `stage_models`, `covariate_files`, or a spec
+  change (`replace_stage_method()`, `modify_stage()`,
+  `modify_region()`, `modify_resample()`) in `run.R`; a method of
+  this experiment's own in `hooks/`.
+
+## Files
+
+Everything this experiment changes is in this folder; nothing
+outside it is edited.
+
+| File | Holds |
+| --- | --- |
+| `run.R` | The configuration and the run |
+| `species.csv` | `taxon,species,note`. Starts as every species in the dataset; delete the rows not fitted |
+| `hooks/` | Optional. Methods or functions of this experiment's own, loaded by `load_framework(hooks = )` |
 
 ## How to read the result
 

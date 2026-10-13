@@ -126,7 +126,9 @@ with_seed <- function(seed, code) {
 
 #' Cut Survey Units into Coarse Spatial Blocks
 #'
-#' Default cut points are the v2 plant grid.
+#' Default cut points are the v2 plant grid (v2_block_breaks()).
+#' An experiment sets others as `long_breaks` and `lat_breaks` in
+#' a spec's `resample` list.
 #'
 #' @param long,lat Numeric vectors of coordinates.
 #' @param long_breaks,lat_breaks Numeric vectors of cut points.
@@ -140,8 +142,8 @@ with_seed <- function(seed, code) {
 spatial_blocks <- function(
   long,
   lat,
-  long_breaks = c(-121, -116, -112, -109),
-  lat_breaks = c(48, 51, 54, 57, 61)
+  long_breaks = v2_block_breaks()$long,
+  lat_breaks = v2_block_breaks()$lat
 ) {
   cells <- interaction(
     droplevels(cut(long, long_breaks)),
@@ -159,6 +161,23 @@ spatial_blocks <- function(
   }
 
   labels[match(cells, present)]
+}
+
+## 3.1 v2_block_breaks() ----
+
+#' The v2 Plant Grid's Block Cut Points
+#'
+#' The one copy of the defaults every blocked resampler uses.
+#'
+#' @return A list of `long` and `lat` numeric vectors.
+#'
+#' @example # Example usage of the function
+#' # v2_block_breaks()$lat
+v2_block_breaks <- function() {
+  list(
+    long = c(-121, -116, -112, -109),
+    lat = c(48, 51, 54, 57, 61)
+  )
 }
 
 

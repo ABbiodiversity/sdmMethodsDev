@@ -161,6 +161,8 @@ kv_lines <- function(values, digits = 4L) {
 #' @param digits Integer. Decimal places for every number.
 #' @param collected collect_results() output for this pipeline
 #'   directory, or NULL to read the stores here.
+#' @param hook_files Character or NULL. The experiment's hook
+#'   files; recorded with their md5 under Provenance.
 #' @return The path written, invisibly.
 #'
 #' @example # Example usage of the function
@@ -175,7 +177,8 @@ run_record <- function(
   config = list(),
   provenance = TRUE,
   digits = 4L,
-  collected = NULL
+  collected = NULL,
+  hook_files = NULL
 ) {
   if (is.null(collected)) {
     collected <- collect_results(pipeline_dir)
@@ -193,11 +196,22 @@ run_record <- function(
 
   ## 3.1 Provenance ----
   if (provenance) {
-    commit <- tryCatch(
-      system2("git", c("rev-parse", "--short", "HEAD"),
-              stdout = TRUE, stderr = FALSE),
-      error = function(e) NA_character_,
-      warning = function(e) NA_character_
+    git <- function(args) {
+      tryCatch(
+        system2("git", args, stdout = TRUE, stderr = FALSE),
+        error = function(e) NA_character_,
+        warning = function(e) NA_character_
+      )
+    }
+    commit <- git(c("rev-parse", "HEAD"))
+    # Code that differs from the commit, which then does not
+    # fully describe the run
+    changed <- git(c("status", "--porcelain", "--", "1_code"))
+
+    # Versions of the modelling packages this session loaded
+    packages <- intersect(
+      c("data.table", "arm", "xgboost", "mgcv", "MuMIn"),
+      loadedNamespaces()
     )
 
     lines <- c(
@@ -210,10 +224,37 @@ run_record <- function(
         written_at = format(
           Sys.time(), "%Y-%m-%d %H:%M:%S", tz = "UTC"
         ),
-        git_commit = if (length(commit) == 1) commit else "-",
+        git_commit = if (length(commit) == 1 && !is.na(commit)) {
+          commit
+        } else {
+          "-"
+        },
+        git_uncommitted_code = if (anyNA(changed)) {
+          "-"
+        } else if (length(changed) > 0) {
+          paste(length(changed), "file(s) under 1_code/ differ")
+        } else {
+          "none"
+        },
         r_version = paste(
           R.version$major, R.version$minor, sep = "."
         ),
+        platform = R.version$platform,
+        packages = if (length(packages) == 0) {
+          "-"
+        } else {
+          versions <- vapply(packages, function(p) {
+            as.character(utils::packageVersion(p))
+          }, character(1))
+          paste(packages, versions)
+        },
+        hooks = if (length(hook_files) == 0) {
+          "none"
+        } else {
+          paste0(basename(hook_files), " (md5 ",
+                 unname(tools::md5sum(hook_files)), ")")
+        },
+        session_info = file.path(pipeline_dir, "session_info.txt"),
         pipeline_dir = pipeline_dir
       ), digits),
       ""

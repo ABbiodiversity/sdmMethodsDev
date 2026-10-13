@@ -259,6 +259,44 @@ load_offsets <- function(taxon, data_dir, species = NULL) {
   )
 }
 
+## 5.1 covariate_columns_needed() ----
+
+#' Split Requested Covariates into Stored, Derivable and Unknown
+#'
+#' Reads the taxon's covariate catalogue only, not the data.
+#' Shared by load_covariates() and the configuration check.
+#'
+#' @param taxon Character. Taxon slug.
+#' @param data_dir Character. The test dataset folder.
+#' @param columns Character vector of master column names.
+#' @param region Character or NULL.
+#' @return A list of `derivable` (computed from other columns),
+#'   `to_read` (stored columns to read, derivation inputs
+#'   included) and `unknown` (neither stored nor derivable).
+#'
+#' @example # Example usage of the function
+#' # covariate_columns_needed("lichen", data_dir, "MAP")$unknown
+covariate_columns_needed <- function(taxon, data_dir, columns,
+                                     region = NULL) {
+  stored <- available_covariates(
+    taxon, data_dir = data_dir, region = region,
+    include_derived = FALSE
+  )
+
+  derivable <- derivable_covariates(columns, stored)
+  to_read <- setdiff(columns, derivable)
+
+  for (one in derivable) {
+    to_read <- unique(c(to_read, derived_covariates()[[one]]$inputs))
+  }
+
+  list(
+    derivable = derivable,
+    to_read = to_read,
+    unknown = setdiff(to_read, stored)
+  )
+}
+
 # 6. load_covariates() ----
 
 #' Load Covariates for One Taxon and Region
@@ -290,19 +328,10 @@ load_covariates <- function(
   # Step 1: Check the taxon's catalogue, not the file header: the
   # wide table holds other taxa's columns, which read back as all
   # NA here.
-  stored <- available_covariates(
-    taxon, data_dir = data_dir, region = region,
-    include_derived = FALSE
-  )
-
-  derivable <- derivable_covariates(columns, stored)
-  to_read <- setdiff(columns, derivable)
-
-  for (one in derivable) {
-    to_read <- unique(c(to_read, derived_covariates()[[one]]$inputs))
-  }
-
-  unknown <- setdiff(to_read, stored)
+  needed <- covariate_columns_needed(taxon, data_dir, columns, region)
+  derivable <- needed$derivable
+  to_read <- needed$to_read
+  unknown <- needed$unknown
 
   if (length(unknown) > 0) {
     stop(

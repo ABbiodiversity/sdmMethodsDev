@@ -260,46 +260,13 @@ prepare_spec <- function(
 #' #                data_dir)
 prepare_region <- function(spec, region, species, data_dir) {
   region_spec <- spec$regions[[region]]
-  rename <- term_map(
-    data_dir, spec$taxon, region, block = region_spec$term_block
-  )
 
-  # Step 1: The stages, with the region's models where a stage
-  # takes them, and every formula in the dataset's names
-  spec$stages <- lapply(spec$stages, function(stage) {
-    if (is.null(stage$models)) {
-      # Plus what goes with them: reference categories,
-      # constants, and columns the age splines read
-      stage$models <- region_spec$habitat_models
-      stage$intercept_cats <- region_spec$intercept_cats %||%
-        stage$intercept_cats
-      stage$constants <- region_spec$constants %||% stage$constants
-      stage$extra_covariates <- c(
-        stage$extra_covariates, region_spec$extra_covariates
-      )
-
-      # Terms held fixed on the grid can be added per region: v2
-      # predicts the south at pAspen = 0.
-      if (!is.null(region_spec$grid_constants)) {
-        stage$grid_constants <- c(
-          stage$grid_constants %||% list(),
-          region_spec$grid_constants
-        )
-      }
-    }
-
-    stage$models <- apply_term_map(
-      get_model_set(stage$models), rename
-    )
-
-    stage
-  })
-
-  # Step 2: The columns to load
-  weight_column <- region_spec$weight_column %||% spec$weight_column
-  covariates <- covariate_request(
-    spec, spec_covariates(spec), region_spec$filter
-  )
+  # Steps 1-2: The resolved stages and the columns to load
+  request <- region_request(spec, region, data_dir)
+  spec <- request$spec
+  rename <- request$rename
+  weight_column <- request$weight_column
+  covariates <- request$covariates
 
   # Step 3: Load once for the region; species are cut from it
   model_data <- build_model_data(
@@ -344,6 +311,73 @@ prepare_region <- function(spec, region, species, data_dir) {
   )
 }
 
+## 3.2.1 region_request() ----
+
+#' Resolve One Region's Stages and the Columns They Need
+#'
+#' Shared by prepare_region() and the configuration check
+#' (check_spec_covariates()), so both resolve names the same way.
+#' Reads only lookups, not data.
+#'
+#' @param spec A taxon spec.
+#' @param region Character.
+#' @param data_dir Character.
+#' @return A list of the spec (with resolved stages), the term
+#'   map, the weight column and the covariates to load.
+#'
+#' @example # Example usage of the function
+#' # region_request(lichen_spec(), "north", data_dir)$covariates
+region_request <- function(spec, region, data_dir) {
+  region_spec <- spec$regions[[region]]
+  rename <- term_map(
+    data_dir, spec$taxon, region, block = region_spec$term_block
+  )
+
+  # Step 1: The stages, with the region's models where a stage
+  # takes them, and every formula in the dataset's names
+  spec$stages <- lapply(spec$stages, function(stage) {
+    if (is.null(stage$models)) {
+      # Plus what goes with them: reference categories,
+      # constants, and columns the age splines read
+      stage$models <- region_spec$habitat_models
+      stage$intercept_cats <- region_spec$intercept_cats %||%
+        stage$intercept_cats
+      stage$constants <- region_spec$constants %||% stage$constants
+      stage$extra_covariates <- c(
+        stage$extra_covariates, region_spec$extra_covariates
+      )
+
+      # Terms held fixed on the grid can be added per region: v2
+      # predicts the south at pAspen = 0.
+      if (!is.null(region_spec$grid_constants)) {
+        stage$grid_constants <- c(
+          stage$grid_constants %||% list(),
+          region_spec$grid_constants
+        )
+      }
+    }
+
+    stage$models <- apply_term_map(
+      get_model_set(stage$models), rename
+    )
+
+    stage
+  })
+
+  # Step 2: The columns to load
+  weight_column <- region_spec$weight_column %||% spec$weight_column
+  covariates <- covariate_request(
+    spec, spec_covariates(spec), region_spec$filter
+  )
+
+  list(
+    spec = spec,
+    rename = rename,
+    weight_column = weight_column,
+    covariates = covariates
+  )
+}
+
 ## 3.3 province_context() ----
 
 #' Assemble the Province-Wide Data a Spec's Province Scope Needs
@@ -362,13 +396,49 @@ prepare_region <- function(spec, region, species, data_dir) {
 #' @example # Example usage of the function
 #' # province_context(spec, data_dir, c("Physcia.adscendens"))
 province_context <- function(spec, data_dir, species) {
+  request <- province_request(spec)
+
+  if (is.null(request) || length(species) == 0) {
+    return(NULL)
+  }
+
+  list(
+    model_data = build_model_data(
+      taxon = spec$taxon,
+      data_dir = data_dir,
+      species = species,
+      covariates = request$covariates,
+      region = NULL,
+      region_filter = NULL,
+      weight_column = NULL,
+      aliases = spec$aliases %||% list(),
+      covariate_files = spec$covariate_files
+    ),
+    stages = request$stages,
+    draws = request$draws
+  )
+}
+
+## 3.3.1 province_request() ----
+
+#' The Province-Scope Stages and Draws, and the Columns They Need
+#'
+#' Shared by province_context() and the configuration check
+#' (check_spec_covariates()).
+#'
+#' @param spec A taxon spec.
+#' @return A list of `stages`, `draws` and `covariates`, or NULL
+#'   when the spec has no province scope.
+#'
+#' @example # Example usage of the function
+#' # province_request(lichen_spec())$covariates
+province_request <- function(spec) {
   province_stages <- Filter(
     function(s) identical(s$scope, "province"), spec$stages
   )
   province_draws <- identical(spec$resample$scope, "province")
 
-  if ((length(province_stages) == 0 && !province_draws) ||
-        length(species) == 0) {
+  if (length(province_stages) == 0 && !province_draws) {
     return(NULL)
   }
 
@@ -395,19 +465,9 @@ province_context <- function(spec, data_dir, species) {
   covariates <- covariate_request(spec, covariates, filters)
 
   list(
-    model_data = build_model_data(
-      taxon = spec$taxon,
-      data_dir = data_dir,
-      species = species,
-      covariates = covariates,
-      region = NULL,
-      region_filter = NULL,
-      weight_column = NULL,
-      aliases = spec$aliases %||% list(),
-      covariate_files = spec$covariate_files
-    ),
     stages = province_stages,
-    draws = province_draws
+    draws = province_draws,
+    covariates = covariates
   )
 }
 
@@ -479,11 +539,14 @@ run_jobs <- function(jobs, prepared, workers = 1L, verbose = TRUE) {
          "called, so workers can load it too.", call. = FALSE)
   }
 
-  # Step 1: Start the workers and load the framework
+  # Step 1: Start the workers and load the framework, with the
+  # experiment's hooks, so its own methods are known there too
   cluster <- parallel::makePSOCKcluster(min(workers, length(jobs)))
   on.exit(parallel::stopCluster(cluster), add = TRUE)
 
-  parallel::clusterCall(cluster, load_worker, project_root)
+  parallel::clusterCall(
+    cluster, load_worker, project_root, getOption("sdm.hook_files")
+  )
 
   # Step 2: Each job carries only its own spec's prepared data
   tasks <- lapply(jobs, function(job) {
@@ -498,11 +561,12 @@ run_jobs <- function(jobs, prepared, workers = 1L, verbose = TRUE) {
 #' Load the Framework in a Background Session
 #'
 #' @param project_root Character. The repository root.
+#' @param hooks Character or NULL. The experiment's hook files.
 #' @return NULL, invisibly.
 #'
 #' @example # Example usage of the function
-#' # parallel::clusterCall(cluster, load_worker, root)
-load_worker <- function(project_root) {
+#' # parallel::clusterCall(cluster, load_worker, root, NULL)
+load_worker <- function(project_root, hooks = NULL) {
   session <- globalenv()
 
   source(
@@ -510,7 +574,7 @@ load_worker <- function(project_root) {
     local = session
   )
   load <- get("load_framework", envir = session)
-  load(project_root, envir = session)
+  load(project_root, envir = session, hooks = hooks)
 
   invisible(NULL)
 }
@@ -1186,6 +1250,12 @@ run_meta <- function(p, region) {
     grid = region$grid_name %||% NA_character_,
     unit_predictions = p$unit_predictions,
     models_overridden = spec$models_overridden %||% NA_character_,
+    # The experiment's own methods, when it has hooks
+    hooks = if (is.null(getOption("sdm.hook_files"))) {
+      NA_character_
+    } else {
+      basename(getOption("sdm.hook_files"))
+    },
     v2_coverage = if (is.null(spec$v2_coverage)) {
       NA_character_
     } else {

@@ -9,6 +9,9 @@
 #     here by name, so adding a method is one new file in
 #     1_code/methods/ with no harness change. Re-sourcing a method
 #     file replaces its entry.
+#   - An experiment's hooks/ register here too (see load_hooks()
+#     in harness.R), but may not replace a method another file
+#     registered.
 #   - Selection rules declare the engine capabilities they need;
 #     validate_spec() (spec.R) checks them before any data is read.
 # ---
@@ -83,6 +86,8 @@ engine_capabilities <- function() {
 #' @param description Character. One line on what it does.
 #' @param requires Character vector of engine capabilities the
 #'   method needs. Used by selection rules.
+#' @param direction Character or NULL. For metrics: which way is
+#'   better; see register_metric().
 #' @return The name, invisibly.
 #'
 #' @example # Example usage of the function
@@ -92,7 +97,8 @@ register_method <- function(
   name,
   value,
   description,
-  requires = character(0)
+  requires = character(0),
+  direction = NULL
 ) {
   if (!kind %in% names(method_kinds())) {
     stop(
@@ -125,11 +131,34 @@ register_method <- function(
   }
 
   entries <- get(kind, envir = .sdm_registry)
+
+  # A hook may re-register only its own names (load_hooks())
+  hook <- getOption("sdm.hook_loading")
+
+  if (!is.null(hook) && name %in% names(entries) &&
+        !identical(entries[[name]]$source, hook)) {
+    stop(
+      "Hook ", basename(hook), " registers ", method_kinds()[[kind]],
+      " `", name, "`, which ",
+      if (is.null(entries[[name]]$source)) {
+        "is built in"
+      } else {
+        paste0("hook ", basename(entries[[name]]$source),
+               " already registered")
+      },
+      ". Give it another name.",
+      call. = FALSE
+    )
+  }
+
   entries[[name]] <- list(
     name = name,
     value = value,
     description = description,
-    requires = requires
+    requires = requires,
+    direction = direction,
+    # NULL for a built-in method; the file for a hook
+    source = hook
   )
   assign(kind, entries, envir = .sdm_registry)
 
@@ -260,11 +289,18 @@ register_resampler <- function(name, fn, description) {
 #' @param name Character. The name metrics are reported under.
 #' @param fn The metric function.
 #' @param description Character. One line.
+#' @param direction Character or NULL. Which way is better:
+#'   "higher", "lower", "toward_one" or "none". NULL keeps the
+#'   built-in table in better_direction() (compare.R), which
+#'   treats an unknown metric as "higher"; a hook metric should
+#'   state it.
 #' @return The name, invisibly.
 #'
 #' @example # Example usage of the function
-#' # register_metric("rmse", metric_rmse, "Root mean squared error")
-register_metric <- function(name, fn, description) {
+#' # register_metric("mae", metric_mae, "Mean absolute error",
+#' #                 direction = "lower")
+register_metric <- function(name, fn, description,
+                            direction = NULL) {
   if (!all(c("observed", "predicted") %in% names(formals(fn)))) {
     stop(
       "Metric `", name, "` must take `observed` and `predicted`.",
@@ -272,7 +308,28 @@ register_metric <- function(name, fn, description) {
     )
   }
 
-  register_method("metric", name, fn, description)
+  allowed <- c("higher", "lower", "toward_one", "none")
+
+  if (!is.null(direction) &&
+        (length(direction) != 1L || !direction %in% allowed)) {
+    stop(
+      "Metric `", name, "`: `direction` must be one of ",
+      paste(allowed, collapse = ", "), ".",
+      call. = FALSE
+    )
+  }
+
+  if (is.null(direction) && !is.null(getOption("sdm.hook_loading"))) {
+    warning(
+      "Hook metric `", name, "` has no `direction`, so comparisons ",
+      "treat higher as better. Pass direction = \"lower\" if not.",
+      call. = FALSE
+    )
+  }
+
+  register_method(
+    "metric", name, fn, description, direction = direction
+  )
 }
 
 ## 2.8 unregister_method() ----

@@ -7,6 +7,7 @@
 #   - the published v2 results, the ABMIexploreR reference
 #     (section 1.3; see harness/data_source.R)
 #   - the framework: 1_code/harness/, methods/, modules/
+#   - species.csv in this folder
 # outputs:
 #   in 2_pipeline/exp_000_parity_v2/:
 #     - <run>/<region>/ result stores, and run_log.csv
@@ -47,10 +48,14 @@ config <- experiment_config(
     "bird"
   ),
 
-  # A focal_species_sets() name, a vector named by taxon, or NULL
-  # for every species. Shorten trials by species, not draws, so
-  # the bands stay honest.
-  species = "parity_check",
+  # This folder's species.csv, or NULL for every species. Two per
+  # taxon, chosen so the test discriminates (rare species have
+  # bands wide enough to pass anything): well above 20 detections
+  # in both regions, prevalence ~5-45%, all 100 v2 draws usable,
+  # and one of each pair balanced between north and south. Its
+  # `note` column gives each species' numbers. Shorten trials by
+  # species, not draws, so the bands stay honest.
+  species = file.path(exp_dir, "species.csv"),
 
   # 100 is v2's and the only count the gate reads; below ~20 the
   # 10-90% bands are unstable. 5 checks the plumbing.

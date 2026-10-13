@@ -237,4 +237,131 @@ taxon_values <- function(x, taxon) {
   out
 }
 
+# 7. Experiment species files ----
+
+## 7.1 read_species_file() ----
+
+#' Read an Experiment's species.csv
+#'
+#' One row per species, with columns `taxon` (the data slug, e.g.
+#' "mite") and `species`. Other columns, such as a `note` on why a
+#' species was chosen, are ignored. The template lists every
+#' species in the dataset; an experiment deletes the rows it does
+#' not fit. A taxon the file does not name runs every species.
+#'
+#' @param path Character. The CSV.
+#' @return A character vector of species named by taxon, as
+#'   taxon_values() reads.
+#'
+#' @example # Example usage of the function
+#' # read_species_file(
+#' #   "1_code/experiments/exp_000_parity_v2/species.csv"
+#' # )
+read_species_file <- function(path) {
+  if (!is.character(path) || length(path) != 1L ||
+        !file.exists(path)) {
+    stop("Species file not found: ", path, call. = FALSE)
+  }
+
+  rows <- fread(path, colClasses = "character", na.strings = "")
+  absent <- setdiff(c("taxon", "species"), names(rows))
+
+  if (length(absent) > 0) {
+    stop(
+      "Species file ", basename(path), " has no ",
+      paste0("`", absent, "`", collapse = " or "), " column. ",
+      "It needs `taxon` and `species`.",
+      call. = FALSE
+    )
+  }
+
+  blank <- which(is.na(rows$taxon) | is.na(rows$species) |
+                   !nzchar(trimws(rows$taxon)) |
+                   !nzchar(trimws(rows$species)))
+
+  if (length(blank) > 0) {
+    stop(
+      "Species file ", basename(path), " has blank `taxon` or ",
+      "`species` in data row(s) ", paste(blank, collapse = ", "), ".",
+      call. = FALSE
+    )
+  }
+
+  keys <- paste(trimws(rows$taxon), trimws(rows$species))
+
+  if (anyDuplicated(keys)) {
+    stop(
+      "Species file ", basename(path), " repeats: ",
+      paste(unique(keys[duplicated(keys)]), collapse = ", "), ".",
+      call. = FALSE
+    )
+  }
+
+  stats::setNames(trimws(rows$species), trimws(rows$taxon))
+}
+
+## 7.2 check_species_names() ----
+
+#' Find Species and Taxon Names the Dataset Does Not Hold
+#'
+#' The reference is the dataset's species queue, so every
+#' experiment spells species the same way. Close matches are
+#' suggested for a misspelt name.
+#'
+#' @param species A species vector named by taxon, or NULL.
+#' @param data_dir Character. The test dataset folder.
+#' @return A character vector of problems, empty when every name
+#'   is known.
+#'
+#' @example # Example usage of the function
+#' # check_species_names(c(lichen = "Physcia.adscendns"), data_dir)
+check_species_names <- function(species, data_dir) {
+  if (is.null(species) || length(species) == 0) {
+    return(character(0))
+  }
+
+  catalogue <- species_catalogue(data_dir)
+  taxa <- names(species)
+
+  if (is.null(taxa) || any(is.na(taxa) | !nzchar(taxa))) {
+    return(paste0(
+      "Every species must be named by its taxon, e.g. ",
+      "c(lichen = \"Physcia.adscendens\"), or come from a ",
+      "species.csv."
+    ))
+  }
+
+  problems <- character(0)
+  unknown_taxa <- setdiff(unique(taxa), catalogue$taxon)
+
+  if (length(unknown_taxa) > 0) {
+    problems <- c(problems, paste0(
+      "Unknown taxon slug(s) in the species list: ",
+      paste(unknown_taxa, collapse = ", "), ". Slugs: ",
+      paste(unique(catalogue$taxon), collapse = ", "), "."
+    ))
+  }
+
+  for (taxon in setdiff(unique(taxa), unknown_taxa)) {
+    available <- unique(catalogue$species[catalogue$taxon == taxon])
+
+    for (one in setdiff(species[taxa == taxon], available)) {
+      close <- available[agrep(
+        one, available, max.distance = 0.2, ignore.case = TRUE
+      )]
+      problems <- c(problems, paste0(
+        "Species `", one, "` is not in the ", taxon, " queue",
+        if (length(close) > 0) {
+          paste0("; did you mean ",
+                 paste(utils::head(close, 3), collapse = ", "), "?")
+        } else {
+          ". See list_species()."
+        }
+      ))
+    }
+  }
+
+  problems
+}
+
 # End of script ----
