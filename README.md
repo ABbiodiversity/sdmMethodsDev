@@ -78,29 +78,30 @@ up by the name the spec gives.
 %% ----------------------------
 %% Taxon as configuration, not codebase
 %% ----------------------------
-%%{init: {"themeVariables": {"edgeLabelBackground": "#ffffff"}}}%%
+%%{init: {
+  "look": "classic",
+  "themeVariables": {"edgeLabelBackground": "#ffffff"},
+  "themeCSS": ".node rect, .node polygon, .node circle, .node path, .edgeLabel, .label-container { filter: none !important; box-shadow: none !important; }"
+}}%%
 flowchart TD
 
-    subgraph fw["framework: one pipeline, taxon as configuration"]
-        direction TB
-        PARAM["response · family · offset · regions · stages · resampling"]
-        PARAM --> SP["plant-group specs<br/>bryophytes · lichens · mites · vascular plants"]
-        PARAM --> SM["mammal specs<br/>summer · winter"]
-        PARAM --> SB["bird spec"]
-        SP --> H["1_code/harness/"]
-        SM --> H
-        SB --> H
-        MT["1_code/methods/<br/>engines · selection rules · resampling · metrics"]
-        MT -.->|"looked up by name"| H
-        H -->|"the same result files<br/>for every taxon and method"| R["result stores"]
-    end
+    PARAM["response · family · offset · regions · stages · resampling"]
+    PARAM --> SP["plant-group specs<br/>bryophytes · lichens · mites · vascular plants"]
+    PARAM --> SM["mammal specs<br/>summer · winter"]
+    PARAM --> SB["bird spec"]
+    SP --> H["1_code/harness/"]
+    SM --> H
+    SB --> H
+    MT["1_code/methods/<br/>engines · selection rules · resampling · metrics"]
+    MT -.->|"looked up by name"| H
+    H -->|"the same result files<br/>for every taxon and method"| R["result stores"]
 
     %% ----------------------------
     %% Styles
     %% ----------------------------
 
-    %% Containers
-    style fw fill:none,stroke:#2D415B,stroke-width:1px
+    %% Connection lines
+    linkStyle default stroke-width:1px
 
     %% Configuration
     style PARAM fill:#ffffff,stroke:#2D415B,stroke-width:1px,stroke-dasharray: 5 5
