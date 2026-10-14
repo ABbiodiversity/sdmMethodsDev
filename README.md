@@ -131,7 +131,11 @@ harness, methods and taxon modules stay a fixed, tested back-end.
 %% ----------------------------
 %% Everything comparable to one v2 baseline
 %% ----------------------------
-%%{init: {"themeVariables": {"edgeLabelBackground": "#ffffff"}}}%%
+%%{init: {
+  "look": "classic",
+  "themeVariables": {"edgeLabelBackground": "#ffffff"},
+  "themeCSS": ".node rect, .node polygon, .node circle, .node path, .cluster rect, .edgeLabel, .label-container { filter: none !important; box-shadow: none !important; }"
+}}%%
 flowchart TD
 
     subgraph fw["framework: everything comparable to one v2 baseline"]
