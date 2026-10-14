@@ -85,16 +85,14 @@ up by the name the spec gives.
 }}%%
 flowchart TD
 
-    PARAM["response · family · offset · regions · stages · resampling"]
-    PARAM --> SP["plant-group specs<br/>bryophytes · lichens · mites · vascular plants"]
-    PARAM --> SM["mammal specs<br/>summer · winter"]
-    PARAM --> SB["bird spec"]
+    PARAM["response · family · offset · model type · model selection"]
+    PARAM --> SP["plants spec.R"]
+    PARAM --> SM["mammals spec.R"]
+    PARAM --> SB["birds spec.R"]
     SP --> H["1_code/harness/"]
     SM --> H
     SB --> H
-    MT["1_code/methods/<br/>engines · selection rules · resampling · metrics"]
-    MT -.->|"looked up by name"| H
-    H -->|"the same result files<br/>for every taxon and method"| R["result stores"]
+    H -->|"select species, covariates,<br/>model specification, etc."| R["result object"]
 
     %% ----------------------------
     %% Styles
@@ -108,7 +106,6 @@ flowchart TD
     style SP fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
     style SM fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
     style SB fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
-    style MT fill:#A3B4C7,stroke:#2D415B,stroke-width:1px,stroke-dasharray: 5 5
 
     %% Shared pipeline
     style H fill:#A4A88780,stroke:#C8A02C,stroke-width:4px
