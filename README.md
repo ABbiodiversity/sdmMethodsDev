@@ -134,32 +134,29 @@ harness, methods and taxon modules stay a fixed, tested back-end.
 %%{init: {
   "look": "classic",
   "themeVariables": {"edgeLabelBackground": "#ffffff"},
-  "themeCSS": ".node rect, .node polygon, .node circle, .node path, .cluster rect, .edgeLabel, .label-container { filter: none !important; box-shadow: none !important; }"
+  "themeCSS": ".node rect, .node polygon, .node circle, .node path, .edgeLabel, .label-container { filter: none !important; box-shadow: none !important; }"
 }}%%
 flowchart TD
 
-    subgraph fw["framework: everything comparable to one v2 baseline"]
-        direction TB
-        D["0_data/test_dataset/"] --> M["1_code/modules/[taxon]/<br/>v2 specs"]
-        V2["0_data/v2_results/<br/>published v2.0"]
-        M --> E0["exp_000_parity_v2"]
-        M --> E1["exp_001"]
-        M --> E2["exp_002"]
-        V2 -->|"parity check"| E0
-        E0 --> O0["3_output/exp_000_parity_v2/"]
-        E1 --> O1["3_output/exp_001/"]
-        E2 --> O2["3_output/exp_002/"]
-        O0 --> C["compare_experiments()"]
-        O1 --> C
-        O2 --> C
-    end
+    D["0_data/test_dataset/"] --> M["1_code/modules/[taxon]/<br/>v2 specs"]
+    V2["0_data/v2_results/<br/>published v2.0"]
+    M --> E0["exp_000_parity_v2"]
+    M --> E1["exp_001"]
+    M --> E2["exp_002"]
+    V2 -->|"parity check"| E0
+    E0 --> O0["3_output/exp_000_parity_v2/"]
+    E1 --> O1["3_output/exp_001/"]
+    E2 --> O2["3_output/exp_002/"]
+    O0 --> C["compare_experiments()"]
+    O1 --> C
+    O2 --> C
 
     %% ----------------------------
     %% Styles
     %% ----------------------------
 
-    %% Container
-    style fw fill:none,stroke:#2D415B,stroke-width:1px
+    %% Connection lines
+    linkStyle default stroke-width:.75px
 
     %% Highlighted borders
     style D fill:#A4A88780,stroke:#B8860B,stroke-width:4px
