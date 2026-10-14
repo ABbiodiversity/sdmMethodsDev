@@ -19,9 +19,10 @@ test_that("the manifest names files that exist", {
   expect_true(all(file.exists(
     file.path(data_dir, manifest$response_file)
   )))
+  # The mammal province row has no grid
   expect_true(all(file.exists(file.path(
     data_dir, "lookup",
-    paste0(manifest$grid, "_prediction_matrix.csv")
+    paste0(stats::na.omit(manifest$grid), "_prediction_matrix.csv")
   ))))
 })
 

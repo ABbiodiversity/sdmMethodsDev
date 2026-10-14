@@ -5,12 +5,13 @@
 # inputs: none
 # outputs: none; returns objects in memory
 # notes:
-#   - v2 reads mammal climate from mammal_climate_predictions.csv
-#     (ABbiodiversity/MammalModels, 1_code/2_habitat-modeling/
-#     climate/: nine binomial GLMs over FFP, MAP, CMD, TD, AICc
-#     averaged). `climate_source = "fitted"` instead fits that set
-#     as a stage, on the climate from
-#     abmi-camera-climate_2023.Rdata that v2 used.
+#   - Climate is fitted as a province-wide stage, carried into the
+#     regional hurdle as `Climate`, as for birds and plants. It
+#     ports ABbiodiversity/MammalModels 1_code/2_habitat-modeling/
+#     climate/ (nine binomial GLMs over FFP, MAP, CMD, TD, AICc
+#     averaged) on v2's own training table, the mammal_province
+#     rows; see climate.R. `climate_source = "precomputed"` reads
+#     v2's prediction (mammal_climate_predictions.csv) instead.
 #   - North and south are separate covariate keys: overlapping
 #     deployments with disagreeing covariates.
 #   - Weights are season days, so the weight column follows the
@@ -123,11 +124,11 @@ mammal_agp_response <- function(values, frame) {
 #' (best by AICc), turned into v2's tables by
 #' mammal_v2_habitat_tables() (hurdle.R).
 #'
-#' @param climate_source Character. "precomputed", the v2
-#'   default, reads each species' climate prediction from
-#'   mammal_climate_predictions.csv and drops the deployments
-#'   without one, as v2 does; "fitted" fits the adapted climate
-#'   stage instead.
+#' @param climate_source Character. "fitted", the default, fits
+#'   v2's climate stage province-wide on v2's training table;
+#'   "precomputed" reads each species' climate prediction from
+#'   mammal_climate_predictions.csv. Both drop the deployments
+#'   without a climate prediction, as v2 does.
 #' @param season Character. "summer" or "winter"; selects the
 #'   weight column and the species queue.
 #' @param tier Character. "modelled" is the full habitat model,
@@ -137,29 +138,36 @@ mammal_agp_response <- function(values, frame) {
 #'
 #' @example # Example usage of the function
 #' # spec <- mammal_spec()
-#' # spec <- mammal_spec(climate_source = "fitted")
+#' # spec <- mammal_spec(climate_source = "precomputed")
 mammal_spec <- function(
-  climate_source = c("precomputed", "fitted"),
+  climate_source = c("fitted", "precomputed"),
   season = c("summer", "winter"),
   tier = "modelled"
 ) {
   climate_source <- match.arg(climate_source)
   season <- match.arg(season)
+  fitted <- climate_source == "fitted"
 
   stages <- list()
 
-  if (climate_source == "fitted") {
+  if (fitted) {
     stages <- list(
       list(
         name = "climate",
-        # The full v2 set (CMD and TD from the camera climate file)
+        # climate/00_models.R and 02_run-models.R
         models = "climate_bird_mammal_v2",
         engine = "glm",
         selection = "aic_average",
         ic = "AICc",
-        carry_as = "Climate",
-        # Fitted on presence; the abundance half reuses it
-        response_transform = mammal_pa_response
+        # Province-wide and unweighted, seasons pooled, fitted on
+        # v2's own table (the mammal_province rows)
+        scope = "province",
+        weighted = FALSE,
+        response_transform = mammal_climate_response,
+        # v2 keeps deployments by FFP, whatever the candidates
+        extra_covariates = "FFP",
+        # plogis(link), as v2's site predictions
+        carry_as = "Climate"
       )
     )
   }
@@ -173,17 +181,20 @@ mammal_spec <- function(
     # Presence; the abundance half reads the raw count
     response_transform = mammal_pa_response,
 
-    # v2 reads climate from a separate pipeline's prediction
-    species_frame = if (climate_source == "precomputed") {
+    # Either way, only deployments with a climate prediction
+    # reach the habitat stage, as v2's join leaves them
+    species_frame = if (fitted) {
+      mammal_climate_available
+    } else {
       mammal_precomputed_climate
-    } else {
-      NULL
     },
-    supplied_columns = if (climate_source == "precomputed") {
-      "Climate"
-    } else {
-      NULL
-    },
+    supplied_columns = if (fitted) NULL else "Climate",
+
+    # The climate rows have their own unit ids: province draws
+    # reach each region through the deployment, and the climate
+    # response reads both seasons
+    province_key = if (fitted) "location_project" else NULL,
+    response_companions = if (fitted) mammal_season_pair else NULL,
     family = "binomial",
     weight_column = paste0("wt_", season),
 
@@ -267,30 +278,35 @@ mammal_spec <- function(
       )
     )),
 
-    resample = list(
-      scheme = "spatial_block",
-      min_detections = 20L
-      # No seed here: the experiment's seed is used
+    resample = c(
+      list(
+        scheme = "spatial_block",
+        min_detections = 20L
+      ),
+      # One draw for the province, mapped to each region, as for
+      # birds and plants. No seed here: the experiment's is used.
+      if (fitted) list(scope = "province")
     ),
 
     climate_source = climate_source,
 
     v2_coverage = list(
-      climate = if (climate_source == "precomputed") {
+      climate = if (fitted) {
+        v2_status(
+          "reproduced",
+          paste(
+            "v2's nine climate GLMs, AICc averaged, unweighted,",
+            "on v2's own table with seasons pooled, province-wide;",
+            "carried as plogis(link). v2 fits once, so draw 1 is",
+            "like for like."
+          )
+        )
+      } else {
         v2_status(
           "reproduced",
           paste(
             "v2's precomputed climate prediction, read per species;",
             "deployments without one are dropped, as in v2."
-          )
-        )
-      } else {
-        v2_status(
-          "partial",
-          paste(
-            "The full v2 9-model set, fitted as a stage. v2 fits",
-            "it once, in a separate pipeline, and reads back a",
-            "prediction; use climate_source = \"precomputed\"."
           )
         )
       },
@@ -306,9 +322,14 @@ mammal_spec <- function(
       resampling = v2_status(
         "partial",
         paste(
-          "Spatial-block bootstrap. v2 fits the habitat stage",
-          "once, so only iteration 1, the full data, is like for",
-          "like."
+          "Spatial-block bootstrap",
+          if (fitted) {
+            "drawn province-wide and mapped to regions."
+          } else {
+            "per region."
+          },
+          "v2 fits once, so only iteration 1, the full data, is",
+          "like for like."
         )
       ),
       season = v2_status(
@@ -321,8 +342,11 @@ mammal_spec <- function(
     ),
 
     notes = paste0(
-      if (climate_source == "fitted") {
-        "Climate fitted with the full 9-model v2 set."
+      if (fitted) {
+        paste(
+          "Climate fitted province-wide with v2's 9-model set on",
+          "v2's own table, seasons pooled."
+        )
       } else {
         "Climate read from v2's precomputed predictions."
       },

@@ -46,6 +46,10 @@ spec_fields <- function() {
       "notes", "models_overridden", "covariate_files",
       # The stage a methods experiment replaces by default
       "habitat_stage",
+      # Where the province table has its own unit ids: the column
+      # that maps its draws to region units, and other response
+      # columns its frame carries (the mammal climate stage)
+      "province_key", "response_companions",
       # Recorded facts a module keeps for its own reports
       "use_protocol", "protocol_is_v2", "climate_source"
     ),
@@ -125,6 +129,29 @@ validate_spec <- function(spec, stop_on_error = TRUE) {
         "formula, such as ~ nr != \"Grassland\"."
       )
     }
+  }
+
+  # Step 2b: The province table's key and companions
+  if (!is.null(spec$province_key)) {
+    if (!is.character(spec$province_key) ||
+          length(spec$province_key) != 1L) {
+      problem(label, ": `province_key` must be one column name.")
+    }
+
+    if (!identical(spec$resample$scope, "province")) {
+      problem(
+        label, ": `province_key` maps province-wide draws, so ",
+        "`resample$scope` must be \"province\"."
+      )
+    }
+  }
+
+  if (!is.null(spec$response_companions) &&
+        !is.function(spec$response_companions)) {
+    problem(
+      label, ": `response_companions` must be a function of the ",
+      "species, returning named response columns."
+    )
   }
 
   # Step 3: Stages, in order
@@ -455,7 +482,22 @@ check_spec_covariates <- function(spec, data_dir, regions = NULL,
   )
 
   if (!is.null(province)) {
-    check(province$covariates, NULL)
+    # NULL for most taxa; "province" where the manifest names a
+    # separate province table
+    region <- tryCatch(
+      province_region(data_dir, spec$taxon), error = function(e) NULL
+    )
+
+    if (!is.null(spec$province_key) && is.null(region)) {
+      problems <- c(problems, paste0(
+        "Run `", label, "`: the spec reads a separate province ",
+        "table (`province_key`), but this test dataset has no ",
+        "`province` row for ", spec$taxon, " in its manifest. ",
+        "Use a dataset version that has one."
+      ))
+    } else {
+      check(province$covariates, region)
+    }
   }
 
   unique(problems)

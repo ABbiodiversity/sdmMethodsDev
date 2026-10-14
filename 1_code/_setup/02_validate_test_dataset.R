@@ -1088,6 +1088,148 @@ if (file.exists(climate_pred_path) &&
   )
 }
 
+## 3.6.1b Mammal climate-stage rows ----
+# The mammal_province rows: v2's combined 2022 table, which the
+# v2 climate stage fits on. Traced back to it and to the camera
+# climate, then checked to reproduce v2's training set: the
+# deployments with a pooled presence must be the ones v2's
+# prediction file covers.
+mammal_climate_data_file <- Sys.getenv(
+  "SDM_MAMMAL_CLIMATE_DATA",
+  unset = setup_input(
+    "abmi_mammals",
+    "Results/Density",
+    paste0(
+      "R Dataset SpTable for ABMI North and South mammal ",
+      "coefficients 2022.RData"
+    )
+  )
+)
+mammal_camera_climate_file <- Sys.getenv(
+  "SDM_MAMMAL_CAMERA_CLIMATE",
+  unset = setup_input(
+    "ab_data_v2023", "abmi-camera-climate_2023.Rdata"
+  )
+)
+
+province_rows <- which(
+  startsWith(mam_csv$survey_unit_id, "mammal_province|")
+)
+
+if (length(province_rows) > 0 &&
+      file.exists(mammal_climate_data_file) &&
+      file.exists(mammal_camera_climate_file)) {
+  label <- "mammal province"
+  env <- new.env()
+  load(mammal_climate_data_file, envir = env)
+  d <- as.data.frame(env$d, check.names = FALSE)
+
+  # Response: keys and every species column the CSV kept
+  keys <- sub("__[0-9]+$", "", mam_csv$survey_unit_id[province_rows])
+  note(
+    label, "keys match source, in order",
+    identical(keys, paste0("mammal_province|", d$location_project)),
+    paste(length(province_rows), "rows")
+  )
+
+  src_cols <- names(d)[env$FirstSpCol.s:env$LastSpCol.w]
+  out_cols <- harmonized_name(src_cols)
+  kept <- out_cols %in% names(mam_csv)
+  cmp <- compare_blocks(
+    mam_csv[province_rows, out_cols[kept], with = FALSE],
+    d[, src_cols[kept]]
+  )
+  note(
+    label, "species values match source", cmp$n == 0,
+    sprintf("%d of %d columns kept; %d cells differ",
+            sum(kept), length(kept), cmp$n)
+  )
+
+  s <- sites[match(mam_csv$survey_unit_id[province_rows],
+                   survey_unit_id)]
+  note(
+    label, "site fields match source",
+    isTRUE(all.equal(s$lat, as.numeric(d$Lat))) &&
+      isTRUE(all.equal(s$long, as.numeric(d$Long))) &&
+      identical(
+        as.numeric(s$summer_days), as.numeric(d$SummerDays)
+      ) &&
+      identical(
+        as.numeric(s$winter_days), as.numeric(d$WinterDays)
+      ) &&
+      identical(s$lured, as.character(d$Lured))
+  )
+
+  # Climate: rebuilt here with v2's join (01_prepare-data.R)
+  cenv <- new.env()
+  load(mammal_camera_climate_file, envir = cenv)
+  cc <- cenv$camera.climate
+  cc_location <- sub(
+    "^CMU-|^NWSAR-", "", sub("_[0-9]{4}$", "", rownames(cc))
+  )
+  first <- !duplicated(cc_location)
+  matched <- match(d$location, cc_location[first])
+  climate_cols <- c("FFP", "MAP", "TD", "CMD", "EMT")
+
+  cov_rows <- covariates[taxon == "mammal_province"][
+    match(mam_csv$survey_unit_id[province_rows], survey_unit_id)
+  ]
+  cmp <- compare_blocks(
+    cov_rows[, ..climate_cols],
+    cc[first, climate_cols][matched, ]
+  )
+  note(
+    label, "climate matches the camera file (v2's join)",
+    cmp$n == 0,
+    sprintf("%d of %d deployments matched", sum(!is.na(matched)),
+            nrow(d))
+  )
+
+  # v2's training set: per deployment, base weighted.mean over
+  # the two seasons (zero-day seasons drop out), and FFP present
+  source_pred <- as.data.frame(fread(mammal_climate_pred_file))
+  pred_species <- setdiff(names(source_pred), "location_project")
+  pred_cols <- harmonized_name(paste0(pred_species, "Summer"))
+  pred_base <- sub("_Summer$", "", pred_cols)
+  checkable <- paste0(pred_base, "_Winter") %in% names(mam_csv) &
+    pred_cols %in% names(mam_csv)
+
+  agree <- vapply(which(checkable), function(i) {
+    summer <- mam_csv[[pred_cols[i]]][province_rows]
+    winter_col <- paste0(pred_base[i], "_Winter")
+    winter <- mam_csv[[winter_col]][province_rows]
+    pooled <- mapply(
+      function(a, b, x, y) weighted.mean(c(a, b), c(x, y)),
+      summer, winter, s$summer_days, s$winter_days
+    )
+    usable <- !is.na(pooled) & !is.na(cov_rows$FFP)
+    setequal(
+      keys[usable],
+      paste0("mammal_province|", source_pred$location_project[
+        !is.na(source_pred[[pred_species[i]]])
+      ])
+    )
+  }, logical(1))
+
+  note(
+    label, "pooled presence reproduces v2's training set",
+    all(agree),
+    sprintf(
+      "%d of %d species agree; not checkable: %s",
+      sum(agree), length(agree),
+      paste(pred_species[!checkable], collapse = ", ")
+    )
+  )
+} else {
+  note(
+    "mammal province", "climate-stage rows available", FALSE,
+    paste(
+      "no mammal_province rows, or source not found;",
+      "set SDM_MAMMAL_CLIMATE_DATA"
+    )
+  )
+}
+
 ## 3.6.2 Bird response, offsets and covariates ----
 # Birds come from one file rather than the snapshot. Its three
 # frames are stored row-aligned on surveyid, so the key is
@@ -1317,8 +1459,10 @@ if (all(present)) {
   named <- c(
     file.path(data_dir, manifest$response_file),
     file.path(data_dir, stats::na.omit(manifest$offset_file)),
-    file.path(lookup_dir,
-              paste0(manifest$grid, "_prediction_matrix.csv"))
+    # The mammal province row has no grid
+    file.path(lookup_dir, paste0(
+      stats::na.omit(manifest$grid), "_prediction_matrix.csv"
+    ))
   )
 
   note(

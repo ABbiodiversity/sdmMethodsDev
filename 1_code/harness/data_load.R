@@ -14,7 +14,9 @@
 #   - Taxon-agnostic: file locations and covariate keys come from
 #     lookup/dataset_manifest.csv (_setup/07). The key is
 #     `<taxon>_<region>` for mammals, whose north and south files
-#     hold different values for the same deployment.
+#     hold different values for the same deployment. A manifest
+#     row with region "province" names a separate province-wide
+#     table (province_region()).
 #   - Reads are column-selective (covariates.csv is ~218 MB, 457
 #     columns). build_model_data() loads once per taxon and
 #     region; model_frame() cuts per-species frames from it.
@@ -118,6 +120,32 @@ covariate_key <- function(taxon, region = NULL, data_dir) {
   }
 
   manifest_entry(data_dir, taxon, region)$covariate_key
+}
+
+## 2.4 province_region() ----
+
+#' Name the Region a Taxon's Province-Wide Data Are Stored Under
+#'
+#' Most taxa store one set of rows that every region filters, so
+#' the province frame is read with no region. A taxon whose
+#' province-wide data are a separate table (the mammal climate
+#' stage) has a manifest row with region "province".
+#'
+#' @param data_dir Character. The test dataset folder.
+#' @param taxon Character. Taxon slug.
+#' @return "province", or NULL when the taxon has no such row.
+#'
+#' @example # Example usage of the function
+#' # province_region(data_dir, "mammal") # "province"
+#' # province_region(data_dir, "lichen") # NULL
+province_region <- function(data_dir, taxon) {
+  manifest <- dataset_manifest(data_dir)
+
+  if (any(manifest$taxon == taxon & manifest$region == "province")) {
+    "province"
+  } else {
+    NULL
+  }
 }
 
 # 3. load_sites() ----
@@ -793,8 +821,11 @@ build_model_data <- function(
 #'   model weights, or NULL.
 #' @param response_name,offset_name,weight_name Character. Column
 #'   names to write into the frame.
+#' @param companions Named character vector of other response
+#'   columns to carry, as `<response_name>_<name>`, or NULL. The
+#'   mammal climate stage pools a species' two seasons.
 #' @return A data frame with the covariates plus the response,
-#'   and the offset and weight when they apply.
+#'   and the offset, weight and companions when they apply.
 #'
 #' @example # Example usage of the function
 #' # d <- model_frame(md, "Aulacomnium.palustre",
@@ -806,7 +837,8 @@ model_frame <- function(
   weight_column = NULL,
   response_name = "response",
   offset_name = "offset",
-  weight_name = "weight"
+  weight_name = "weight",
+  companions = NULL
 ) {
   if (!species %in% names(model_data$response)) {
     stop(
@@ -853,6 +885,23 @@ model_frame <- function(
     }
 
     frame[[weight_name]] <- frame[[weight_column]]
+  }
+
+  # Step 4: Attach companion responses, for a stage's own
+  # response transform to read (fit_one_stage())
+  for (name in names(companions)) {
+    column <- companions[[name]]
+
+    if (!column %in% names(model_data$response)) {
+      stop(
+        "Companion `", column, "` of `", species, "` is not a ",
+        "column of the ", model_data$taxon, " response table.",
+        call. = FALSE
+      )
+    }
+
+    frame[[paste0(response_name, "_", name)]] <-
+      model_data$response[[column]]
   }
 
   frame

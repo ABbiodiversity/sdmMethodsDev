@@ -16,6 +16,9 @@
 #       coefficients 2024.RData
 #   from the ABMI Mammals shared drive:
 #     - Lookup Tables/WildTrax Species Strings.RData
+#     - Results/Density/R Dataset SpTable for ABMI North and
+#       South mammal coefficients 2022.RData, the table v2's
+#       mammal climate stage fits on (section 1.7b)
 #   from the work_abmi shared drive, read-only:
 #     - 1_projects/active/sdmMethodsDev/remote/birds_data_v2/
 #       Stratified.Rdata, the copy v2's birds were fitted on
@@ -62,6 +65,10 @@
 #   - Mammal covariates and prediction matrices come from the
 #     SpTable files (matrices checked identical to the ABMI
 #     Mammals drive CSVs); the climate block is replaced (1.6).
+#   - The mammal climate stage has its own rows, covariate key
+#     `mammal_province`, from v2's combined 2022 table (1.7b).
+#     They are written after every other taxon's rows, so the
+#     existing rows keep their order.
 #   - Birds come from Stratified.Rdata (1.10), read-only
 #     (SDM_BIRD_DATA overrides). Prediction matrices come from
 #     the vegetation models project (1.8; SDM_V2_LOOKUP
@@ -285,6 +292,24 @@ mammal_climate_pred_file <- Sys.getenv(
     "abmi_mammals",
     "Results/Habitat Modeling/2024/Climate/Predictions",
     "All Species Climate Predictions.csv"
+  )
+)
+
+## 1.7b Name the mammal climate table ----
+# v2's climate stage (MammalModels climate/01_prepare-data.R)
+# fits on this combined table, not the 2024 regional ones: it
+# holds 120 deployments the regional habitat filters drop. It
+# also carries the archived prep script's bug that blanks summer
+# densities when WinterDays < 10; kept, as v2 fitted on it.
+mammal_climate_data_file <- Sys.getenv(
+  "SDM_MAMMAL_CLIMATE_DATA",
+  unset = setup_input(
+    "abmi_mammals",
+    "Results/Density",
+    paste0(
+      "R Dataset SpTable for ABMI North and South mammal ",
+      "coefficients 2022.RData"
+    )
   )
 )
 
@@ -1157,6 +1182,152 @@ read_mammal_region <- function(path, region, native_sp) {
   ))
 }
 
+## 2.9b read_mammal_province() ----
+
+#' Read v2's Combined Mammal Table for the Climate Stage
+#'
+#' Same unit, site and climate rules as read_mammal_region(), on
+#' the 2022 combined file's own layout (`FirstSpCol.s` to
+#' `LastSpCol.w`). The only habitat columns kept are the two the
+#' region filters read. There is no species queue or prediction
+#' matrix: the climate stage fits whatever the regions fit.
+#'
+#' @param path Character. Path to the combined 2022 .RData file.
+#' @param native_sp Character. WildTrax common-name strings.
+#' @return A list with `species`, `sites`, `climate` and `veg`, or
+#'   NULL when the file is absent.
+#'
+#' @example # Example usage of the function
+#' # out <- read_mammal_province(mammal_climate_data_file,
+#' #                             native_sp)
+read_mammal_province <- function(path, native_sp) {
+  if (!file.exists(path)) {
+    return(NULL)
+  }
+
+  env <- load_rdata(path)
+  d <- as.data.frame(env$d, stringsAsFactors = FALSE)
+
+  # Step 1: The species block, from the file's own indices
+  span <- env$FirstSpCol.s:env$LastSpCol.w
+
+  if (anyNA(span) || max(span) > ncol(d)) {
+    stop(
+      "Species column indices in ", basename(path),
+      " fall outside the data.",
+      call. = FALSE
+    )
+  }
+
+  species_cols <- names(d)[span]
+  harmonized <- normalize_mammal_column(
+    species_cols, native_sp, "mammal province"
+  )
+
+  if (anyDuplicated(harmonized) > 0) {
+    stop(
+      "Normalizing mammal province names merged distinct ",
+      "columns: ",
+      paste(
+        unique(harmonized[duplicated(harmonized)]),
+        collapse = ", "
+      ),
+      call. = FALSE
+    )
+  }
+
+  # Step 2: Units. Four deployments appear twice; they get
+  # numbered ids, and the climate stage pools them as v2 does.
+  unit_id <- make_unique_ids(
+    paste0("mammal_province|", d$location_project),
+    "mammal province"
+  )
+
+  values <- d[, species_cols, drop = FALSE]
+  names(values) <- harmonized
+
+  species <- data.frame(
+    survey_unit_id = unit_id,
+    values,
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
+
+  sites <- data.frame(
+    survey_unit_id = unit_id,
+    survey_design = "mammal_camera",
+    region = "province",
+    site = NA_character_,
+    site_year = NA_character_,
+    year = NA_integer_,
+    quadrant = NA_character_,
+    on_off_grid = NA_character_,
+    location = as.character(d$location),
+    project = as.character(d$project),
+    nearest_site = as.character(d$NearestSite),
+    lured = d$Lured,
+    summer_days = as.numeric(d$SummerDays),
+    winter_days = as.numeric(d$WinterDays),
+    lat = as.numeric(d$Lat),
+    long = as.numeric(d$Long),
+    elevation = NA_real_,
+    easting = NA_real_,
+    northing = NA_real_,
+    nr = as.character(d$NR),
+    nsr = as.character(d$NSR),
+    luf = as.character(d$LUF),
+    stringsAsFactors = FALSE
+  )
+
+  # Step 3: Climate, joined on location as v2's climate stage
+  # does (01_prepare-data.R:81-106); the SpTable's own climate
+  # columns are not used
+  camera_climate <- read_camera_climate(
+    mammal_camera_climate_file, mammal_camera_climate_cols
+  )
+
+  if (is.null(camera_climate)) {
+    stop(
+      "Camera climate not found at ", mammal_camera_climate_file,
+      "; the mammal climate rows cannot be built without it.",
+      call. = FALSE
+    )
+  }
+
+  matched <- match(as.character(d$location), camera_climate$location)
+
+  climate <- data.frame(
+    survey_unit_id = unit_id,
+    location_project = as.character(d$location_project),
+    camera_climate[matched, mammal_camera_climate_cols, drop = FALSE],
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
+  rownames(climate) <- NULL
+
+  # Step 4: The habitat columns the region filters name
+  veg <- data.frame(
+    survey_unit_id = unit_id,
+    Water = as.numeric(d$Water),
+    WetlandMargin = as.numeric(d$WetlandMargin),
+    stringsAsFactors = FALSE
+  )
+
+  message(
+    "  mammal province: ", nrow(species), " units x ",
+    length(species_cols), " species-season columns; camera ",
+    "climate matched ", sum(!is.na(matched)), " (",
+    round(100 * mean(!is.na(matched)), 1), "%)"
+  )
+
+  return(list(
+    species = species,
+    sites = sites,
+    climate = climate,
+    veg = veg
+  ))
+}
+
 ## 2.10 read_bird_data() ----
 
 #' Read the Bird Data Package
@@ -1425,6 +1596,21 @@ mammal_parts <- lapply(
 )
 names(mammal_parts) <- names(mammal_files)
 
+# Kept apart from mammal_parts: no species queue, prediction
+# matrix or habitat block, so the per-region steps skip it
+mammal_province <- read_mammal_province(
+  mammal_climate_data_file, native_sp
+)
+
+if (is.null(mammal_province)) {
+  warning(
+    "Mammal climate table not found at ", mammal_climate_data_file,
+    "; no mammal_province rows are written, so the fitted mammal ",
+    "climate stage cannot run. Set SDM_MAMMAL_CLIMATE_DATA.",
+    call. = FALSE
+  )
+}
+
 ## 3.4 Read the bird data package ----
 message("Reading bird data ...")
 
@@ -1481,6 +1667,29 @@ mammal_species <- rbind(
   align_columns(mammal_parts$south$species, mammal_species_cols)
 )
 
+## 4.3 Append the climate stage's rows ----
+# Last, so the regional rows keep their order. Species the
+# regions never record are dropped: nothing could model them.
+if (!is.null(mammal_province)) {
+  province_only <- setdiff(
+    names(mammal_province$species),
+    c("survey_unit_id", mammal_species_cols)
+  )
+
+  if (length(province_only) > 0) {
+    message(
+      "  mammal province: ", length(province_only),
+      " species-season column(s) not in the regional files, ",
+      "dropped: ", paste(province_only, collapse = ", ")
+    )
+  }
+
+  mammal_species <- rbind(
+    mammal_species,
+    align_columns(mammal_province$species, mammal_species_cols)
+  )
+}
+
 message(
   "  mammal combined: ",
   nrow(mammal_species),
@@ -1498,7 +1707,9 @@ all_sites <- do.call(
   c(
     lapply(plant_parts, function(x) x$sites),
     lapply(mammal_parts, function(x) x$sites),
-    list(bird = bird_parts$sites)
+    list(bird = bird_parts$sites),
+    # Last, so existing rows keep their order (section 4.3)
+    list(mammal_province = mammal_province$sites)
   )
 )
 rownames(all_sites) <- NULL
@@ -1645,7 +1856,16 @@ covariate_blocks <- c(
       soil = bird_parts$soil,
       design = bird_parts$design
     )
-  )
+  ),
+  # Last, so existing rows keep their order (section 4.3)
+  if (!is.null(mammal_province)) {
+    list(
+      mammal_province = list(
+        climate = mammal_province$climate,
+        veg = mammal_province$veg
+      )
+    )
+  }
 )
 
 merged_covariates <- lapply(
@@ -1736,7 +1956,7 @@ covariate_taxa <- list(
   bryophyte = "bryophyte",
   lichen = "lichen",
   mite = "mite",
-  mammal = c("mammal_north", "mammal_south"),
+  mammal = c("mammal_north", "mammal_south", "mammal_province"),
   bird = "bird"
 )
 

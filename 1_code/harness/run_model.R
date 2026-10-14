@@ -382,10 +382,12 @@ region_request <- function(spec, region, data_dir) {
 
 #' Assemble the Province-Wide Data a Spec's Province Scope Needs
 #'
-#' v2 fits plant and bird climate stages, and draws the plant
-#' bootstrap, province-wide; only habitat is per region. Specs
-#' declare this with `scope = "province"`. Loads the unfiltered
-#' data once per spec.
+#' v2 fits plant, bird and mammal climate stages, and draws the
+#' plant bootstrap, province-wide; only habitat is per region.
+#' Specs declare this with `scope = "province"`. Loads the
+#' unfiltered data once per spec: the taxon's own rows, or its
+#' separate province table where the manifest names one (the
+#' mammal climate stage; province_region()).
 #'
 #' @param spec A taxon spec, with stage models already resolved.
 #' @param data_dir Character.
@@ -402,13 +404,21 @@ province_context <- function(spec, data_dir, species) {
     return(NULL)
   }
 
+  # Companion responses (e.g. the other season) load alongside
+  companions <- if (is.function(spec$response_companions)) {
+    unlist(lapply(species, spec$response_companions),
+           use.names = FALSE)
+  } else {
+    character(0)
+  }
+
   list(
     model_data = build_model_data(
       taxon = spec$taxon,
       data_dir = data_dir,
-      species = species,
+      species = unique(c(species, companions)),
       covariates = request$covariates,
-      region = NULL,
+      region = province_region(data_dir, spec$taxon),
       region_filter = NULL,
       weight_column = NULL,
       aliases = spec$aliases %||% list(),
@@ -453,9 +463,15 @@ province_request <- function(spec) {
     }
   }
 
+  # Not the spec's weight column: province frames are unweighted
+  # (province_context()), and a separate province table need not
+  # carry it
   stage_names <- vapply(province_stages, `[[`, character(1), "name")
   covariates <- if (length(stage_names) > 0) {
-    spec_covariates(spec, stage_names = stage_names)
+    setdiff(
+      spec_covariates(spec, stage_names = stage_names),
+      spec$weight_column
+    )
   } else {
     character(0)
   }
@@ -475,8 +491,9 @@ province_request <- function(spec) {
 
 #' The Columns to Load, Given the Covariates the Formulas Name
 #'
-#' Adds the stored-draw key and region-filter columns; drops
-#' aliases and site fields, which do not come from
+#' Adds the stored-draw key, the province key (which maps
+#' province draws to region units) and region-filter columns;
+#' drops aliases and site fields, which do not come from
 #' covariates.csv.
 #'
 #' @param spec A taxon spec.
@@ -502,6 +519,7 @@ covariate_request <- function(spec, covariates, filters = NULL) {
   unique(c(
     covariates,
     spec$resample$id_column,
+    spec$province_key,
     setdiff(filter_terms, c(site_columns(), "survey_unit_id"))
   ))
 }
@@ -628,7 +646,10 @@ fit_species <- function(species, p) {
   if (!is.null(p$province)) {
     province <- list(frame = model_frame(
       p$province$model_data, species = species,
-      transform = spec$response_transform %||% "identity"
+      transform = spec$response_transform %||% "identity",
+      companions = if (is.function(spec$response_companions)) {
+        spec$response_companions(species)
+      }
     ))
 
     if (p$province$draws) {
@@ -664,8 +685,15 @@ fit_species <- function(species, p) {
     }
 
     # Step 2: The draws. Province-wide draws are filtered to the
-    # region's units when fitted, as v2 subsets them.
-    draws <- if (!is.null(province$draws)) {
+    # region's units when fitted, as v2 subsets them; where the
+    # province table has its own unit ids, they are first mapped
+    # to the region's units through `province_key`.
+    draws <- if (is.list(province$draws) &&
+                   !is.null(spec$province_key)) {
+      map_province_draws(
+        province$draws, province$frame, frame, spec$province_key
+      )
+    } else if (!is.null(province$draws)) {
       province$draws
     } else {
       tryCatch(
@@ -692,9 +720,17 @@ fit_species <- function(species, p) {
       if (!is.null(province) && length(p$province$stages) > 0) {
         key <- as.character(boot)
 
+        # On the province draw, not the region's mapped copy (the
+        # same draw unless `province_key` maps it)
+        province_draw <- if (is.list(province$draws)) {
+          province$draws[[i]]
+        } else {
+          draws[[i]]
+        }
+
         if (is.null(province_fits[[key]])) {
           province_fits[[key]] <<- fit_province_stages(
-            p$province$stages, province$frame, draws[[i]], spec,
+            p$province$stages, province$frame, province_draw, spec,
             species
           )
         }
@@ -745,6 +781,52 @@ fit_province_stages <- function(stages, frame, draw, spec, species) {
   })
 
   stats::setNames(fits, vapply(stages, `[[`, character(1), "name"))
+}
+
+## 4.6 map_province_draws() ----
+
+#' Map Province Draws onto a Region's Own Units
+#'
+#' For taxa whose province table has its own unit ids (the mammal
+#' climate rows), a shared key column links the two. Each region
+#' unit stands for the first province unit with its key, and is
+#' drawn as often as that unit is. Region units whose key the
+#' province table lacks are never drawn, as v2's mammal habitat
+#' models drop deployments with no climate prediction.
+#'
+#' @param draws List of character vectors of province unit ids.
+#' @param province_frame The species' province-wide frame.
+#' @param region_frame The species' region frame.
+#' @param key Character. The column both frames carry.
+#' @return A list of character vectors of region unit ids, in
+#'   region frame order, repeats kept. Draw 1 (every province
+#'   unit) gives each mapped region unit once.
+#'
+#' @example # Example usage of the function
+#' # map_province_draws(draws, province$frame, frame,
+#' #                    "location_project")
+map_province_draws <- function(draws, province_frame, region_frame,
+                               key) {
+  for (one in list(province_frame, region_frame)) {
+    if (!key %in% names(one)) {
+      stop("Province key `", key, "` is not in the frame.",
+           call. = FALSE)
+    }
+  }
+
+  province_ids <- as.character(province_frame$survey_unit_id)
+  stands_for <- province_ids[match(
+    as.character(region_frame[[key]]),
+    as.character(province_frame[[key]])
+  )]
+  region_ids <- as.character(region_frame$survey_unit_id)
+
+  lapply(draws, function(draw) {
+    counts <- table(factor(draw, levels = unique(draw)))
+    n <- as.integer(counts[match(stands_for, names(counts))])
+    n[is.na(n)] <- 0L
+    rep(region_ids, n)
+  })
 }
 
 # 5. Fitting one draw ----
