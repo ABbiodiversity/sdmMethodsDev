@@ -1,6 +1,6 @@
 # exp_000_parity_v2
 
-Generated 2026-10-08 03:59:22
+Generated 2026-10-14 10:16:53
 
 **Trial run.** 14 focal species, 100 of 100 draws. Its parity numbers show the pipeline ran; they are not a parity read.
 
@@ -29,13 +29,13 @@ stated. Change it there, not here.
 | vascular_plant | habitat | reproduced | IVW on the prediction grid, the stand-age splines, cutblock convergence, footprint pooling, the south pAspen and the 20-detection skip. Matches v2 to 2e-12 on the full-data draw, north and south. |
 | vascular_plant | validation | reproduced | v2's seven validation AUCs, in-bag as v2 scores them and out-of-bag as well. South exact; north within 2e-4, a residual v2's own coefficients show too. |
 | vascular_plant | resampling | reproduced | v2's spatial-block bootstrap, drawn once per species across the province with its 20-detection redraw rule. The same method, not the same draws: v2 is unseeded. |
-| mammal_summer | climate | reproduced | v2's precomputed climate prediction, read per species; deployments without one are dropped, as in v2. |
+| mammal_summer | climate | reproduced | v2's nine climate GLMs, AICc averaged, unweighted, on v2's own table with seasons pooled, province-wide; carried as plogis(link). v2 fits once, so draw 1 is like for like. |
 | mammal_summer | habitat | reproduced | v2's hurdle: presence, abundance and total abundance on the full habitat set, with the stand-age splines, calibration and cutblock convergence. Matches v2's published tables to 2e-14, north and south. |
-| mammal_summer | resampling | partial | Spatial-block bootstrap. v2 fits the habitat stage once, so only iteration 1, the full data, is like for like. |
+| mammal_summer | resampling | partial | Spatial-block bootstrap drawn province-wide and mapped to regions. v2 fits once, so only iteration 1, the full data, is like for like. |
 | mammal_summer | season | reproduced | One season per spec; run.R runs both, and the gate averages them as v2's `.all` references do. |
-| mammal_winter | climate | reproduced | v2's precomputed climate prediction, read per species; deployments without one are dropped, as in v2. |
+| mammal_winter | climate | reproduced | v2's nine climate GLMs, AICc averaged, unweighted, on v2's own table with seasons pooled, province-wide; carried as plogis(link). v2 fits once, so draw 1 is like for like. |
 | mammal_winter | habitat | reproduced | v2's hurdle: presence, abundance and total abundance on the full habitat set, with the stand-age splines, calibration and cutblock convergence. Matches v2's published tables to 2e-14, north and south. |
-| mammal_winter | resampling | partial | Spatial-block bootstrap. v2 fits the habitat stage once, so only iteration 1, the full data, is like for like. |
+| mammal_winter | resampling | partial | Spatial-block bootstrap drawn province-wide and mapped to regions. v2 fits once, so only iteration 1, the full data, is like for like. |
 | mammal_winter | season | reproduced | One season per spec; run.R runs both, and the gate averages them as v2's `.all` references do. |
 | bird | climate | reproduced | v2's 25 candidates, AICc averaged, fitted once on the province-wide draw, unweighted, and carried as exp(link) without the offset, as MuMIn predicts it. |
 | bird | landcover | reproduced | Staged BIC over v2's groups, weighted by vegw or soilw, always advancing to each group's winner. Raw coefficients are translated onto v2's standardized template by standardize.R, a port checked exact against v2's packaged output. |
@@ -83,10 +83,10 @@ _Every taxon and region that ran had a reference to compare against._
 | bryophyte | bryophyte | south | - | - | 2 | 100 | climate, habitat | TRUE | TRUE |
 | lichen | lichen | north | - | - | 2 | 100 | climate, habitat | TRUE | TRUE |
 | lichen | lichen | south | - | - | 2 | 100 | climate, habitat | TRUE | TRUE |
-| mammal | mammal_summer | north | summer | hurdle | 2 | 100 | habitat_presence, habitat_abundance, habitat_total | TRUE | TRUE |
-| mammal | mammal_summer | south | summer | hurdle | 2 | 100 | habitat_presence, habitat_abundance, habitat_total | TRUE | TRUE |
-| mammal | mammal_winter | north | winter | hurdle | 2 | 100 | habitat_presence, habitat_abundance, habitat_total | TRUE | TRUE |
-| mammal | mammal_winter | south | winter | hurdle | 2 | 100 | habitat_presence, habitat_abundance, habitat_total | TRUE | TRUE |
+| mammal | mammal_summer | north | summer | hurdle | 2 | 100 | climate, habitat_presence, habitat_abundance, habitat_total | TRUE | TRUE |
+| mammal | mammal_summer | south | summer | hurdle | 2 | 100 | climate, habitat_presence, habitat_abundance, habitat_total | TRUE | TRUE |
+| mammal | mammal_winter | north | winter | hurdle | 2 | 100 | climate, habitat_presence, habitat_abundance, habitat_total | TRUE | TRUE |
+| mammal | mammal_winter | south | winter | hurdle | 2 | 100 | climate, habitat_presence, habitat_abundance, habitat_total | TRUE | TRUE |
 | mite | mite | north | - | - | 2 | 100 | climate, habitat | TRUE | TRUE |
 | mite | mite | south | - | - | 2 | 100 | climate, habitat | TRUE | TRUE |
 | vascular_plant | vascular_plant | north | - | - | 2 | 100 | climate, habitat | TRUE | TRUE |
@@ -105,23 +105,25 @@ fixes at a placeholder are left out of the reachable scores.
 | bird | north | climate | median | 2 | 20 | 100 | 100.000 | 20 | 100.000 | 0.000 | 0.000 | 0.000 | 0 | 1.000 | 1.000 | not gated (trial run) | pass |
 | bryophyte | north | climate | median | 1 | 19 | 100 | 100.000 | 19 | 100.000 | 0.035 | 0.000 | 1.400 | 6 | 1.000 | 1.062 | not gated (trial run) | pass |
 | lichen | north | climate | median | 2 | 38 | 100 | 100.000 | 38 | 100.000 | 0.000 | 0.000 | 0.644 | 17 | 0.993 | 0.879 | not gated (trial run) | pass |
+| mammal | north | climate | iteration 1 | 2 | 10 | 100 | 100.000 | 10 | 100.000 | 0.000 | 0.000 | 0.000 | 0 | 1.000 | - | not gated (trial run) | pass |
 | mite | north | climate | median | 2 | 38 | 100 | 100.000 | 38 | 100.000 | 0.000 | 0.000 | 1.950 | 20 | 0.905 | 0.953 | not gated (trial run) | pass |
 | vascular_plant | north | climate | median | 2 | 38 | 100 | 100.000 | 38 | 100.000 | 0.000 | 0.000 | 0.266 | 24 | 1.000 | 0.970 | not gated (trial run) | pass |
 | bird | south | climate | median | 2 | 20 | 100 | 100.000 | 20 | 100.000 | 0.000 | 0.000 | 0.000 | 0 | 1.000 | 1.000 | not gated (trial run) | pass |
 | bryophyte | south | climate | median | 1 | 19 | 100 | 100.000 | 19 | 100.000 | 0.035 | 0.000 | 1.400 | 6 | 1.000 | 1.062 | not gated (trial run) | pass |
 | lichen | south | climate | median | 2 | 38 | 100 | 100.000 | 38 | 100.000 | 0.000 | 0.000 | 0.644 | 17 | 0.993 | 0.879 | not gated (trial run) | pass |
+| mammal | south | climate | iteration 1 | 2 | 10 | 100 | 100.000 | 10 | 100.000 | 0.000 | 0.000 | 0.000 | 0 | 1.000 | - | not gated (trial run) | pass |
 | mite | south | climate | median | 2 | 38 | 100 | 100.000 | 38 | 100.000 | 0.000 | 0.000 | 1.950 | 20 | 0.905 | 0.953 | not gated (trial run) | pass |
 | vascular_plant | south | climate | median | 2 | 38 | 100 | 100.000 | 38 | 100.000 | 0.000 | 0.000 | 0.266 | 24 | 1.000 | 0.970 | not gated (trial run) | pass |
 | bird | north | habitat | median | 2 | 178 | 100 | 100.000 | 168 | 100.000 | 0.000 | 0.000 | 0.000 | 0 | 1.000 | 1.000 | not gated (trial run) | pass |
 | bryophyte | north | habitat | median | 1 | 94 | 100 | 100.000 | 94 | 100.000 | 0.072 | 0.023 | 0.081 | 0 | 0.997 | 0.911 | not gated (trial run) | pass |
 | lichen | north | habitat | median | 2 | 188 | 100 | 100.000 | 188 | 100.000 | 0.091 | 0.024 | 0.118 | 0 | 0.999 | 0.988 | not gated (trial run) | pass |
-| mammal | north | habitat | iteration 1 | 2 | 448 | 65 | 100.000 | 436 | 100.000 | 0.000 | 0.000 | 0.000 | 0 | 1.000 | - | not gated (trial run) | pass |
+| mammal | north | habitat | iteration 1 | 2 | 448 | 69 | 100.000 | 436 | 100.000 | 0.000 | 0.000 | 0.000 | 0 | 1.000 | - | not gated (trial run) | pass |
 | mite | north | habitat | median | 1 | 94 | 100 | 100.000 | 94 | 100.000 | 0.140 | 0.035 | 0.148 | 0 | 0.999 | 0.993 | not gated (trial run) | pass |
 | vascular_plant | north | habitat | median | 2 | 188 | 100 | 100.000 | 188 | 100.000 | 0.108 | 0.022 | 0.125 | 0 | 0.999 | 0.950 | not gated (trial run) | pass |
 | bird | south | habitat | median | 2 | 46 | 100 | 100.000 | 40 | 100.000 | 0.000 | 0.000 | 0.000 | 0 | 1.000 | 1.000 | not gated (trial run) | pass |
 | bryophyte | south | habitat | median | 1 | 19 | 100 | 100.000 | 19 | 100.000 | 0.047 | 0.021 | 0.060 | 0 | 0.993 | 1.042 | not gated (trial run) | pass |
 | lichen | south | habitat | median | 2 | 40 | 100 | 100.000 | 40 | 100.000 | 0.088 | 0.029 | 0.278 | 1 | 0.994 | 0.961 | not gated (trial run) | pass |
-| mammal | south | habitat | iteration 1 | 2 | 126 | 99 | 100.000 | 120 | 100.000 | 0.000 | 0.000 | 0.000 | 0 | 1.000 | - | not gated (trial run) | pass |
+| mammal | south | habitat | iteration 1 | 2 | 126 | 100 | 100.000 | 120 | 100.000 | 0.000 | 0.000 | 0.000 | 0 | 1.000 | - | not gated (trial run) | pass |
 | mite | south | habitat | median | 2 | 40 | 100 | 100.000 | 40 | 100.000 | 0.068 | 0.024 | 0.464 | 1 | 0.991 | 0.975 | not gated (trial run) | pass |
 | vascular_plant | south | habitat | median | 2 | 40 | 100 | 100.000 | 40 | 100.000 | 0.074 | 0.027 | 0.184 | 0 | 0.997 | 1.021 | not gated (trial run) | pass |
 
@@ -147,7 +149,7 @@ Median AUC over species, scored on each run's final model: for plants, v2's own 
 | bird | south | 2 | 0.706 | 0.702 | - | - |
 | bryophyte | south | 2 | 0.676 | 0.664 | 0.676 | 0.664 |
 | lichen | south | 2 | 0.802 | 0.792 | 0.802 | 0.792 |
-| mammal | south | 4 | 0.739 | 0.716 | - | - |
+| mammal | south | 4 | 0.740 | 0.715 | - | - |
 | mite | south | 2 | 0.796 | 0.781 | 0.796 | 0.781 |
 | vascular_plant | south | 2 | 0.850 | 0.844 | 0.850 | 0.844 |
 
