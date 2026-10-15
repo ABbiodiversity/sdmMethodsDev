@@ -25,7 +25,8 @@ fake_repo <- function(existing = list()) {
     getOption("sdm.project_root", "."), "1_code", "experiments",
     "_template"
   )
-  file.copy(list.files(source_template, full.names = TRUE), template)
+  file.copy(list.files(source_template, full.names = TRUE), template,
+            recursive = TRUE)
 
   for (where in names(existing)) {
     dir.create(file.path(root, where, existing[[where]]),
@@ -72,7 +73,8 @@ test_that("new_experiment() scaffolds all three folders", {
 
   code <- file.path(root, "1_code/experiments", out$id)
   expected <- c(
-    file.path(code, c("run.R", "README.md")),
+    file.path(code, c("run.R", "README.md", "species.csv",
+                      "hooks/.gitkeep")),
     file.path(root, "2_pipeline", out$id,
               c(".gitkeep", "logs/.gitkeep")),
     file.path(root, "3_output", out$id,
@@ -89,6 +91,19 @@ test_that("new_experiment() scaffolds all three folders", {
   expect_true(any(grepl(
     'id = "exp_003_covariate_scale"', run, fixed = TRUE
   )))
+  expect_true(any(grepl(
+    'exp_dir <- "1_code/experiments/exp_003_covariate_scale"', run,
+    fixed = TRUE
+  )))
+  # The species list is copied as is: every species, for the
+  # experiment to cut down
+  expect_identical(
+    readLines(file.path(code, "species.csv")),
+    readLines(file.path(
+      getOption("sdm.project_root", "."), "1_code", "experiments",
+      "_template", "species.csv"
+    ))
+  )
   expect_true(any(grepl("Experiment 003 - Covariate Scale", run,
                         fixed = TRUE)))
   expect_true(any(grepl("author: Test Author", run, fixed = TRUE)))

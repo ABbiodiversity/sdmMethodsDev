@@ -14,7 +14,9 @@
 #   - Taxon-agnostic: file locations and covariate keys come from
 #     lookup/dataset_manifest.csv (_setup/07). The key is
 #     `<taxon>_<region>` for mammals, whose north and south files
-#     hold different values for the same deployment.
+#     hold different values for the same deployment. A manifest
+#     row with region "province" names a separate province-wide
+#     table (province_region()).
 #   - Reads are column-selective (covariates.csv is ~218 MB, 457
 #     columns). build_model_data() loads once per taxon and
 #     region; model_frame() cuts per-species frames from it.
@@ -118,6 +120,32 @@ covariate_key <- function(taxon, region = NULL, data_dir) {
   }
 
   manifest_entry(data_dir, taxon, region)$covariate_key
+}
+
+## 2.4 province_region() ----
+
+#' Name the Region a Taxon's Province-Wide Data Are Stored Under
+#'
+#' Most taxa store one set of rows that every region filters, so
+#' the province frame is read with no region. A taxon whose
+#' province-wide data are a separate table (the mammal climate
+#' stage) has a manifest row with region "province".
+#'
+#' @param data_dir Character. The test dataset folder.
+#' @param taxon Character. Taxon slug.
+#' @return "province", or NULL when the taxon has no such row.
+#'
+#' @example # Example usage of the function
+#' # province_region(data_dir, "mammal") # "province"
+#' # province_region(data_dir, "lichen") # NULL
+province_region <- function(data_dir, taxon) {
+  manifest <- dataset_manifest(data_dir)
+
+  if (any(manifest$taxon == taxon & manifest$region == "province")) {
+    "province"
+  } else {
+    NULL
+  }
 }
 
 # 3. load_sites() ----
@@ -259,6 +287,44 @@ load_offsets <- function(taxon, data_dir, species = NULL) {
   )
 }
 
+## 5.1 covariate_columns_needed() ----
+
+#' Split Requested Covariates into Stored, Derivable and Unknown
+#'
+#' Reads the taxon's covariate catalogue only, not the data.
+#' Shared by load_covariates() and the configuration check.
+#'
+#' @param taxon Character. Taxon slug.
+#' @param data_dir Character. The test dataset folder.
+#' @param columns Character vector of master column names.
+#' @param region Character or NULL.
+#' @return A list of `derivable` (computed from other columns),
+#'   `to_read` (stored columns to read, derivation inputs
+#'   included) and `unknown` (neither stored nor derivable).
+#'
+#' @example # Example usage of the function
+#' # covariate_columns_needed("lichen", data_dir, "MAP")$unknown
+covariate_columns_needed <- function(taxon, data_dir, columns,
+                                     region = NULL) {
+  stored <- available_covariates(
+    taxon, data_dir = data_dir, region = region,
+    include_derived = FALSE
+  )
+
+  derivable <- derivable_covariates(columns, stored)
+  to_read <- setdiff(columns, derivable)
+
+  for (one in derivable) {
+    to_read <- unique(c(to_read, derived_covariates()[[one]]$inputs))
+  }
+
+  list(
+    derivable = derivable,
+    to_read = to_read,
+    unknown = setdiff(to_read, stored)
+  )
+}
+
 # 6. load_covariates() ----
 
 #' Load Covariates for One Taxon and Region
@@ -290,19 +356,10 @@ load_covariates <- function(
   # Step 1: Check the taxon's catalogue, not the file header: the
   # wide table holds other taxa's columns, which read back as all
   # NA here.
-  stored <- available_covariates(
-    taxon, data_dir = data_dir, region = region,
-    include_derived = FALSE
-  )
-
-  derivable <- derivable_covariates(columns, stored)
-  to_read <- setdiff(columns, derivable)
-
-  for (one in derivable) {
-    to_read <- unique(c(to_read, derived_covariates()[[one]]$inputs))
-  }
-
-  unknown <- setdiff(to_read, stored)
+  needed <- covariate_columns_needed(taxon, data_dir, columns, region)
+  derivable <- needed$derivable
+  to_read <- needed$to_read
+  unknown <- needed$unknown
 
   if (length(unknown) > 0) {
     stop(
@@ -764,8 +821,11 @@ build_model_data <- function(
 #'   model weights, or NULL.
 #' @param response_name,offset_name,weight_name Character. Column
 #'   names to write into the frame.
+#' @param companions Named character vector of other response
+#'   columns to carry, as `<response_name>_<name>`, or NULL. The
+#'   mammal climate stage pools a species' two seasons.
 #' @return A data frame with the covariates plus the response,
-#'   and the offset and weight when they apply.
+#'   and the offset, weight and companions when they apply.
 #'
 #' @example # Example usage of the function
 #' # d <- model_frame(md, "Aulacomnium.palustre",
@@ -777,7 +837,8 @@ model_frame <- function(
   weight_column = NULL,
   response_name = "response",
   offset_name = "offset",
-  weight_name = "weight"
+  weight_name = "weight",
+  companions = NULL
 ) {
   if (!species %in% names(model_data$response)) {
     stop(
@@ -824,6 +885,23 @@ model_frame <- function(
     }
 
     frame[[weight_name]] <- frame[[weight_column]]
+  }
+
+  # Step 4: Attach companion responses, for a stage's own
+  # response transform to read (fit_one_stage())
+  for (name in names(companions)) {
+    column <- companions[[name]]
+
+    if (!column %in% names(model_data$response)) {
+      stop(
+        "Companion `", column, "` of `", species, "` is not a ",
+        "column of the ", model_data$taxon, " response table.",
+        call. = FALSE
+      )
+    }
+
+    frame[[paste0(response_name, "_", name)]] <-
+      model_data$response[[column]]
   }
 
   frame

@@ -98,9 +98,10 @@ requires a separate pipeline.
 │   ├── _shared/             # plant_group.R; standard_specs.R
 │   └── <taxon>/spec.R       # that taxon's v2 configuration
 ├── experiments/
-│   ├── _shared/             # focal-species sets
 │   ├── _template/           # the starting point for a new one
-│   └── exp_NNN_*/run.R      # configuration, then run_experiment()
+│   └── exp_NNN_*/           # run.R: configuration, then
+│                            #   run_experiment(); species.csv;
+│                            #   hooks/ for its own methods
 └── tests/                   # contract tests; store comparison
 ```
 
@@ -108,6 +109,14 @@ The harness knows nothing about any taxon, and nothing about any
 particular method: it looks methods up by the name a spec gives. A
 module contributes only a spec. An experiment changes parts of a
 spec, or names different methods in it.
+
+**An experiment edits only its own folder.** The harness, methods
+and modules are a fixed, tested back-end; everything an experiment
+varies is an `experiment_config()` argument, a spec change made in
+its `run.R`, its `species.csv`, or a method in its `hooks/`. The
+defaults are v2's: `experiment_config()`'s argument defaults hold
+the run-level ones, `standard_specs()` the model-level ones, and an
+experiment passes only what it changes.
 
 There are six taxon modules: `bryophytes`, `lichens`, `soil_mites`,
 `vascular_plants`, `mammals` and `birds`. The first four share the v2
@@ -127,6 +136,47 @@ engine paired with a rule it cannot serve - a boosted tree with
 inverse-variance averaging, say - stops with a sentence rather than
 silently returning nothing hours into a run. `check_engine()` tests a
 new engine against the contract on synthetic data.
+
+A method one experiment is testing lives in that experiment's
+`hooks/` folder rather than here. `load_framework(hooks = )`
+sources the hook files after the built-in methods, and each
+parallel worker sources them too. A hook registers with the same
+`register_*()` calls and meets the same contracts, but may not
+reuse a name already registered: that would change the name's
+meaning for everything else in the session. A metric declares
+which way is better (`direction`), so comparisons read a new
+metric correctly.
+
+### Spec changes are recorded
+
+An experiment changes a v2 spec with `replace_stage_method()`,
+`modify_stage()`, `modify_region()` or `modify_resample()`, never
+by editing a module. Each validates the spec and appends the change
+to `models_overridden` and `v2_coverage`, so the stores'
+`meta.json` and the run record say what differs from v2. Stage
+fields cover the engine, rule and its settings, `ic`,
+`min_detections`, scope, weighting, carrying and grid constants;
+resample settings include the spatial block cut points
+(`long_breaks`, `lat_breaks`, defaulting to the v2 plant grid).
+
+### Configuration is checked before anything runs
+
+`experiment_config()` collects every problem and stops once with
+the list: species names against the dataset's species queue (with
+close matches), runs, draw counts, regions, metrics, every spec,
+and every covariate the formulas name. The covariate check
+resolves names with the same code the run uses
+(`region_request()`, `province_request()`,
+`covariate_columns_needed()`), so it cannot disagree with the
+run.
+
+### Provenance
+
+`run_record.md` gives every setting and change from v2, and, in
+its volatile Provenance section, the full git commit, how many
+files under `1_code/` differ from it, R version, platform,
+modelling package versions, and each hook file with its md5.
+`2_pipeline/<id>/session_info.txt` holds the full `sessionInfo()`.
 
 The rules talk to an engine only through its interface: coefficients
 come from `engine$coef()`, computed once per fit, and every rule's
@@ -276,9 +326,13 @@ holds; see below):
 
 ```r
 stage_models <- list(
-  # the v2 set, plus topography in every candidate
-  "climate" = extend_models(
-    "climate_plant_v2_full", c("elevation", "slope")
+  # the v2 set, plus AHM in every candidate
+  "climate" = extend_models("climate_plant_v2_full", "AHM"),
+  # the v2 set without the candidates that use space
+  "lichen.climate" = drop_candidates(
+    "climate_plant_v2_full",
+    c("Easting", "Northing", "Easting2", "Northing2",
+      "EastingNorthing")
   ),
   # or built from covariates alone
   "mite.climate" = models_from_covariates(
@@ -287,7 +341,10 @@ stage_models <- list(
 )
 ```
 
-Keys are `taxon.stage`, or `stage` for every taxon. `form` decides the
+Keys are `taxon.stage`, or `stage` for every taxon; a `taxon.stage`
+key wins over a `stage` key. `drop_candidates()` removes every
+candidate that uses a term; `strip_terms()` keeps every candidate,
+less the term. `form` decides the
 shape of a covariate comparison — `single`, `each`, `ladder` or
 `all_subsets`, the last capped because ten covariates is 1,023 models per
 species per draw. Swapping the set changes the covariates automatically:
@@ -296,11 +353,16 @@ the v2 plant climate set loads 18, a two-covariate ladder loads 2.
 An override is recorded in `meta.json`, so a run that did not fit the v2
 candidate sets cannot be mistaken for one that did.
 
-Species are selected the same way, by a named vector whose names are
-taxa; names may repeat and an unnamed entry applies to every taxon.
+Species are selected by the experiment's `species.csv`, one row per
+species (`taxon,species,note`). The template lists every species a
+run can fit; an experiment deletes the rows it does not fit. The
+rows left also set the runs: with no `taxa`, only runs that fit a
+listed species are fitted, judged by the run's taxon, tier and
+(for mammals) season. Names are checked against the dataset's
+species queue. A named vector works too:
 
 ```r
-focal_species <- c(
+species <- c(
   lichen = "Alectoria.sarmentosa",
   lichen = "Bryoria.fremontii",
   mite   = "Oppiella.nova"
@@ -492,7 +554,18 @@ It sits on a regularization axis. A Bayesian framework comparison needs
    abundance.) `covariate_files` lets an experiment add covariates the
    frozen dataset does not hold, from its own files;
    `exp_002_soilgrids` adds SoilGrids at 0–5 cm from the
-   sciSpatialR catalogue to the climate stage. Still to come:
+   sciSpatialR catalogue to the climate stage.
+6a. **Built (2026-10-13).** Experiment-local configuration: each
+   experiment's own `species.csv` (replacing the shared focal-species
+   sets) and `hooks/`; `modify_stage()`, `modify_region()` and
+   `modify_resample()`; `regions`, `metrics` and `compare_metrics` in
+   `experiment_config()`, which now checks species, specs and
+   covariates before anything runs and reports every problem at
+   once; runs read off the species list; settable spatial block cut
+   points; `drop_candidates()` and `strip_terms()`; fuller
+   provenance. Checked against the previous code at 5 draws for the
+   14 parity species: every coefficient, metric and grid prediction
+   identical. Still to come:
    `mgcv` GAMs and `brms` as method files, the topography and
    remote-sensing covariates, and
    spatial prediction onto the 1 km grid.

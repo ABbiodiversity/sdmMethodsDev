@@ -275,7 +275,10 @@ fill_template <- function(template_dir, code_dir, id, number, slug,
     "[YYYY-MM-DD]" = format(Sys.Date(), "%Y-%m-%d")
   )
 
-  files <- list.files(template_dir, recursive = TRUE)
+  # all.files: hooks/.gitkeep keeps the empty hooks/ folder
+  files <- list.files(
+    template_dir, recursive = TRUE, all.files = TRUE
+  )
 
   for (file in files) {
     text <- readLines(file.path(template_dir, file), warn = FALSE)

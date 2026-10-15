@@ -23,8 +23,12 @@ source("1_code/experiments/exp_000_parity_v2/run.R")
 
 Every decision is in `run.R`'s `experiment_config()` call (section
 1.2); section 1.3 points the run at the v2 reference. As committed,
-`run.R` runs the `parity_check` species at 5 draws on 12 workers. For
-the gate, set `species = NULL` and `n_bootstraps = 100`.
+`run.R` runs the species in this folder's `species.csv` (two per
+taxon, chosen so the test discriminates; its `note` column gives
+each one's detections and prevalence) at 100 draws on 12 workers.
+For the gate, set `species = NULL`, which runs every species. Later
+experiments copy this `species.csv` for a like-for-like
+comparison.
 `run_experiment()` fits, summarizes, then runs this experiment's steps:
 
 | Step | Script | Writes, in `3_output/exp_000_parity_v2/` |

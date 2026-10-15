@@ -11,9 +11,10 @@
 #   - Single entry point: experiments source this file and call
 #     load_framework().
 #   - Load order: harness/ (including the method registry),
-#     methods/ (each file registers itself), modules/, then
-#     experiments/_shared/. Files or folders starting with "_"
-#     are shared helpers and load first.
+#     methods/ (each file registers itself), modules/, any
+#     experiments/_shared/ files, then the experiment's own
+#     hooks/. Files or folders starting with "_" are shared
+#     helpers and load first.
 # ---
 
 # 1. Setup ----
@@ -124,22 +125,26 @@ load_modules <- function(
 
 # 5. load_framework() ----
 
-#' Load the Harness, Methods, Taxon Modules and Shared Settings
+#' Load the Harness, Methods, Taxon Modules and an Experiment's
+#' Hooks
 #'
 #' What an experiment calls first. Everything is sourced into one
 #' environment, the caller's by default.
 #'
 #' @param project_root Character. The repository root.
 #' @param envir Environment to source into.
+#' @param hooks Character or NULL. The experiment's `hooks/`
+#'   folder, or a vector of `.R` files; see load_hooks().
 #' @return The project root, invisibly.
 #'
 #' @example # Example usage of the function
 #' # source("1_code/harness/harness.R")
-#' # load_framework()
+#' # load_framework(hooks = "1_code/experiments/exp_003_x/hooks")
 #' # list_methods()
 load_framework <- function(
   project_root = ".",
-  envir = parent.frame()
+  envir = parent.frame(),
+  hooks = NULL
 ) {
   project_root <- normalizePath(project_root, winslash = "/")
   code_dir <- file.path(project_root, "1_code")
@@ -148,6 +153,7 @@ load_framework <- function(
   load_methods(file.path(code_dir, "methods"), envir)
   load_modules(file.path(code_dir, "modules"), envir)
 
+  # Optional; an absent folder sources nothing
   shared <- sort(list.files(
     file.path(code_dir, "experiments", "_shared"),
     pattern = "\\.R$", full.names = TRUE
@@ -157,10 +163,81 @@ load_framework <- function(
   # Parallel workers load the framework from here themselves
   options(sdm.project_root = project_root)
 
+  load_hooks(hooks, envir)
+
   invisible(project_root)
 }
 
-# 6. source_all() ----
+# 6. load_hooks() ----
+
+#' Source an Experiment's Own Methods and Functions
+#'
+#' Hooks register methods with the register_*() functions, or
+#' define functions a spec field names. A hook may not replace a
+#' method already registered: that would change the name's meaning
+#' for everything else in the session. Re-sourcing the same file
+#' is allowed. The files are kept in `sdm.hook_files`, so parallel
+#' workers source them too and the run record lists them.
+#'
+#' @param hooks Character or NULL. A folder (its `.R` files, in
+#'   file-name order) or a vector of `.R` files.
+#' @param envir Environment to source into.
+#' @return The hook files, invisibly.
+#'
+#' @example # Example usage of the function
+#' # load_hooks("1_code/experiments/exp_003_x/hooks")
+load_hooks <- function(hooks, envir = parent.frame()) {
+  if (is.null(hooks) || length(hooks) == 0) {
+    options(sdm.hook_files = NULL)
+    return(invisible(character(0)))
+  }
+
+  files <- unlist(lapply(hooks, function(one) {
+    if (dir.exists(one)) {
+      sort(list.files(one, pattern = "\\.R$", full.names = TRUE))
+    } else {
+      one
+    }
+  }))
+
+  absent <- files[!file.exists(files)]
+
+  if (length(absent) > 0) {
+    stop(
+      "Hook file(s) not found:\n  ",
+      paste(absent, collapse = "\n  "),
+      call. = FALSE
+    )
+  }
+
+  files <- normalizePath(files, winslash = "/")
+
+  # register_method() reads this to refuse a clash; see registry.R
+  for (path in files) {
+    options(sdm.hook_loading = path)
+    tryCatch(
+      source(path, local = envir),
+      error = function(e) {
+        message <- conditionMessage(e)
+
+        # A clash already names the hook
+        if (!startsWith(message, "Hook ")) {
+          message <- paste0("Hook ", basename(path), " failed: ",
+                            message)
+        }
+
+        stop(message, call. = FALSE)
+      },
+      finally = options(sdm.hook_loading = NULL)
+    )
+  }
+
+  options(sdm.hook_files = files)
+
+  invisible(files)
+}
+
+# 7. source_all() ----
 
 #' Source Files in Order, Failing Clearly on a Missing One
 #'

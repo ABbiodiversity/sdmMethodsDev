@@ -343,13 +343,33 @@ manifest <- rbind(
   )
 )
 
+# The mammal climate stage's province-wide rows (_setup/01
+# section 4.3), when 01 wrote them. Last, so existing rows keep
+# their order. No grid: the climate stage predicts no habitat.
+column_map <- fread(file.path(lookup_dir, "covariate_columns.csv"))
+
+if ("mammal_province" %in% column_map$taxon) {
+  manifest <- rbind(manifest, data.frame(
+    taxon = "mammal",
+    region = "province",
+    response_file = "mammal.csv",
+    offset_file = NA_character_,
+    covariate_key = "mammal_province",
+    grid = NA_character_,
+    bootstrap_ids = NA_character_,
+    bootstrap_layout = NA_character_,
+    stringsAsFactors = FALSE
+  ))
+}
+
 ## 5.1 Check every named file exists ----
 dataset_dir <- dirname(lookup_dir)
 named <- c(
   file.path(dataset_dir, manifest$response_file),
   file.path(dataset_dir, stats::na.omit(manifest$offset_file)),
-  file.path(lookup_dir,
-            paste0(manifest$grid, "_prediction_matrix.csv"))
+  file.path(lookup_dir, paste0(
+    stats::na.omit(manifest$grid), "_prediction_matrix.csv"
+  ))
 )
 absent <- unique(named[!file.exists(named)])
 

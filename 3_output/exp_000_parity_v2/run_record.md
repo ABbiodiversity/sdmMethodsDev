@@ -6,26 +6,36 @@ Written by `run_record()`. The result stores this describes are gitignored; this
 
 _Volatile. Excluded from cross-run comparison._
 
-- **git_commit**: 4a8cb32
+- **git_commit**: 49a10153fbed84f24261647611e8b426326ef7de
+- **git_uncommitted_code**: none
+- **hooks**: none
+- **packages**: data.table 1.18.0
 - **pipeline_dir**: D:/local_projects/active/sdmMethodsDev/2_pipeline/exp_000_parity_v2
+- **platform**: x86_64-w64-mingw32
 - **r_version**: 4.5.0
-- **written_at**: 2026-10-08 09:59:23
+- **session_info**: D:/local_projects/active/sdmMethodsDev/2_pipeline/exp_000_parity_v2/session_info.txt
+- **written_at**: 2026-10-14 16:16:53
 
 ## Configuration
 
 - **boot_seed**: 20260909.0000
 - **changes_from_v2**: none
+- **compare_metrics**: oob_auc, oob_deviance_explained, oob_rmse, oob_spearman, oob_calibration_slope
 - **compared_with**: none (baseline)
 - **covariate_files**: none
-- **data_dir**: published 2026-10-05 (//ABMI-DATA2/science/sdmMethodsDev/0_data/test_dataset/2026-10-05)
+- **data_dir**: local (D:/local_projects/active/sdmMethodsDev/0_data/test_dataset)
 - **engines**: bayesglm, glm
 - **focal_species**: bird=AMRO, bird=YEWA, bryophyte=Bryum.All, bryophyte=Ceratodon.purpureus, lichen=Cladonia.chlorophaea, lichen=Physcia.adscendens, mammal=Coyote_Summer, mammal=Coyote_Winter, mammal=Moose_Summer, mammal=Moose_Winter, mite=Ceratozetes.gracilis, mite=Trhypochthonius.tectorum, vascular_plant=Galium.boreale, vascular_plant=Vicia.americana
-- **jobs_not_ok**: 1
-- **jobs_ok**: 2799
+- **hooks**: none
+- **jobs_not_ok**: 0
+- **jobs_ok**: 2800
 - **jobs_total**: 2800
+- **metrics**: all registered
 - **n_bootstraps**: 100
 - **plant_bootstrap**: spatial_block
+- **regions**: all
 - **selection**: aic_average, hurdle, ivw_grid, staged_bic
+- **species_file**: species.csv
 - **species_n**: 14
 - **stage_models**: spec defaults (v2 candidate sets)
 - **taxa**: bird, bryophyte, lichen, mammal_summer, mammal_winter, mite, vascular_plant
@@ -41,10 +51,10 @@ _Volatile. Excluded from cross-run comparison._
 | bryophyte | south | 2 | 100 | 7800 | 5600 | 3200 |
 | lichen | north | 2 | 100 | 22000 | 5600 | 8600 |
 | lichen | south | 2 | 100 | 7800 | 5600 | 3200 |
-| mammal_summer | north | 2 | 100 | 43450 | 2800 | 9000 |
-| mammal_summer | south | 2 | 100 | 13731 | 2786 | 3980 |
-| mammal_winter | north | 2 | 100 | 44008 | 2800 | 9000 |
-| mammal_winter | south | 2 | 100 | 13800 | 2800 | 4000 |
+| mammal_summer | north | 2 | 100 | 44630 | 2800 | 9000 |
+| mammal_summer | south | 2 | 100 | 14800 | 2800 | 4000 |
+| mammal_winter | north | 2 | 100 | 45098 | 2800 | 9000 |
+| mammal_winter | south | 2 | 100 | 14800 | 2800 | 4000 |
 | mite | north | 2 | 100 | 21800 | 5600 | 8600 |
 | mite | south | 2 | 100 | 7600 | 5600 | 3200 |
 | vascular_plant | north | 2 | 100 | 21800 | 5600 | 8600 |
@@ -194,62 +204,62 @@ _Volatile. Excluded from cross-run comparison._
 | lichen | south | v2val_Full_Joint_Truncated | 200 | 0.8057 | 0.7733 | 0.8261 | 0.8013 | 0.0213 |
 | lichen | south | v2val_Full_Truncated | 200 | 0.8072 | 0.7724 | 0.8287 | 0.8021 | 0.0232 |
 | lichen | south | v2val_Landcover | 200 | 0.7520 | 0.7339 | 0.7705 | 0.7526 | 0.0143 |
-| mammal_summer | north | insample_auc | 200 | 0.7195 | 0.6076 | 0.8295 | 0.7195 | 0.1048 |
-| mammal_summer | north | insample_calibration_slope | 200 | 0.9415 | 0.7950 | 0.9994 | 0.9143 | 0.0790 |
-| mammal_summer | north | insample_deviance_explained | 200 | 0.1457 | 0.0267 | 0.2897 | 0.1557 | 0.1242 |
-| mammal_summer | north | insample_n | 200 | 2563.5000 | 2538.0000 | 2587.0000 | 2577.0800 | 149.9873 |
-| mammal_summer | north | insample_prevalence | 200 | 0.2733 | 0.2209 | 0.3269 | 0.2735 | 0.0486 |
-| mammal_summer | north | insample_rmse | 200 | 0.3850 | 0.3230 | 0.4431 | 0.3836 | 0.0575 |
-| mammal_summer | north | insample_spearman | 200 | 0.3181 | 0.1570 | 0.4710 | 0.3152 | 0.1473 |
-| mammal_summer | north | oob_auc | 198 | 0.7008 | 0.5803 | 0.8199 | 0.7002 | 0.1098 |
-| mammal_summer | north | oob_calibration_slope | 198 | 0.8458 | 0.5527 | 0.9867 | 0.7990 | 0.1680 |
-| mammal_summer | north | oob_deviance_explained | 198 | 0.0563 | 0.0013 | 0.2662 | 0.1234 | 0.1179 |
-| mammal_summer | north | oob_n | 200 | 1489.5000 | 1466.0000 | 1515.0000 | 1475.9200 | 149.9873 |
-| mammal_summer | north | oob_prevalence | 198 | 0.2735 | 0.2193 | 0.3287 | 0.2728 | 0.0485 |
-| mammal_summer | north | oob_rmse | 198 | 0.3917 | 0.3259 | 0.4480 | 0.3883 | 0.0571 |
-| mammal_summer | north | oob_spearman | 198 | 0.2890 | 0.1134 | 0.4545 | 0.2851 | 0.1566 |
-| mammal_summer | south | insample_auc | 199 | 0.7546 | 0.6196 | 0.7995 | 0.7107 | 0.0791 |
-| mammal_summer | south | insample_calibration_slope | 199 | 0.9613 | 0.8460 | 1.0524 | 0.9550 | 0.0819 |
-| mammal_summer | south | insample_deviance_explained | 199 | 0.1647 | 0.0214 | 0.2324 | 0.1205 | 0.0943 |
-| mammal_summer | south | insample_n | 199 | 674.0000 | 662.0000 | 689.0000 | 678.4171 | 40.4188 |
-| mammal_summer | south | insample_prevalence | 199 | 0.2069 | 0.1750 | 0.6994 | 0.4351 | 0.2552 |
-| mammal_summer | south | insample_rmse | 199 | 0.3563 | 0.3391 | 0.4250 | 0.3822 | 0.0389 |
-| mammal_summer | south | insample_spearman | 199 | 0.3342 | 0.1592 | 0.3998 | 0.2818 | 0.1044 |
-| mammal_summer | south | oob_auc | 197 | 0.7154 | 0.5675 | 0.7903 | 0.6784 | 0.0930 |
-| mammal_summer | south | oob_calibration_slope | 197 | 0.7382 | 0.3358 | 1.0724 | 0.7360 | 0.2780 |
-| mammal_summer | south | oob_deviance_explained | 197 | 0.0147 | -0.0349 | 0.2068 | 0.0619 | 0.1132 |
-| mammal_summer | south | oob_n | 199 | 391.0000 | 376.0000 | 403.0000 | 386.5829 | 40.4188 |
-| mammal_summer | south | oob_prevalence | 197 | 0.2300 | 0.1685 | 0.7076 | 0.4357 | 0.2560 |
-| mammal_summer | south | oob_rmse | 197 | 0.3897 | 0.3411 | 0.4384 | 0.3914 | 0.0411 |
-| mammal_summer | south | oob_spearman | 197 | 0.2707 | 0.0727 | 0.3889 | 0.2325 | 0.1292 |
-| mammal_winter | north | insample_auc | 200 | 0.7665 | 0.6675 | 0.8446 | 0.7591 | 0.0814 |
-| mammal_winter | north | insample_calibration_slope | 200 | 0.9541 | 0.8712 | 1.0110 | 0.9464 | 0.0554 |
-| mammal_winter | north | insample_deviance_explained | 200 | 0.1900 | 0.0702 | 0.3056 | 0.1876 | 0.1090 |
-| mammal_winter | north | insample_n | 200 | 2609.5000 | 2585.0000 | 2640.1000 | 2626.3900 | 152.6091 |
-| mammal_winter | north | insample_prevalence | 200 | 0.1764 | 0.1455 | 0.2061 | 0.1760 | 0.0269 |
-| mammal_winter | north | insample_rmse | 200 | 0.3161 | 0.2973 | 0.3353 | 0.3168 | 0.0164 |
-| mammal_winter | north | insample_spearman | 200 | 0.3518 | 0.2111 | 0.4734 | 0.3443 | 0.1214 |
-| mammal_winter | north | oob_auc | 198 | 0.7540 | 0.6364 | 0.8417 | 0.7404 | 0.0916 |
-| mammal_winter | north | oob_calibration_slope | 198 | 0.8826 | 0.6191 | 1.0325 | 0.8552 | 0.1596 |
-| mammal_winter | north | oob_deviance_explained | 198 | 0.0839 | 0.0080 | 0.2921 | 0.1494 | 0.1240 |
-| mammal_winter | north | oob_n | 200 | 1517.5000 | 1486.9000 | 1542.0000 | 1500.6100 | 152.6091 |
-| mammal_winter | north | oob_prevalence | 198 | 0.1742 | 0.1426 | 0.2060 | 0.1734 | 0.0271 |
-| mammal_winter | north | oob_rmse | 198 | 0.3199 | 0.2972 | 0.3413 | 0.3193 | 0.0172 |
-| mammal_winter | north | oob_spearman | 198 | 0.3263 | 0.1702 | 0.4645 | 0.3186 | 0.1319 |
-| mammal_winter | south | insample_auc | 200 | 0.7315 | 0.6779 | 0.8331 | 0.7557 | 0.0673 |
-| mammal_winter | south | insample_calibration_slope | 200 | 0.9493 | 0.8167 | 1.0904 | 0.9489 | 0.1093 |
-| mammal_winter | south | insample_deviance_explained | 200 | 0.1130 | 0.0574 | 0.2652 | 0.1552 | 0.0897 |
-| mammal_winter | south | insample_n | 200 | 695.0000 | 682.0000 | 709.0000 | 699.1600 | 41.4843 |
-| mammal_winter | south | insample_prevalence | 200 | 0.3351 | 0.0822 | 0.6144 | 0.3449 | 0.2590 |
-| mammal_winter | south | insample_rmse | 200 | 0.3196 | 0.2155 | 0.4099 | 0.3142 | 0.0927 |
-| mammal_winter | south | insample_spearman | 200 | 0.3081 | 0.2774 | 0.3331 | 0.3064 | 0.0216 |
-| mammal_winter | south | oob_auc | 198 | 0.7123 | 0.6520 | 0.8075 | 0.7227 | 0.0632 |
-| mammal_winter | south | oob_calibration_slope | 198 | 0.7412 | 0.4709 | 1.0531 | 0.7570 | 0.2412 |
-| mammal_winter | south | oob_deviance_explained | 198 | 0.0619 | 0.0061 | 0.1945 | 0.0691 | 0.1295 |
-| mammal_winter | south | oob_n | 200 | 403.0000 | 389.0000 | 416.0000 | 398.8400 | 41.4843 |
-| mammal_winter | south | oob_prevalence | 198 | 0.3423 | 0.0803 | 0.6235 | 0.3480 | 0.2608 |
-| mammal_winter | south | oob_rmse | 198 | 0.3325 | 0.2222 | 0.4211 | 0.3238 | 0.0914 |
-| mammal_winter | south | oob_spearman | 198 | 0.2687 | 0.2234 | 0.3096 | 0.2658 | 0.0350 |
+| mammal_summer | north | insample_auc | 200 | 0.7206 | 0.6073 | 0.8275 | 0.7199 | 0.1037 |
+| mammal_summer | north | insample_calibration_slope | 200 | 0.9333 | 0.8042 | 1.0034 | 0.9184 | 0.0737 |
+| mammal_summer | north | insample_deviance_explained | 200 | 0.1480 | 0.0289 | 0.2859 | 0.1561 | 0.1228 |
+| mammal_summer | north | insample_n | 200 | 2563.0000 | 2533.8000 | 2592.0000 | 2576.6500 | 150.4575 |
+| mammal_summer | north | insample_prevalence | 200 | 0.2725 | 0.2204 | 0.3249 | 0.2730 | 0.0484 |
+| mammal_summer | north | insample_rmse | 200 | 0.3834 | 0.3237 | 0.4424 | 0.3831 | 0.0573 |
+| mammal_summer | north | insample_spearman | 200 | 0.3152 | 0.1569 | 0.4663 | 0.3156 | 0.1458 |
+| mammal_summer | north | oob_auc | 198 | 0.7013 | 0.5801 | 0.8185 | 0.6988 | 0.1111 |
+| mammal_summer | north | oob_calibration_slope | 198 | 0.8306 | 0.5424 | 1.0026 | 0.7914 | 0.1828 |
+| mammal_summer | north | oob_deviance_explained | 198 | 0.0490 | 0.0001 | 0.2657 | 0.1224 | 0.1231 |
+| mammal_summer | north | oob_n | 200 | 1490.0000 | 1461.0000 | 1519.2000 | 1476.3500 | 150.4575 |
+| mammal_summer | north | oob_prevalence | 198 | 0.2730 | 0.2184 | 0.3295 | 0.2737 | 0.0489 |
+| mammal_summer | north | oob_rmse | 198 | 0.3937 | 0.3270 | 0.4495 | 0.3892 | 0.0573 |
+| mammal_summer | north | oob_spearman | 198 | 0.2888 | 0.1104 | 0.4538 | 0.2829 | 0.1588 |
+| mammal_summer | south | insample_auc | 200 | 0.7143 | 0.6234 | 0.8003 | 0.7116 | 0.0795 |
+| mammal_summer | south | insample_calibration_slope | 200 | 0.9678 | 0.8533 | 1.0836 | 0.9703 | 0.0972 |
+| mammal_summer | south | insample_deviance_explained | 200 | 0.1050 | 0.0210 | 0.2307 | 0.1209 | 0.0962 |
+| mammal_summer | south | insample_n | 200 | 673.0000 | 656.0000 | 688.0000 | 676.8100 | 41.1119 |
+| mammal_summer | south | insample_prevalence | 200 | 0.4377 | 0.1739 | 0.6994 | 0.4364 | 0.2559 |
+| mammal_summer | south | insample_rmse | 200 | 0.3856 | 0.3369 | 0.4249 | 0.3819 | 0.0397 |
+| mammal_summer | south | insample_spearman | 200 | 0.2831 | 0.1540 | 0.4021 | 0.2804 | 0.1068 |
+| mammal_summer | south | oob_auc | 198 | 0.6840 | 0.5687 | 0.7848 | 0.6787 | 0.0888 |
+| mammal_summer | south | oob_calibration_slope | 198 | 0.7858 | 0.3758 | 1.1071 | 0.7808 | 0.3016 |
+| mammal_summer | south | oob_deviance_explained | 198 | 0.0149 | -0.0449 | 0.1982 | 0.0506 | 0.1180 |
+| mammal_summer | south | oob_n | 200 | 392.0000 | 377.0000 | 409.0000 | 388.1900 | 41.1119 |
+| mammal_summer | south | oob_prevalence | 198 | 0.4435 | 0.1688 | 0.7070 | 0.4370 | 0.2547 |
+| mammal_summer | south | oob_rmse | 198 | 0.4000 | 0.3424 | 0.4363 | 0.3918 | 0.0402 |
+| mammal_summer | south | oob_spearman | 198 | 0.2487 | 0.0883 | 0.3805 | 0.2371 | 0.1207 |
+| mammal_winter | north | insample_auc | 200 | 0.7631 | 0.6695 | 0.8444 | 0.7591 | 0.0815 |
+| mammal_winter | north | insample_calibration_slope | 200 | 0.9426 | 0.8647 | 1.0007 | 0.9383 | 0.0524 |
+| mammal_winter | north | insample_deviance_explained | 200 | 0.1850 | 0.0710 | 0.3049 | 0.1879 | 0.1095 |
+| mammal_winter | north | insample_n | 200 | 2608.5000 | 2582.7000 | 2636.3000 | 2624.0150 | 152.9481 |
+| mammal_winter | north | insample_prevalence | 200 | 0.1736 | 0.1452 | 0.2056 | 0.1751 | 0.0265 |
+| mammal_winter | north | insample_rmse | 200 | 0.3168 | 0.2977 | 0.3358 | 0.3163 | 0.0164 |
+| mammal_winter | north | insample_spearman | 200 | 0.3499 | 0.2133 | 0.4719 | 0.3437 | 0.1211 |
+| mammal_winter | north | oob_auc | 198 | 0.7508 | 0.6345 | 0.8383 | 0.7396 | 0.0914 |
+| mammal_winter | north | oob_calibration_slope | 198 | 0.8705 | 0.6189 | 1.0232 | 0.8459 | 0.1527 |
+| mammal_winter | north | oob_deviance_explained | 198 | 0.1140 | 0.0135 | 0.2898 | 0.1503 | 0.1222 |
+| mammal_winter | north | oob_n | 200 | 1518.5000 | 1490.7000 | 1544.3000 | 1502.9850 | 152.9481 |
+| mammal_winter | north | oob_prevalence | 198 | 0.1704 | 0.1417 | 0.2099 | 0.1751 | 0.0279 |
+| mammal_winter | north | oob_rmse | 198 | 0.3214 | 0.3003 | 0.3419 | 0.3202 | 0.0170 |
+| mammal_winter | north | oob_spearman | 198 | 0.3306 | 0.1685 | 0.4623 | 0.3186 | 0.1324 |
+| mammal_winter | south | insample_auc | 200 | 0.7409 | 0.6805 | 0.8293 | 0.7530 | 0.0642 |
+| mammal_winter | south | insample_calibration_slope | 200 | 0.9499 | 0.8259 | 1.0604 | 0.9468 | 0.0933 |
+| mammal_winter | south | insample_deviance_explained | 200 | 0.1214 | 0.0605 | 0.2553 | 0.1521 | 0.0855 |
+| mammal_winter | south | insample_n | 200 | 694.0000 | 678.0000 | 714.0000 | 698.7250 | 42.4394 |
+| mammal_winter | south | insample_prevalence | 200 | 0.3435 | 0.0812 | 0.6126 | 0.3457 | 0.2594 |
+| mammal_winter | south | insample_rmse | 200 | 0.3191 | 0.2161 | 0.4094 | 0.3143 | 0.0922 |
+| mammal_winter | south | insample_spearman | 200 | 0.3070 | 0.2741 | 0.3331 | 0.3039 | 0.0236 |
+| mammal_winter | south | oob_auc | 198 | 0.7149 | 0.6499 | 0.8120 | 0.7247 | 0.0657 |
+| mammal_winter | south | oob_calibration_slope | 198 | 0.7685 | 0.4709 | 1.0860 | 0.7887 | 0.2523 |
+| mammal_winter | south | oob_deviance_explained | 198 | 0.0646 | 0.0219 | 0.2122 | 0.0789 | 0.1401 |
+| mammal_winter | south | oob_n | 200 | 404.0000 | 384.0000 | 420.0000 | 399.2750 | 42.4394 |
+| mammal_winter | south | oob_prevalence | 198 | 0.3300 | 0.0776 | 0.6210 | 0.3467 | 0.2598 |
+| mammal_winter | south | oob_rmse | 198 | 0.3288 | 0.2190 | 0.4203 | 0.3226 | 0.0922 |
+| mammal_winter | south | oob_spearman | 198 | 0.2649 | 0.2157 | 0.3172 | 0.2667 | 0.0419 |
 | mite | north | insample_auc | 200 | 0.7415 | 0.6711 | 0.7964 | 0.7353 | 0.0572 |
 | mite | north | insample_calibration_slope | 200 | 0.9839 | 0.8742 | 1.0308 | 0.9642 | 0.0621 |
 | mite | north | insample_deviance_explained | 200 | 0.0588 | -0.0563 | 0.1372 | 0.0443 | 0.0839 |

@@ -111,6 +111,11 @@ sources <- list(
         "Results/Habitat Modeling/2024/Climate/Predictions/",
         "All Species Climate Predictions.csv"
       ),
+      # The table v2's mammal climate stage fits on
+      paste0(
+        "Results/Density/R Dataset SpTable for ABMI North and ",
+        "South mammal coefficients 2022.RData"
+      ),
       "Data/Lookup Tables/WildTrax Species Strings.RData"
     )
   )

@@ -8,8 +8,9 @@ from the repository root.
 | `run_tests.R` | Loads the framework and runs `testthat/`. Takes seconds. Dataset checks are skipped when the published dataset cannot be reached |
 | `compare_stores.R` | Compares two sets of result stores, matched on keys, to a tolerance (default 1e-10) |
 | `testthat/test-dataset.R` | Manifest, species queue, covariate keys, bird grid, covariate cache, `covariate_files` joins |
+| `testthat/test-experiment_config.R` | Hooks (loading, the clash rule, metric direction), `species.csv` and the runs it sets, `modify_stage()` / `modify_region()` / `modify_resample()`, `drop_candidates()` / `strip_terms()`, block cut points, and each problem `experiment_config()` reports |
 | `testthat/test-methods.R` | Every engine passes `check_engine()`; registry lookups; metrics |
-| `testthat/test-new_experiment.R` | Slugs, numbering and scaffolding of `new_experiment()` |
+| `testthat/test-new_experiment.R` | Slugs, numbering and scaffolding of `new_experiment()`, including `species.csv` and `hooks/` |
 | `testthat/test-results.R` | Shard merging, seeds, spatial CV folds, baseline comparison, draw summaries |
 | `testthat/test-specs.R` | Every standard spec validates; `replace_stage_method()`; hurdle; error reporting; `stage_models` |
 
@@ -19,8 +20,8 @@ Rscript 1_code/tests/compare_stores.R <old_dir> <new_dir> [max_boot] [file,file]
 ```
 
 The tests do not replace the parity check. For a change meant to leave
-results alone, run the `parity_check` species at 5 draws to a scratch
-folder and compare its stores with exp_000's, as in
+results alone, run exp_000's species (its `species.csv`) at 5 draws to
+a scratch folder and compare its stores with exp_000's, as in
 [`docs/getting_started.md`](../../docs/getting_started.md#check-that-nothing-broke).
 Draws are seeded per species and made in order, so draws 1–5 match
 those of a 100-draw run.

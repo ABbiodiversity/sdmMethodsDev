@@ -33,6 +33,8 @@
 #' @param response Numeric vector, one per row of `frame`, used
 #'   only for the detection check.
 #' @param max_attempts Integer. Redraws before failing.
+#' @param long_breaks,lat_breaks Numeric vectors of block cut
+#'   points; the v2 plant grid by default (v2_block_breaks()).
 #' @param seed Integer or NULL. NULL leaves the stream unseeded,
 #'   which is what v2 did.
 #' @return A list of character vectors, one per iteration.
@@ -47,6 +49,8 @@ resample_spatial_block <- function(
   min_detections = 0L,
   response = NULL,
   max_attempts = 100L,
+  long_breaks = v2_block_breaks()$long,
+  lat_breaks = v2_block_breaks()$lat,
   seed = harness_seed()
 ) {
   for (one in c(long_column, lat_column)) {
@@ -60,7 +64,8 @@ resample_spatial_block <- function(
 
   units <- as.character(frame$survey_unit_id)
   blocks <- spatial_blocks(
-    frame[[long_column]], frame[[lat_column]]
+    frame[[long_column]], frame[[lat_column]],
+    long_breaks = long_breaks, lat_breaks = lat_breaks
   )
   by_block <- split(seq_along(units), blocks)
 
@@ -116,6 +121,8 @@ resample_spatial_block <- function(
 #' @param context List with `spec` and `response_name`.
 #' @param min_detections,long_column,lat_column,max_attempts
 #'   Settings from the spec's `resample` list.
+#' @param long_breaks,lat_breaks Block cut points, also from
+#'   `resample`; the v2 plant grid by default.
 #' @return A list of character vectors of survey unit ids.
 #'
 #' @example # Example usage of the function
@@ -124,7 +131,8 @@ resample_spatial_block <- function(
 resampler_spatial_block <- function(
   frame, iterations, seed, context,
   min_detections = 0L, long_column = "long", lat_column = "lat",
-  max_attempts = 100L
+  max_attempts = 100L, long_breaks = v2_block_breaks()$long,
+  lat_breaks = v2_block_breaks()$lat
 ) {
   response <- frame[[context$response_name]]
 
@@ -156,7 +164,8 @@ resampler_spatial_block <- function(
     frame = frame, iterations = iterations,
     long_column = long_column, lat_column = lat_column,
     min_detections = min_detections, response = response,
-    max_attempts = max_attempts, seed = seed
+    max_attempts = max_attempts, long_breaks = long_breaks,
+    lat_breaks = lat_breaks, seed = seed
   )
 }
 

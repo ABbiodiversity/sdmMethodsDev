@@ -50,7 +50,7 @@ included.
 | Climate stage | v2's candidates (plants 58, birds 25), model-averaged | The same candidates, each with the nine soil terms added |
 | Climate → habitat | Carried as `Climate` | The same; the carried prediction now includes soil |
 | Habitat stage | v2 | v2, unchanged |
-| Species, draws, seed | `parity_check`, 20260909 | The same |
+| Species, draws, seed | exp_000's (`species.csv`, two per taxon), 20260909 | The same |
 
 - **Why the climate stage.** It is fitted once, province-wide, so one set of
   formulas serves every region, and it is v2's broad-scale environmental

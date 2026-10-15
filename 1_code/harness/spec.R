@@ -12,6 +12,9 @@
 #     data is read. Unknown fields are errors, because a misspelt
 #     field is otherwise silently ignored; arguments of the named
 #     rule or resampler count as known fields.
+#   - Experiments change a v2 spec with replace_stage_method(),
+#     modify_stage(), modify_region() and modify_resample(), never
+#     by editing a module; each records what it changed.
 # ---
 
 # 1. Setup ----
@@ -43,6 +46,10 @@ spec_fields <- function() {
       "notes", "models_overridden", "covariate_files",
       # The stage a methods experiment replaces by default
       "habitat_stage",
+      # Where the province table has its own unit ids: the column
+      # that maps its draws to region units, and other response
+      # columns its frame carries (the mammal climate stage)
+      "province_key", "response_companions",
       # Recorded facts a module keeps for its own reports
       "use_protocol", "protocol_is_v2", "climate_source"
     ),
@@ -122,6 +129,29 @@ validate_spec <- function(spec, stop_on_error = TRUE) {
         "formula, such as ~ nr != \"Grassland\"."
       )
     }
+  }
+
+  # Step 2b: The province table's key and companions
+  if (!is.null(spec$province_key)) {
+    if (!is.character(spec$province_key) ||
+          length(spec$province_key) != 1L) {
+      problem(label, ": `province_key` must be one column name.")
+    }
+
+    if (!identical(spec$resample$scope, "province")) {
+      problem(
+        label, ": `province_key` maps province-wide draws, so ",
+        "`resample$scope` must be \"province\"."
+      )
+    }
+  }
+
+  if (!is.null(spec$response_companions) &&
+        !is.function(spec$response_companions)) {
+    problem(
+      label, ": `response_companions` must be a function of the ",
+      "species, returning named response columns."
+    )
   }
 
   # Step 3: Stages, in order
@@ -362,6 +392,117 @@ spec_covariates <- function(spec, stage_names = NULL) {
   unique(c(covariates, extra, spec$weight_column))
 }
 
+## 4.1 check_spec_covariates() ----
+
+#' Find Covariates a Spec Names That the Data Does Not Hold
+#'
+#' Resolves names as a run does (region_request() and
+#' province_request() in run_model.R), then checks the taxon's
+#' covariate catalogue and the experiment's covariate_files. Reads
+#' lookups only, so it is quick enough to run when an experiment
+#' is configured.
+#'
+#' @param spec A taxon spec, with any stage_models applied.
+#' @param data_dir Character. The test dataset folder.
+#' @param regions Character vector of regions to check, or NULL
+#'   for every region the spec defines.
+#' @param label Character. The run's name, for messages.
+#' @return A character vector of problems, empty when every
+#'   covariate is found.
+#'
+#' @example # Example usage of the function
+#' # check_spec_covariates(lichen_spec(), data_dir)
+check_spec_covariates <- function(spec, data_dir, regions = NULL,
+                                  label = spec$taxon) {
+  problems <- character(0)
+  file_columns <- covariate_file_columns(spec$covariate_files)
+
+  check <- function(columns, region) {
+    where <- paste0(
+      "Run `", label, "`",
+      if (is.null(region)) " (province-wide)" else
+        paste0(" (", region, ")")
+    )
+    columns <- setdiff(unique(columns), file_columns)
+
+    tryCatch({
+      unknown <- covariate_columns_needed(
+        spec$taxon, data_dir, columns, region
+      )$unknown
+      available <- available_covariates(
+        data_dir, spec$taxon, region = region
+      )
+
+      for (one in unknown) {
+        close <- available[agrep(
+          one, available, max.distance = 0.2, ignore.case = TRUE
+        )]
+        problems <<- c(problems, paste0(
+          where, ": covariate `", one, "` is not in the dataset ",
+          "or covariate_files",
+          if (length(close) > 0) {
+            paste0("; did you mean ",
+                   paste(utils::head(close, 3), collapse = ", "), "?")
+          } else {
+            "."
+          }
+        ))
+      }
+    }, error = function(e) {
+      problems <<- c(
+        problems, paste0(where, ": ", conditionMessage(e))
+      )
+    })
+  }
+
+  for (region in regions %||% names(spec$regions)) {
+    request <- tryCatch(
+      region_request(spec, region, data_dir),
+      error = function(e) {
+        problems <<- c(problems, paste0(
+          "Run `", label, "` (", region, "): ", conditionMessage(e)
+        ))
+        NULL
+      }
+    )
+
+    if (!is.null(request)) {
+      check(c(request$covariates, request$weight_column), region)
+    }
+  }
+
+  province <- tryCatch(
+    province_request(spec),
+    error = function(e) {
+      problems <<- c(problems, paste0(
+        "Run `", label, "`: ", conditionMessage(e)
+      ))
+      NULL
+    }
+  )
+
+  if (!is.null(province)) {
+    # NULL for most taxa; "province" where the manifest names a
+    # separate province table
+    region <- tryCatch(
+      province_region(data_dir, spec$taxon), error = function(e) NULL
+    )
+
+    if (!is.null(spec$province_key) && is.null(region)) {
+      problems <- c(problems, paste0(
+        "Run `", label, "`: the spec reads a separate province ",
+        "table (`province_key`), but this test dataset has no ",
+        "`province` row for ", spec$taxon, " in its manifest. ",
+        "Use a dataset version that has one."
+      ))
+    } else {
+      check(province$covariates, region)
+    }
+  }
+
+  unique(problems)
+}
+
 # 5. apply_stage_models() ----
 
 #' Swap a Spec's Candidate Sets for an Experiment's Own
@@ -545,6 +686,210 @@ replace_stage_method <- function(
     spec$notes %||% "", " Stage `", stage, "` fitted with ",
     label, "."
   )
+
+  spec
+}
+
+## 6.1 modify_stage() ----
+
+#' Change Fields of One Stage of a Spec, in an Experiment
+#'
+#' How an experiment changes a v2 setting without editing the
+#' taxon module: the module stays the record of v2, and the change
+#' is recorded in `models_overridden` (so experiment_changes(),
+#' meta.json and the run record show it) and in `v2_coverage`.
+#' The spec is validated, so a misspelt field fails here.
+#'
+#' @param spec A taxon spec.
+#' @param stage Character. The stage's name.
+#' @param ... Named fields to set; NULL removes a field. Fields a
+#'   stage's rule takes as arguments are accepted too.
+#' @return The spec.
+#'
+#' @example # Example usage of the function
+#' # spec <- modify_stage(lichen_spec(), "habitat",
+#' #                      min_detections = 10L)
+modify_stage <- function(spec, stage, ...) {
+  fields <- spec_change_fields(list(...))
+  names_in <- vapply(spec$stages, `[[`, character(1), "name")
+  index <- match(stage, names_in)
+
+  if (length(stage) != 1L || is.na(index)) {
+    stop(
+      "Spec `", spec$taxon, "` has no stage `", stage, "`. Stages: ",
+      paste(names_in, collapse = ", "),
+      call. = FALSE
+    )
+  }
+
+  for (field in names(fields)) {
+    spec$stages[[index]][field] <- list(fields[[field]])
+  }
+
+  changes <- describe_spec_change(stage, fields)
+  spec <- record_spec_change(spec, changes, coverage_key = stage)
+
+  validate_spec(spec)
+}
+
+## 6.2 modify_region() ----
+
+#' Change Fields of One Region of a Spec, in an Experiment
+#'
+#' As modify_stage(), for a region: its `filter`, `grid`,
+#' `grid_constants`, `habitat_models` and the rest of
+#' spec_fields()$region.
+#'
+#' @param spec A taxon spec.
+#' @param region Character. The region's name.
+#' @param ... Named fields to set; NULL removes a field.
+#' @return The spec.
+#'
+#' @example # Example usage of the function
+#' # spec <- modify_region(lichen_spec(), "north",
+#' #                       filter = ~ nr == "Boreal")
+modify_region <- function(spec, region, ...) {
+  fields <- spec_change_fields(list(...))
+
+  if (length(region) != 1L || !region %in% names(spec$regions)) {
+    stop(
+      "Spec `", spec$taxon, "` has no region `", region,
+      "`. Regions: ", paste(names(spec$regions), collapse = ", "),
+      call. = FALSE
+    )
+  }
+
+  for (field in names(fields)) {
+    spec$regions[[region]][field] <- list(fields[[field]])
+  }
+
+  changes <- describe_spec_change(paste("region", region), fields)
+  spec <- record_spec_change(spec, changes)
+
+  validate_spec(spec)
+}
+
+## 6.3 modify_resample() ----
+
+#' Change a Spec's Resampling, in an Experiment
+#'
+#' As modify_stage(), for `spec$resample`: the scheme and its
+#' settings (e.g. `min_detections`, `long_breaks`, `lat_breaks`).
+#'
+#' @param spec A taxon spec.
+#' @param ... Named settings; NULL removes one.
+#' @param replace Logical. Drop the current settings first, keeping
+#'   only `scope` unless it is given. Use it to switch scheme, as
+#'   the old scheme's settings are not the new one's.
+#' @return The spec.
+#'
+#' @example # Example usage of the function
+#' # spec <- modify_resample(lichen_spec(), scheme = "spatial_cv",
+#' #                         replace = TRUE)
+modify_resample <- function(spec, ..., replace = FALSE) {
+  fields <- spec_change_fields(list(...))
+
+  if (replace) {
+    spec$resample <- spec$resample["scope"]
+    spec$resample <- spec$resample[
+      !vapply(spec$resample, is.null, logical(1))
+    ]
+  }
+
+  for (field in names(fields)) {
+    spec$resample[field] <- list(fields[[field]])
+  }
+
+  changes <- describe_spec_change(
+    if (replace) "resample (replaced)" else "resample", fields
+  )
+  spec <- record_spec_change(
+    spec, changes, coverage_key = "resampling"
+  )
+
+  validate_spec(spec)
+}
+
+## 6.4 spec_change_fields() ----
+
+#' Check the Fields Passed to a modify_*() Function
+#'
+#' @param fields A list from `list(...)`.
+#' @return The list, when every entry is named.
+#'
+#' @example # Example usage of the function
+#' # spec_change_fields(list(ic = "BIC"))
+spec_change_fields <- function(fields) {
+  if (length(fields) == 0) {
+    stop("Name at least one field to change.", call. = FALSE)
+  }
+
+  if (is.null(names(fields)) || any(!nzchar(names(fields)))) {
+    stop(
+      "Every field to change must be named, e.g. ic = \"BIC\".",
+      call. = FALSE
+    )
+  }
+
+  fields
+}
+
+## 6.5 describe_spec_change() ----
+
+#' Describe Changed Fields for the Record
+#'
+#' @param where Character. What was changed, e.g. a stage name.
+#' @param fields Named list of new values.
+#' @return A character vector, one "where: field = value" each.
+#'
+#' @example # Example usage of the function
+#' # describe_spec_change("habitat", list(ic = "BIC"))
+describe_spec_change <- function(where, fields) {
+  values <- vapply(fields, function(value) {
+    text <- if (is.null(value)) {
+      "removed"
+    } else if (is.function(value)) {
+      "a custom function"
+    } else {
+      paste(deparse(value, width.cutoff = 500L), collapse = " ")
+    }
+
+    if (nchar(text) > 80) paste0(substr(text, 1, 77), "...") else text
+  }, character(1))
+
+  paste0(where, ": ", names(fields), " = ", values)
+}
+
+## 6.6 record_spec_change() ----
+
+#' Record a Spec Change Where the Run Record Reads It
+#'
+#' @param spec A taxon spec.
+#' @param changes Character vector from describe_spec_change().
+#' @param coverage_key Character or NULL. The `v2_coverage` entry
+#'   the change makes no longer v2's.
+#' @return The spec.
+#'
+#' @example # Example usage of the function
+#' # record_spec_change(spec, "habitat: ic = \"BIC\"", "habitat")
+record_spec_change <- function(spec, changes, coverage_key = NULL) {
+  spec$models_overridden <- c(spec$models_overridden, changes)
+
+  if (!is.null(coverage_key)) {
+    # Earlier changes to the same entry are kept
+    prior <- spec$v2_coverage[[coverage_key]]
+    earlier <- if (!is.null(prior) &&
+                     startsWith(prior$note, "Changed: ")) {
+      sub("\\.$", "; ", prior$note)
+    } else {
+      "Changed: "
+    }
+
+    spec$v2_coverage[[coverage_key]] <- v2_status(
+      "not reproduced",
+      paste0(earlier, paste(changes, collapse = "; "), ".")
+    )
+  }
 
   spec
 }

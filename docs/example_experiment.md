@@ -59,7 +59,9 @@ Then drop `dry_run = TRUE` to create them. You get:
 ```
 1_code/experiments/<id>/
 ├── README.md     # the question; from _template/
-└── run.R         # the decisions; id, title, author, date filled in
+├── run.R         # the decisions; id, title, author, date filled in
+├── species.csv   # every species a run can fit; cut it down
+└── hooks/        # empty; methods of the experiment's own
 2_pipeline/<id>/
 └── logs/
 3_output/<id>/
@@ -68,8 +70,10 @@ Then drop `dry_run = TRUE` to create them. You get:
 └── report.md     # a stub
 ```
 
-Leave `id` in `run.R` as it is. The rest of this page fills in
-those two files and adds one script beside them.
+Leave `id` and `exp_dir` in `run.R` as they are. The rest of this
+page fills in `README.md`, `species.csv` and `run.R`, and adds one
+script beside them. Nothing outside the experiment's folder is
+edited.
 
 ## Step 2: Write down the question
 
@@ -85,7 +89,13 @@ relative to exp_000 and what does not. exp_002's:
 | Climate stage | v2's candidates (plants 58, birds 25), model-averaged | The same candidates, each with the nine soil terms added |
 | Climate → habitat | Carried as `Climate` | The same; the carried prediction now includes soil |
 | Habitat stage | v2 | v2, unchanged |
-| Species, draws, seed | `parity_check`, 20260909 | The same |
+| Species, draws, seed | exp_000's (`species.csv`, two per taxon), 20260909 | The same |
+
+To keep exp_000's species, replace the rows of your `species.csv`
+with the plant and bird rows of
+`1_code/experiments/exp_000_parity_v2/species.csv`. The rows left
+also decide which runs are fitted, so mammal rows would add the
+mammal runs.
 
 Write down the reasoning for each choice while you still have it.
 exp_002 records three:
@@ -220,7 +230,9 @@ bird_soil[1]
 ```
 
 To build a candidate set from covariates alone instead, see
-`models_from_covariates()` in `1_code/harness/model_sets.R`.
+`models_from_covariates()` in `1_code/harness/model_sets.R`. To
+take covariates out of a set, `drop_candidates()` and
+`strip_terms()` sit beside it.
 
 
 ## Step 5: Configure the run
@@ -232,7 +244,7 @@ comparison is like for like:
 config <- experiment_config(
   id = "exp_002_soilgrids",
   taxa = c(plant_taxa, "bird"),
-  species = "parity_check",     # exp_000's species
+  species = file.path(exp_dir, "species.csv"),  # exp_000's
   n_bootstraps = 5,             # 5 checks; 100 for a result
   seed = 20260909,              # exp_000's seed
   stage_models = stage_models,  # the change
@@ -241,7 +253,10 @@ config <- experiment_config(
 )
 ```
 
-`soil_file` is the CSV from Step 3. exp_002's `run.R` also runs
+exp_002 names `taxa` because it predates runs being read off the
+species list; a new experiment can leave `taxa` out, and its
+`species.csv` then sets the runs. `soil_file` is the CSV from
+Step 3. exp_002's `run.R` also runs
 the extraction script when that file is missing, so one `source()`
 call does everything:
 
@@ -259,9 +274,11 @@ if (!file.exists(soil_file)) {
 Delete the CSV to extract again.
 
 `experiment_config()` checks the covariate file (Step 3's
-contract), the runs named in `taxa`, and the draw count before
-anything is fitted, and prints what it will do. A problem with any
-of them stops it here, not hours in.
+contract), the species names, the runs, the draw count, each spec,
+and every covariate the formulas name (here, that each `sg_` column
+is in `soil_file`) before anything is fitted, and prints what it
+will do. It lists every problem at once, so one run shows all there
+is to fix, here and not hours in.
 
 ## Step 6: Run it at 5 draws
 
@@ -345,7 +362,7 @@ lower RMSE; and a calibration slope closer to 1.
 A difference is worth reading only if it is consistent across
 species (`share_better`) and large relative to the bands. **A
 5-draw run is a pipeline check, not a result.** Its bands are
-unstable, and `parity_check` is two species per taxon. Say so
+unstable, and exp_000's species list is two species per taxon. Say so
 wherever you report it, as exp_002's README does.
 
 ## Step 9: Run at 100 draws and write it up
@@ -370,8 +387,11 @@ When the 5-draw run is clean:
 
 ## Checklist
 
-- [ ] Scaffolded with `new_experiment()`; `id` in `run.R`
-      unchanged.
+- [ ] Scaffolded with `new_experiment()`; `id` and `exp_dir` in
+      `run.R` unchanged.
+- [ ] `species.csv` cut down to the species fitted (exp_000's for
+      a like-for-like comparison).
+- [ ] Nothing edited outside the experiment's folder.
 - [ ] Question, design table, and reasoning in the README before
       the first run.
 - [ ] One change relative to exp_000; species, seed, and draws

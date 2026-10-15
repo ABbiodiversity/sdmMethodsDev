@@ -5,15 +5,19 @@
 # inputs:
 #   the published test dataset (see data_source.R)
 # outputs:
-#   in 2_pipeline/<id>/: the result stores and run_log.csv
+#   in 2_pipeline/<id>/: the result stores, run_log.csv and
+#   session_info.txt
 #   in 3_output/<id>/: tables/, run_record.md, and whatever the
 #   experiment's own steps write
 # notes:
 #   - The part every experiment shares, so each run.R is a short
-#     list of decisions. experiment_config() checks them before
-#     anything is fitted; run_experiment() fits, summarizes,
-#     compares with the baseline (exp_000, v2), runs the
-#     experiment's own steps and writes the run record.
+#     list of decisions. experiment_config() checks them all
+#     before anything is fitted and reports every problem at
+#     once; run_experiment() fits, summarizes, compares with the
+#     baseline (exp_000, v2), runs the experiment's own steps and
+#     writes the run record.
+#   - The argument defaults here, with standard_specs(), are the
+#     v2 defaults: an experiment passes only what it changes.
 #   - Steps receive everything through `config` and `results`.
 # ---
 
@@ -30,10 +34,14 @@ library(data.table) # run log writing (version: 1.16.4)
 #'   "exp_001_covariate_scale". Names its 2_pipeline/ and
 #'   3_output/ folders.
 #' @param taxa Character vector of runs, from
-#'   names(standard_specs()), or NULL for all of them.
-#' @param species A focal-species set name (see
-#'   focal_species_sets()), a species vector named by taxon, or
-#'   NULL for every species.
+#'   names(standard_specs()), or NULL. NULL with a species list
+#'   runs only the runs that fit a listed species (e.g. a
+#'   `Moose_Summer` row runs `mammal_summer`); NULL with no species
+#'   list runs every run.
+#' @param species The path to the experiment's species.csv (see
+#'   read_species_file()), a species vector named by taxon, or
+#'   NULL for every species. Names are checked against the
+#'   dataset's species queue.
 #' @param n_bootstraps Integer. Draws per species. 100 is v2's.
 #' @param seed Integer or NULL. The base seed; NULL leaves the
 #'   draws unseeded, as v2 did.
@@ -55,15 +63,25 @@ library(data.table) # run log writing (version: 1.16.4)
 #'   itself.
 #' @param v2_bootstraps Integer. v2's draw count, which a run must
 #'   reach to be gated.
+#' @param regions Character vector of regions to fit, e.g.
+#'   "north", or NULL for every region each spec defines.
+#' @param metrics Character vector of registered metrics to score
+#'   each draw with, or NULL for all of them (default_metrics()).
+#' @param compare_metrics Character vector of prefixed metrics
+#'   (e.g. "oob_auc") to compare with the baseline, or NULL for
+#'   default_compare_metrics().
 #' @param project_root Character. The repository root.
 #' @param data_dir,pipeline_dir,out_dir Character, or NULL for
 #'   test_dataset_dir(), 2_pipeline/<id> and 3_output/<id>.
-#' @return A list of class `experiment_config`.
+#' @return A list of class `experiment_config`. Every problem
+#'   found is reported in one error before anything is fitted.
 #'
 #' @example # Example usage of the function
-#' # config <- experiment_config("exp_001_test", taxa = "lichen",
-#' #                             species = "one_each",
-#' #                             n_bootstraps = 5)
+#' # config <- experiment_config(
+#' #   "exp_001_test",
+#' #   species = "1_code/experiments/exp_001_test/species.csv",
+#' #   n_bootstraps = 5
+#' # )
 experiment_config <- function(
   id,
   taxa = NULL,
@@ -78,13 +96,67 @@ experiment_config <- function(
   unit_predictions = "none",
   baseline = "exp_000_parity_v2",
   v2_bootstraps = 100L,
+  regions = NULL,
+  metrics = NULL,
+  compare_metrics = NULL,
   project_root = getOption("sdm.project_root", "."),
   data_dir = NULL,
   pipeline_dir = NULL,
   out_dir = NULL
 ) {
-  # Step 1: The runs
+  # Problems are collected and reported together, so one run of
+  # run.R shows everything to fix
+  problems <- character(0)
+  problem <- function(...) {
+    problems <<- c(problems, paste0(...))
+  }
+
   specs <- specs %||% standard_specs(plant_bootstrap)
+  data_dir <- test_dataset_dir(data_dir)
+
+  # Step 1: The species: the experiment's species.csv, or a
+  # vector named by taxon
+  species_file <- is.character(species) && length(species) == 1L &&
+    is.null(names(species))
+  focal <- species
+
+  if (species_file) {
+    focal <- tryCatch(
+      read_species_file(species),
+      error = function(e) {
+        problem(conditionMessage(e))
+        NULL
+      }
+    )
+  }
+
+  for (one in check_species_names(focal, data_dir)) {
+    problem(one)
+  }
+
+  # Step 2: The runs. Without `taxa`, a species list names them:
+  # only runs that fit a listed species, so editing species.csv
+  # alone sets what runs.
+  taxa_given <- !is.null(taxa)
+
+  if (!taxa_given && !is.null(focal) && length(problems) == 0) {
+    covered <- runs_for_species(specs, focal, data_dir)
+    taxa <- names(specs)[vapply(covered, length, integer(1)) > 0]
+    uncovered <- setdiff(
+      paste(names(focal), focal),
+      unlist(lapply(names(covered), function(key) {
+        paste(specs[[key]]$taxon, covered[[key]])
+      }))
+    )
+
+    if (length(uncovered) > 0) {
+      problem(
+        "No run fits ", paste(uncovered, collapse = ", "),
+        " (e.g. a species not \"modelled\" in any region)."
+      )
+    }
+  }
+
   taxa <- taxa %||% names(specs)
   unknown <- setdiff(taxa, names(specs))
 
@@ -98,44 +170,57 @@ experiment_config <- function(
 
   specs <- specs[taxa]
 
-  # Step 2: The draw count, checked now rather than hours in
-  if (!is.numeric(n_bootstraps) || length(n_bootstraps) != 1L ||
-        is.na(n_bootstraps) || n_bootstraps < 1 ||
-        n_bootstraps != round(n_bootstraps)) {
-    stop(
-      "n_bootstraps must be a single whole number of 1 or more.",
-      call. = FALSE
-    )
-  }
+  # A run given in `taxa` whose taxon the list does not name runs
+  # every species, so say so: it makes a partial list the longest
+  # run
+  if (taxa_given && !is.null(focal)) {
+    slugs <- vapply(specs, `[[`, character(1), "taxon")
+    unnamed <- names(slugs)[!slugs %in% names(focal)]
 
-  n_bootstraps <- as.integer(n_bootstraps)
-  data_dir <- test_dataset_dir(data_dir)
-
-  # Stored draws have a hard ceiling; drawn ones do not
-  for (key in names(specs)) {
-    spec <- specs[[key]]
-
-    if (!identical(spec$resample$scheme, "precomputed") ||
-          isTRUE(spec$resample$per_species)) {
-      next
-    }
-
-    location <- manifest_entry(data_dir, spec$taxon)$bootstrap_ids
-    stored <- length(names(fread(
-      file.path(data_dir, location), nrows = 0
-    )))
-
-    if (n_bootstraps > stored) {
-      stop(
-        "n_bootstraps is ", n_bootstraps, " but only ", stored,
-        " ", spec$taxon, " draws are stored. Lower it, or drop `",
-        key, "`.",
-        call. = FALSE
+    if (length(unnamed) > 0) {
+      message(
+        "Note: ", paste(unnamed, collapse = ", "), " are not named ",
+        "in the species list, so every species will be run for ",
+        "them. Leave `taxa` out to run only the listed species."
       )
     }
   }
 
-  if (n_bootstraps < v2_bootstraps) {
+  # Step 3: The draw count, checked now rather than hours in
+  if (!is.numeric(n_bootstraps) || length(n_bootstraps) != 1L ||
+        is.na(n_bootstraps) || n_bootstraps < 1 ||
+        n_bootstraps != round(n_bootstraps)) {
+    problem(
+      "n_bootstraps must be a single whole number of 1 or more."
+    )
+  } else {
+    n_bootstraps <- as.integer(n_bootstraps)
+
+    # Stored draws have a hard ceiling; drawn ones do not
+    for (key in names(specs)) {
+      spec <- specs[[key]]
+
+      if (!identical(spec$resample$scheme, "precomputed") ||
+            isTRUE(spec$resample$per_species)) {
+        next
+      }
+
+      location <- manifest_entry(data_dir, spec$taxon)$bootstrap_ids
+      stored <- length(names(fread(
+        file.path(data_dir, location), nrows = 0
+      )))
+
+      if (n_bootstraps > stored) {
+        problem(
+          "n_bootstraps is ", n_bootstraps, " but only ", stored,
+          " ", spec$taxon, " draws are stored. Lower it, or drop `",
+          key, "`."
+        )
+      }
+    }
+  }
+
+  if (is.integer(n_bootstraps) && n_bootstraps < v2_bootstraps) {
     message(
       "Note: running ", n_bootstraps, " of ", v2_bootstraps,
       " v2 draws. This is a trial; its parity numbers are not a ",
@@ -143,35 +228,97 @@ experiment_config <- function(
     )
   }
 
-  # Step 3: Covariates the experiment adds from its own files.
+  # Step 4: Covariates the experiment adds from its own files.
   # Absolute paths, so parallel workers find them too.
   if (!is.null(covariate_files)) {
     covariate_files <- normalizePath(
       covariate_files, winslash = "/", mustWork = FALSE
     )
-    check_covariate_files(covariate_files, data_dir)
-
-    specs <- lapply(specs, function(spec) {
-      spec$covariate_files <- covariate_files
-      spec
+    files_ok <- tryCatch({
+      check_covariate_files(covariate_files, data_dir)
+      TRUE
+    }, error = function(e) {
+      problem(conditionMessage(e))
+      FALSE
     })
+
+    if (files_ok) {
+      specs <- lapply(specs, function(spec) {
+        spec$covariate_files <- covariate_files
+        spec
+      })
+    }
   }
 
-  # Step 4: The species. A taxon the set does not name runs every
-  # species, so say so: it makes a partial set the longest run.
-  focal <- get_focal_species(species)
+  # Step 5: Regions and metrics
+  for (key in names(specs)) {
+    absent <- setdiff(regions, names(specs[[key]]$regions))
 
-  if (!is.null(focal)) {
-    slugs <- vapply(specs, `[[`, character(1), "taxon")
-    unnamed <- names(slugs)[!slugs %in% names(focal)]
-
-    if (length(unnamed) > 0) {
-      message(
-        "Note: ", paste(unnamed, collapse = ", "), " are not named ",
-        "in the species set, so every species will be run for ",
-        "them. Narrow `taxa` to avoid it."
+    if (length(absent) > 0) {
+      problem(
+        "Run `", key, "` has no region(s) ",
+        paste(absent, collapse = ", "), ". Its regions: ",
+        paste(names(specs[[key]]$regions), collapse = ", "), "."
       )
     }
+  }
+
+  unknown_metrics <- setdiff(metrics, registered_names("metric"))
+
+  if (length(unknown_metrics) > 0) {
+    problem(
+      "Unknown metric(s): ", paste(unknown_metrics, collapse = ", "),
+      ". Registered: ",
+      paste(registered_names("metric"), collapse = ", "), "."
+    )
+  }
+
+  # Prefixed as the summaries are; v2val_ rows come from the plant
+  # specs' own validation, not the registry
+  compare_base <- sub("^(insample_|oob_)", "", compare_metrics)
+  unknown_compare <- compare_metrics[
+    !compare_base %in% registered_names("metric") &
+      !startsWith(compare_base, "v2val_")
+  ]
+
+  if (length(unknown_compare) > 0) {
+    problem(
+      "Unknown compare_metrics: ",
+      paste(unknown_compare, collapse = ", "), ". Use a registered ",
+      "metric with an `oob_` or `insample_` prefix, e.g. oob_auc."
+    )
+  }
+
+  # Step 6: Every spec as it will run, and the covariates it
+  # names, checked before any data is read
+  for (key in names(specs)) {
+    spec <- apply_stage_models(specs[[key]], stage_models)
+    spec_problems <- validate_spec(spec, stop_on_error = FALSE)
+
+    if (is.character(spec_problems)) {
+      problem(
+        "Run `", key, "`:\n    - ",
+        paste(spec_problems, collapse = "\n    - ")
+      )
+      next
+    }
+
+    for (one in check_spec_covariates(
+      spec, data_dir,
+      regions = intersect(regions %||% names(spec$regions),
+                          names(spec$regions)),
+      label = key
+    )) {
+      problem(one)
+    }
+  }
+
+  if (length(problems) > 0) {
+    stop(
+      "experiment_config() found ", length(problems),
+      " problem(s):\n  - ", paste(problems, collapse = "\n  - "),
+      call. = FALSE
+    )
   }
 
   structure(
@@ -179,11 +326,11 @@ experiment_config <- function(
       id = id,
       taxa = taxa,
       specs = specs,
-      # The set's name, for the record; "inline" for a vector
-      species_set = if (is.character(species) &&
-                          length(species) == 1L &&
-                          is.null(names(species))) {
-        species
+      # For the record: the file's name, "inline" or "all"
+      species_set = if (species_file) {
+        basename(species)
+      } else if (is.null(focal)) {
+        "all"
       } else {
         "inline"
       },
@@ -194,6 +341,11 @@ experiment_config <- function(
       stage_models = stage_models,
       covariate_files = covariate_files,
       plant_bootstrap = plant_bootstrap,
+      regions = regions,
+      metrics = metrics,
+      compare_metrics = compare_metrics,
+      # Loaded by load_framework(hooks = ); workers load them too
+      hooks = getOption("sdm.hook_files"),
       workers = as.integer(workers),
       unit_predictions = unit_predictions,
       # The baseline does not compare with itself
@@ -208,7 +360,37 @@ experiment_config <- function(
   )
 }
 
-## 2.1 print.experiment_config() ----
+## 2.1 runs_for_species() ----
+
+#' Which Listed Species Each Run Fits
+#'
+#' A run fits a listed species when the species is in the run's
+#' queue: its taxon, tier and, for mammals, season.
+#'
+#' @param specs Named list of specs.
+#' @param species A species vector named by taxon.
+#' @param data_dir Character. The test dataset folder.
+#' @return A named list, one character vector of species per run
+#'   (empty when the run fits none).
+#'
+#' @example # Example usage of the function
+#' # runs_for_species(standard_specs(), c(mammal = "Moose_Summer"),
+#' #                  data_dir)
+runs_for_species <- function(specs, species, data_dir) {
+  lapply(specs, function(spec) {
+    listed <- unname(species[names(species) == spec$taxon])
+
+    if (length(listed) == 0) {
+      return(character(0))
+    }
+
+    intersect(listed, list_species(
+      data_dir, spec$taxon, tier = spec$tier, season = spec$season
+    ))
+  })
+}
+
+## 2.2 print.experiment_config() ----
 
 #' Print an Experiment's Configuration
 #'
@@ -235,6 +417,14 @@ print.experiment_config <- function(x, ...) {
   } else {
     paste(changes, collapse = "\n            ")
   }, "\n", sep = "")
+  if (!is.null(x$regions)) {
+    cat("  regions:  ", paste(x$regions, collapse = ", "), "\n",
+        sep = "")
+  }
+  if (!is.null(x$hooks)) {
+    cat("  hooks:    ", paste(basename(x$hooks), collapse = ", "),
+        "\n", sep = "")
+  }
   cat("  workers:  ", x$workers, "\n", sep = "")
   cat("  baseline: ", x$baseline %||% "none (this is the baseline)",
       "\n", sep = "")
@@ -283,8 +473,10 @@ run_experiment <- function(
       data_dir = config$data_dir,
       pipeline_dir = config$pipeline_dir,
       species = config$focal_species,
+      regions = config$regions,
       iterations = seq_len(config$n_bootstraps),
       stage_models = config$stage_models,
+      metrics = config$metrics,
       boot_seed = config$seed,
       workers = config$workers,
       unit_predictions = config$unit_predictions
@@ -292,6 +484,11 @@ run_experiment <- function(
 
     fwrite(run_log, file.path(config$pipeline_dir, "run_log.csv"),
            na = "")
+    # The full session, beside the stores it produced
+    writeLines(
+      utils::capture.output(utils::sessionInfo()),
+      file.path(config$pipeline_dir, "session_info.txt")
+    )
     cat("\nRun log:\n")
     print(table(run_log$taxon, run_log$status))
   }
@@ -323,7 +520,8 @@ run_experiment <- function(
       out_file = file.path(config$out_dir, "run_record.md"),
       exp_id = config$id,
       config = record_config(config, run_log),
-      collected = results
+      collected = results,
+      hook_files = config$hooks
     )
     cat("Run record: ", record_file, "\n", sep = "")
   }
@@ -373,6 +571,16 @@ record_config <- function(config, run_log = NULL) {
       NA_integer_
     } else {
       length(config$focal_species)
+    },
+    species_file = config$species_set,
+    regions = config$regions %||% "all",
+    metrics = config$metrics %||% "all registered",
+    compare_metrics = config$compare_metrics %||%
+      default_compare_metrics(),
+    hooks = if (is.null(config$hooks)) {
+      "none"
+    } else {
+      basename(config$hooks)
     },
     n_bootstraps = config$n_bootstraps,
     v2_bootstraps = config$v2_bootstraps,
@@ -478,16 +686,25 @@ compare_to_baseline <- function(
     return(results)
   }
 
+  compared <- config$compare_metrics %||% default_compare_metrics()
   comparison <- compare_experiments(
     candidate_dir = config$out_dir,
-    baseline_dir = baseline_dir
+    baseline_dir = baseline_dir,
+    metrics = compared
   )
 
-  # The headline, for the console; per-species rows are written
+  # The headline, for the console; per-species rows are written.
+  # An experiment's own metrics are shown when it names no default.
+  headline <- intersect(
+    c("oob_auc", "oob_deviance_explained", "oob_calibration_slope"),
+    compared
+  )
   shown <- comparison$summary[
-    comparison$summary$metric %in% c(
-      "oob_auc", "oob_deviance_explained", "oob_calibration_slope"
-    ),
+    comparison$summary$metric %in% (if (length(headline) > 0) {
+      headline
+    } else {
+      compared
+    }),
     c("taxon", "region", "metric", "median_baseline",
       "median_candidate", "median_difference", "share_better")
   ]

@@ -53,7 +53,7 @@ sdmMethodsDev/
 │   ├── harness/            # the shared pipeline; names no taxon or method
 │   ├── methods/            # engines, selection rules, resampling, metrics
 │   ├── modules/            # one v2 spec per taxon; _shared/ for common code
-│   ├── experiments/        # one folder per question; _template/, _shared/
+│   ├── experiments/        # one folder per question; _template/
 │   ├── _setup/             # 00-08: build, check and publish the dataset
 │   ├── tests/              # contract tests and the store comparison
 │   └── _scratch.R          # dated workspace for exploration
@@ -78,36 +78,34 @@ up by the name the spec gives.
 %% ----------------------------
 %% Taxon as configuration, not codebase
 %% ----------------------------
-%%{init: {"themeVariables": {"edgeLabelBackground": "#ffffff"}}}%%
+%%{init: {
+  "look": "classic",
+  "themeVariables": {"edgeLabelBackground": "#ffffff"},
+  "themeCSS": ".node rect, .node polygon, .node circle, .node path, .edgeLabel, .label-container { filter: none !important; box-shadow: none !important; }"
+}}%%
 flowchart TD
 
-    subgraph fw["framework: one pipeline, taxon as configuration"]
-        direction TB
-        PARAM["response · family · offset · regions · stages · resampling"]
-        PARAM --> SP["plant-group specs<br/>bryophytes · lichens · mites · vascular plants"]
-        PARAM --> SM["mammal specs<br/>summer · winter"]
-        PARAM --> SB["bird spec"]
-        SP --> H["1_code/harness/"]
-        SM --> H
-        SB --> H
-        MT["1_code/methods/<br/>engines · selection rules · resampling · metrics"]
-        MT -.->|"looked up by name"| H
-        H -->|"the same result files<br/>for every taxon and method"| R["result stores"]
-    end
+    PARAM["response · family · offset · model type · model selection"]
+    PARAM --> SP["plants spec.R"]
+    PARAM --> SM["mammals spec.R"]
+    PARAM --> SB["birds spec.R"]
+    SP --> H["1_code/harness/"]
+    SM --> H
+    SB --> H
+    H -->|"select species, covariates,<br/>model specification, etc."| R["result object"]
 
     %% ----------------------------
     %% Styles
     %% ----------------------------
 
-    %% Containers
-    style fw fill:none,stroke:#2D415B,stroke-width:1px
+    %% Connection lines
+    linkStyle default stroke-width:1px
 
     %% Configuration
     style PARAM fill:#ffffff,stroke:#2D415B,stroke-width:1px,stroke-dasharray: 5 5
     style SP fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
     style SM fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
     style SB fill:#A3B4C7,stroke:#2D415B,stroke-width:1px
-    style MT fill:#A3B4C7,stroke:#2D415B,stroke-width:1px,stroke-dasharray: 5 5
 
     %% Shared pipeline
     style H fill:#A4A88780,stroke:#C8A02C,stroke-width:4px
@@ -123,35 +121,40 @@ v2.0 output. Every later experiment changes one thing and is compared
 with exp_000, so a difference is a difference in method rather than in
 plumbing. Because the dataset is frozen, results stay comparable.
 
+An experiment edits only its own folder: its species list, the spec
+changes in its `run.R`, and any methods of its own in `hooks/`. The
+harness, methods and taxon modules stay a fixed, tested back-end.
+
 ```mermaid
 %% ----------------------------
 %% Everything comparable to one v2 baseline
 %% ----------------------------
-%%{init: {"themeVariables": {"edgeLabelBackground": "#ffffff"}}}%%
+%%{init: {
+  "look": "classic",
+  "themeVariables": {"edgeLabelBackground": "#ffffff"},
+  "themeCSS": ".node rect, .node polygon, .node circle, .node path, .edgeLabel, .label-container { filter: none !important; box-shadow: none !important; }"
+}}%%
 flowchart TD
 
-    subgraph fw["framework: everything comparable to one v2 baseline"]
-        direction TB
-        D["0_data/test_dataset/"] --> M["1_code/modules/[taxon]/<br/>v2 specs"]
-        V2["0_data/v2_results/<br/>published v2.0"]
-        M --> E0["exp_000_parity_v2"]
-        M --> E1["exp_001"]
-        M --> E2["exp_002"]
-        V2 -->|"parity check"| E0
-        E0 --> O0["3_output/exp_000_parity_v2/"]
-        E1 --> O1["3_output/exp_001/"]
-        E2 --> O2["3_output/exp_002/"]
-        O0 --> C["compare_experiments()"]
-        O1 --> C
-        O2 --> C
-    end
+    D["0_data/test_dataset/"] --> M["1_code/modules/[taxon]/<br/>v2 specs"]
+    V2["0_data/v2_results/<br/>published v2.0"]
+    M --> E0["exp_000_parity_v2"]
+    M --> E1["exp_001"]
+    M --> E2["exp_002"]
+    V2 -->|"parity check"| E0
+    E0 --> O0["3_output/exp_000_parity_v2/"]
+    E1 --> O1["3_output/exp_001/"]
+    E2 --> O2["3_output/exp_002/"]
+    O0 --> C["compare_experiments()"]
+    O1 --> C
+    O2 --> C
 
     %% ----------------------------
     %% Styles
     %% ----------------------------
 
-    %% Container
-    style fw fill:none,stroke:#2D415B,stroke-width:1px
+    %% Connection lines
+    linkStyle default stroke-width:.75px
 
     %% Highlighted borders
     style D fill:#A4A88780,stroke:#B8860B,stroke-width:4px

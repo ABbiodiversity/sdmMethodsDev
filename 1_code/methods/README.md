@@ -1,9 +1,13 @@
 # Methods
 
-Every method a spec can name lives here, one file each. A file
-defines its method and registers it under a name; a spec names it;
-the harness looks it up. Adding a method is adding a file. No
+Every built-in method a spec can name lives here, one file each. A
+file defines its method and registers it under a name; a spec names
+it; the harness looks it up. Adding a method is adding a file. No
 harness file changes.
+
+A method added here is shared: every experiment sees it. A method
+one experiment is testing goes in that experiment's `hooks/` folder
+instead (see [Methods in an experiment's hooks](#methods-in-an-experiments-hooks)).
 
 ```r
 source("1_code/harness/harness.R")
@@ -38,8 +42,14 @@ skeleton for an engine and a selection rule; it is not loaded.
 | selection | `hurdle` | Presence, then abundance given presence, each through an inner rule (`part_selection`); reports both and their product on the grid (v2 mammals) | those of `part_selection` |
 | resampler | `precomputed` | Replay draws stored with the dataset (v2 birds; plant `v2_ids`) | |
 | resampler | `spatial_block` | Bootstrap within coarse spatial blocks (v2 plants, mammals) | |
-| resampler | `spatial_cv` | Spatial block cross-validation; each draw holds out one fold | |
+| resampler | `spatial_cv` | Spatial block cross-validation; each draw holds out one fold, so `n_bootstraps` is the number of folds | |
 | metric | `auc`, `deviance_explained`, `rmse`, `spearman`, `calibration_slope`, `prevalence`, `n` | Scored in-sample and out-of-bag for every draw | |
+
+Both blocked resamplers cut blocks at the v2 plant grid
+(`v2_block_breaks()`) unless the spec's `resample` list sets
+`long_breaks` and `lat_breaks`, e.g.
+`modify_resample(spec, scheme = "spatial_cv", replace = TRUE,
+lat_breaks = c(48, 50, 52, 54, 56, 58, 61))`.
 
 `validate_spec()` checks a spec against this table before any data
 is read. A rule paired with an engine that lacks what it needs, an
@@ -137,7 +147,42 @@ species' draws depend only on its seed.
 
 **Metric.** A function of `observed` and `predicted`, both on the
 response scale, returning one number. Return `NA` rather than
-stopping when the metric does not apply to a draw.
+stopping when the metric does not apply to a draw. Register it with
+a `direction` (`"higher"`, `"lower"`, `"toward_one"` or `"none"`)
+so comparisons with the baseline know which way is better; without
+one, higher is assumed.
+
+## Methods in an experiment's hooks
+
+An experiment tests a method of its own without touching this
+folder. Put the file in the experiment's `hooks/`, register the
+method there with the same `register_*()` call, and load it:
+
+```r
+exp_dir <- "1_code/experiments/exp_003_my_question"
+source("1_code/harness/harness.R")
+load_framework(hooks = file.path(exp_dir, "hooks"))
+```
+
+```r
+# hooks/mae.R
+register_metric(
+  "mae",
+  function(observed, predicted) mean(abs(observed - predicted)),
+  "Mean absolute error", direction = "lower"
+)
+```
+
+The contracts are the ones above. Parallel workers load the same
+hook files. A hook may not reuse a name already registered, built
+in or from another hook file: that would change the name's meaning
+for everything else in the session. The run record lists each hook
+file with its md5. A hook can also define a plain function that a
+spec field names, such as a `response_transform` or a
+`post_process` step, set with `modify_stage()`.
+
+When a hook method proves itself, move it here so every experiment
+can use it.
 
 ## Checklist for a new method
 
@@ -147,5 +192,5 @@ stopping when the metric does not apply to a draw.
       it `requires`.
 - [ ] `check_engine()` passes, for an engine.
 - [ ] `Rscript 1_code/tests/run_tests.R` passes.
-- [ ] Tried on one species and a few draws (`species = "one_each"`,
+- [ ] Tried on a few species and draws (a short `species.csv`,
       `n_bootstraps = 5`) before a full run.

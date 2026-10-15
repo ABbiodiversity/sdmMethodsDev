@@ -25,6 +25,8 @@
 #'   coordinate columns.
 #' @param folds Integer. Number of folds.
 #' @param long_column,lat_column Character. Coordinate columns.
+#' @param long_breaks,lat_breaks Numeric vectors of block cut
+#'   points; the v2 plant grid by default (v2_block_breaks()).
 #' @param seed Integer or NULL. Defaults to harness_seed().
 #' @return A list of lists, each with `train` and `test`
 #'   character vectors of survey unit ids.
@@ -37,11 +39,14 @@ resample_spatial_cv <- function(
   folds = 5L,
   long_column = "long",
   lat_column = "lat",
+  long_breaks = v2_block_breaks()$long,
+  lat_breaks = v2_block_breaks()$lat,
   seed = harness_seed()
 ) {
   units <- as.character(frame$survey_unit_id)
   blocks <- spatial_blocks(
-    frame[[long_column]], frame[[lat_column]]
+    frame[[long_column]], frame[[lat_column]],
+    long_breaks = long_breaks, lat_breaks = lat_breaks
   )
   present <- unique(blocks[!is.na(blocks)])
 
@@ -77,8 +82,9 @@ resample_spatial_cv <- function(
 #'   folds.
 #' @param seed Integer or NULL.
 #' @param context Unused.
-#' @param long_column,lat_column Settings from the spec's
-#'   `resample` list.
+#' @param long_column,lat_column,long_breaks,lat_breaks Settings
+#'   from the spec's `resample` list; the cut points default to
+#'   the v2 plant grid.
 #' @return A list of character vectors: each fold's training
 #'   units.
 #'
@@ -86,11 +92,14 @@ resample_spatial_cv <- function(
 #' # resampler_spatial_cv(frame, 1:5, 42L, list())
 resampler_spatial_cv <- function(
   frame, iterations, seed, context,
-  long_column = "long", lat_column = "lat"
+  long_column = "long", lat_column = "lat",
+  long_breaks = v2_block_breaks()$long,
+  lat_breaks = v2_block_breaks()$lat
 ) {
   splits <- resample_spatial_cv(
     frame, folds = length(iterations), long_column = long_column,
-    lat_column = lat_column, seed = seed
+    lat_column = lat_column, long_breaks = long_breaks,
+    lat_breaks = lat_breaks, seed = seed
   )
 
   lapply(splits, `[[`, "train")

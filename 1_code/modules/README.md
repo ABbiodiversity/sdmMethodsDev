@@ -5,6 +5,13 @@ code: it states what v2 does for a taxon as a spec list, and the
 [harness](../harness/) runs it. A change here affects every
 experiment; review it as such.
 
+Experiments never edit a module to vary a taxon. They change the
+spec the module returns, in their own `run.R`: module arguments
+(`use_protocol`, `climate_source`, `tier`, `bootstrap`),
+`replace_stage_method()`, or `modify_stage()`, `modify_region()`
+and `modify_resample()`, which validate the change and record it.
+A module stays the record of what v2 does.
+
 `load_framework()` sources `_shared/` first, then every other folder,
 each in file-name order.
 

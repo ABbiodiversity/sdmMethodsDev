@@ -5,6 +5,7 @@
 # inputs:
 #   - the published test dataset (harness/data_source.R)
 #   - 3_output/exp_000_parity_v2/tables/, the v2 baseline
+#   - species.csv in this folder: exp_000's species
 # outputs:
 #   in 2_pipeline/exp_001_xgboost/:
 #     - <run>/<region>/ result stores, and run_log.csv
@@ -24,6 +25,8 @@
 # 1. Setup ----
 
 ## 1.1 Load the framework ----
+exp_dir <- "1_code/experiments/exp_001_xgboost"
+
 source("1_code/harness/harness.R")
 load_framework()
 
@@ -49,7 +52,7 @@ specs <- lapply(
 config <- experiment_config(
   id = "exp_001_xgboost",
   taxa = names(specs),
-  species = "parity_check",
+  species = file.path(exp_dir, "species.csv"),
   # 5 checks the pipeline runs; 100 for a result to read
   n_bootstraps = 100,
   seed = 20260909,

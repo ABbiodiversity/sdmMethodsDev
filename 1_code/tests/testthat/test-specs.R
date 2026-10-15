@@ -16,7 +16,7 @@ test_that("every standard spec validates", {
     expect_silent(validate_spec(standard_specs()[[key]]))
   }
   expect_silent(validate_spec(
-    mammal_spec(climate_source = "fitted", season = "summer")
+    mammal_spec(climate_source = "precomputed", season = "summer")
   ))
 })
 
@@ -31,7 +31,9 @@ test_that("one call swaps the habitat method of every run", {
 
   # The mammal hurdle keeps its structure; both halves take the
   # new engine, and v2's GLM table-building is removed with them
-  habitat <- specs$mammal_summer$stages[[1]]
+  habitat <- Filter(
+    function(s) s$name == "habitat", specs$mammal_summer$stages
+  )[[1]]
   expect_equal(habitat$selection, "hurdle")
   expect_equal(habitat$part_selection, "single")
   expect_equal(habitat$engine, "xgboost")

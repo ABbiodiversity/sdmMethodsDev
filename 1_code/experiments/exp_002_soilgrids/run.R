@@ -8,6 +8,7 @@
 #     soil covariates, written by 01_extract_soilgrids_covariates.R
 #     in this folder (run here when the file is missing)
 #   - 3_output/exp_000_parity_v2/tables/, the v2 baseline
+#   - species.csv in this folder: exp_000's species
 # outputs:
 #   in 2_pipeline/exp_002_soilgrids/:
 #     - <run>/<region>/ result stores, and run_log.csv
@@ -25,6 +26,8 @@
 # 1. Setup ----
 
 ## 1.1 Load the framework ----
+exp_dir <- "1_code/experiments/exp_002_soilgrids"
+
 source("1_code/harness/harness.R")
 load_framework()
 
@@ -72,7 +75,7 @@ stage_models <- c(
 config <- experiment_config(
   id = "exp_002_soilgrids",
   taxa = c(plant_taxa, "bird"),
-  species = "parity_check",
+  species = file.path(exp_dir, "species.csv"),
   # 5 checks the pipeline runs; 100 for a result to read
   n_bootstraps = 5,
   seed = 20260909,
