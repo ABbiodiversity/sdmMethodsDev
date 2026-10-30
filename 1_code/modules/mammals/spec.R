@@ -290,6 +290,12 @@ mammal_spec <- function(
 
     climate_source = climate_source,
 
+    # How the model is mapped onto the prediction grid, as v2's
+    # make-species-predictions.R maps it (spatial.R). Needs the
+    # fitted climate stage: precomputed climate has no
+    # coefficients to map.
+    spatial = if (fitted) mammal_spatial() else NULL,
+
     v2_coverage = list(
       climate = if (fitted) {
         v2_status(

@@ -1,0 +1,112 @@
+region,grid_class,model_class,engine_class,fixed_value,note
+north,DeciduousR,DecidR,"",,v2 rename (make-species-predictions.R:184-218)
+north,Deciduous1,Decid1,"",,v2 rename (make-species-predictions.R:184-218)
+north,Deciduous2,Decid2,"",,v2 rename (make-species-predictions.R:184-218)
+north,Deciduous3,Decid3,"",,v2 rename (make-species-predictions.R:184-218)
+north,Deciduous4,Decid4,"",,v2 rename (make-species-predictions.R:184-218)
+north,Deciduous5,Decid5,"",,v2 rename (make-species-predictions.R:184-218)
+north,Deciduous6,Decid6,"",,v2 rename (make-species-predictions.R:184-218)
+north,Deciduous7,Decid7,"",,v2 rename (make-species-predictions.R:184-218)
+north,Deciduous8,Decid8,"",,v2 rename (make-species-predictions.R:184-218)
+north,MixedwoodR,MixedwoodR,"",,""
+north,Mixedwood1,Mixedwood1,"",,""
+north,Mixedwood2,Mixedwood2,"",,""
+north,Mixedwood3,Mixedwood3,"",,""
+north,Mixedwood4,Mixedwood4,"",,""
+north,Mixedwood5,Mixedwood5,"",,""
+north,Mixedwood6,Mixedwood6,"",,""
+north,Mixedwood7,Mixedwood7,"",,""
+north,Mixedwood8,Mixedwood8,"",,""
+north,PineR,PineR,"",,""
+north,Pine1,Pine1,"",,""
+north,Pine2,Pine2,"",,""
+north,Pine3,Pine3,"",,""
+north,Pine4,Pine4,"",,""
+north,Pine5,Pine5,"",,""
+north,Pine6,Pine6,"",,""
+north,Pine7,Pine7,"",,""
+north,Pine8,Pine8,"",,""
+north,WhiteSpruceR,SpruceR,"",,v2 rename (make-species-predictions.R:184-218)
+north,WhiteSpruce1,Spruce1,"",,v2 rename (make-species-predictions.R:184-218)
+north,WhiteSpruce2,Spruce2,"",,v2 rename (make-species-predictions.R:184-218)
+north,WhiteSpruce3,Spruce3,"",,v2 rename (make-species-predictions.R:184-218)
+north,WhiteSpruce4,Spruce4,"",,v2 rename (make-species-predictions.R:184-218)
+north,WhiteSpruce5,Spruce5,"",,v2 rename (make-species-predictions.R:184-218)
+north,WhiteSpruce6,Spruce6,"",,v2 rename (make-species-predictions.R:184-218)
+north,WhiteSpruce7,Spruce7,"",,v2 rename (make-species-predictions.R:184-218)
+north,WhiteSpruce8,Spruce8,"",,v2 rename (make-species-predictions.R:184-218)
+north,BlackSpruceR,TreedBogR,"",,v2 rename (make-species-predictions.R:184-218)
+north,BlackSpruce1,TreedBog1,"",,v2 rename (make-species-predictions.R:184-218)
+north,BlackSpruce2,TreedBog2,"",,v2 rename (make-species-predictions.R:184-218)
+north,BlackSpruce3,TreedBog3,"",,v2 rename (make-species-predictions.R:184-218)
+north,BlackSpruce4,TreedBog4,"",,v2 rename (make-species-predictions.R:184-218)
+north,BlackSpruce5,TreedBog5,"",,v2 rename (make-species-predictions.R:184-218)
+north,BlackSpruce6,TreedBog6,"",,v2 rename (make-species-predictions.R:184-218)
+north,BlackSpruce7,TreedBog7,"",,v2 rename (make-species-predictions.R:184-218)
+north,BlackSpruce8,TreedBog8,"",,v2 rename (make-species-predictions.R:184-218)
+north,TreedFen,TreedFen,"",,""
+north,TreedSwamp,TreedSwamp,"",,""
+north,Grass,GrassHerb,"",,v2 rename (make-species-predictions.R:184-218)
+north,Shrub,Shrub,"",,""
+north,GraminoidFen,GraminoidFen,"",,""
+north,Marsh,Marsh,"",,""
+north,ShrubbyBog,ShrubbyBog,"",,""
+north,ShrubbyFen,ShrubbyFen,"",,""
+north,ShrubbySwamp,ShrubbySwamp,"",,""
+north,Bare,Bare,"",,""
+north,SnowIce,"","",,"no v2 coefficient; v2 sets it to 0 or drops it, so it adds 0"
+north,Water,Water,"",,""
+north,UrbInd,Industrial,"",,v2 rename (make-species-predictions.R:184-218)
+north,Rural,Rural,"",,""
+north,Mine,"","",,"no v2 coefficient; v2 sets it to 0 or drops it, so it adds 0"
+north,Wellsites,Well,"",,v2 rename (make-species-predictions.R:184-218)
+north,EnSoftLin,EnSoftLin,"",,""
+north,EnSeismic,EnSeismic,"",,""
+north,HardLin,HardLin,"",,""
+north,TrSoftLin,TrSoftLin,"",,""
+north,Crop,Crop,"",,""
+north,RoughP,RoughP,"",,""
+north,TameP,TameP,"",,""
+north,HWater,"","",,"no v2 coefficient; v2 sets it to 0 or drops it, so it adds 0"
+north,CCDeciduousR,CCDecidR,"",,v2 rename (make-species-predictions.R:184-218)
+north,CCDeciduous1,CCDecid1,"",,v2 rename (make-species-predictions.R:184-218)
+north,CCDeciduous2,CCDecid2,"",,v2 rename (make-species-predictions.R:184-218)
+north,CCDeciduous3,CCDecid3,"",,v2 rename (make-species-predictions.R:184-218)
+north,CCDeciduous4,CCDecid4,"",,v2 rename (make-species-predictions.R:184-218)
+north,CCMixedwoodR,CCMixedwoodR,"",,""
+north,CCMixedwood1,CCMixedwood1,"",,""
+north,CCMixedwood2,CCMixedwood2,"",,""
+north,CCMixedwood3,CCMixedwood3,"",,""
+north,CCMixedwood4,CCMixedwood4,"",,""
+north,CCPineR,CCPineR,"",,""
+north,CCPine1,CCPine1,"",,""
+north,CCPine2,CCPine2,"",,""
+north,CCPine3,CCPine3,"",,""
+north,CCPine4,CCPine4,"",,""
+north,CCWhiteSpruceR,CCSpruceR,"",,v2 rename (make-species-predictions.R:184-218)
+north,CCWhiteSpruce1,CCSpruce1,"",,v2 rename (make-species-predictions.R:184-218)
+north,CCWhiteSpruce2,CCSpruce2,"",,v2 rename (make-species-predictions.R:184-218)
+north,CCWhiteSpruce3,CCSpruce3,"",,v2 rename (make-species-predictions.R:184-218)
+north,CCWhiteSpruce4,CCSpruce4,"",,v2 rename (make-species-predictions.R:184-218)
+south,ClaySub,ClaySub,"",,""
+south,Other,Other,"",,""
+south,RapidDrain,RapidDrain,"",,""
+south,Loamy,Loamy,"",,""
+south,SandyLoam,SandyLoam,"",,""
+south,ThinBreak,ThinBreak,"",,""
+south,Blowout,Blowout,"",,""
+south,SoilUnknown,"","",,"no v2 coefficient; v2 sets it to 0 or drops it, so it adds 0"
+south,Water,Water,"",,""
+south,UrbInd,Industrial,"",,v2 rename (make-species-predictions.R:184-218)
+south,Rural,Rural,"",,""
+south,Mine,Mine,"",,""
+south,Wellsites,Well,"",,v2 rename (make-species-predictions.R:184-218)
+south,EnSoftLin,EnSoftLin,"",,""
+south,EnSeismic,EnSeismic,"",,""
+south,HardLin,HardLin,"",,""
+south,TrSoftLin,TrSoftLin,"",,""
+south,Crop,Crop,"",,""
+south,RoughP,RoughP,"",,""
+south,TameP,TameP,"",,""
+south,HWater,"","",,"no v2 coefficient; v2 sets it to 0 or drops it, so it adds 0"
+south,HFor,"","",,"no v2 coefficient; v2 sets it to 0 or drops it, so it adds 0"

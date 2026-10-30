@@ -11,8 +11,11 @@
 # outputs:
 #   in 2_pipeline/exp_000_parity_v2/:
 #     - <run>/<region>/ result stores, and run_log.csv
+#     - predictions/<run>/, the per-cell maps as RDS
 #   in 3_output/exp_000_parity_v2/:
 #     - tables/, figures/, report.md, run_record.md
+#     - maps/<run>/, the GeoTIFF maps, and
+#       tables/prediction_summary.csv and prediction_parity.csv
 # notes:
 #   - The validation gate and the baseline for every experiment:
 #     each taxon's v2 spec against the published v2 output.
@@ -75,7 +78,12 @@ config <- experiment_config(
   workers = 12,
 
   # "oob" or "all" write per-unit predictions (GBs for birds)
-  unit_predictions = "none"
+  unit_predictions = "none",
+
+  # Map every fitted species onto the prediction grid, with the
+  # v2 rule and the harness defaults (harness/predict_spatial.R):
+  # the median draw, current land cover, the whole province
+  prediction = prediction_config(enabled = TRUE)
 )
 
 ## 1.3 The v2 reference ----
@@ -98,6 +106,10 @@ results <- run_experiment(
   translate = list(bird = bird_habitat_translation),
   steps = list(
     compare = script_step(file.path(exp_dir, "01_compare_to_v2.R")),
+    # The maps against v2's map scripts and published coefficients
+    predictions = script_step(
+      file.path(exp_dir, "04_compare_predictions.R")
+    ),
     plot = script_step(file.path(exp_dir, "02_plot_parity.R")),
     report = script_step(file.path(exp_dir, "03_build_report.R"))
   )

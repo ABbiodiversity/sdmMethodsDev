@@ -108,7 +108,29 @@ config <- experiment_config(
   #   ),
   stage_models = NULL,
 
-  workers = 12
+  workers = 12,
+
+  # Spatial prediction onto the unified 1 km grid, after fitting
+  # (harness/predict_spatial.R). Off unless enabled; every other
+  # key below is at its default, the v2 rule. Uncomment to map:
+  #   prediction = prediction_config(
+  #     enabled = TRUE,
+  #     species = NULL,             # NULL: every fitted species
+  #     scenarios = "current",      # and/or "reference"
+  #     draws = "median",           # "all" adds mean and sd maps;
+  #                                 # or draw numbers, e.g. 1
+  #     extent = NULL,              # NULL: province; "parity_test";
+  #                                 # list(LufName = "Lower Peace");
+  #                                 # list(bbox = c(xmin, xmax,
+  #                                 #               ymin, ymax))
+  #     caps_from = "province",     # "extent": quicker, not v2's
+  #     outputs = c("table", "raster"),  # and/or "png"
+  #     summaries = c("province", "natural_region"),
+  #     sample_cells = 10000,       # median-draw sample
+  #     chunk_cells = 50000,        # engines without coefficients
+  #     workers = NULL              # NULL: `workers` above
+  #   ),
+  prediction = prediction_config()
 )
 
 # 2. Run ----

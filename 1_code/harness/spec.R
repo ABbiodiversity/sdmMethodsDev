@@ -51,7 +51,9 @@ spec_fields <- function() {
       # columns its frame carries (the mammal climate stage)
       "province_key", "response_companions",
       # Recorded facts a module keeps for its own reports
-      "use_protocol", "protocol_is_v2", "climate_source"
+      "use_protocol", "protocol_is_v2", "climate_source",
+      # How the fitted model is mapped (predict_spatial.R)
+      "spatial"
     ),
     region = c(
       "filter", "grid", "term_block", "habitat_models",
@@ -152,6 +154,13 @@ validate_spec <- function(spec, stop_on_error = TRUE) {
       label, ": `response_companions` must be a function of the ",
       "species, returning named response columns."
     )
+  }
+
+  # Step 2c: The spatial prediction settings, when given
+  if (!is.null(spec$spatial)) {
+    for (one in check_spatial_spec(spec$spatial)) {
+      problem(label, ": ", one)
+    }
   }
 
   # Step 3: Stages, in order

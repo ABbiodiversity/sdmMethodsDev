@@ -144,6 +144,10 @@ bird_spec <- function() {
       )
     ),
 
+    # How the model is mapped onto the prediction grid, as v2's
+    # 09.Predict.R maps it (spatial.R)
+    spatial = bird_spatial(),
+
     notes = paste0(
       "QPAD offset inside the formula. The landcover groups' ",
       "derived terms (wtAge, isCon, fcc2) are all present; ",

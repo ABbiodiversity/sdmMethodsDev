@@ -220,11 +220,41 @@ if (!is.null(run_coefficients)) {
               "ref_part", "species", "term")
     values <- c("n", "median", "p10", "p90", "boot1", "mean", "sd")
 
+    # v2 averages the pAspen slopes on their own scales, logit for
+    # presence and log for abundance, then publishes plogis and
+    # exp (south-models/03_basic-models.R:883-915); every other
+    # term is averaged as published. The spread (sd) is averaged
+    # as is.
+    located <- c("median", "p10", "p90", "boot1", "mean")
+    aspen <- mammals$term == "pAspen" &
+      mammals$ref_part %in% c("presence", "abundance")
+    to_slope <- function(x, part) {
+      ifelse(part == "presence", stats::qlogis(x), log(x))
+    }
+    from_slope <- function(x, part) {
+      ifelse(part == "presence", stats::plogis(x), exp(x))
+    }
+
+    for (v in located) {
+      mammals[[v]][aspen] <- to_slope(mammals[[v]][aspen],
+                                      mammals$ref_part[aspen])
+    }
+
     averaged <- stats::aggregate(
       mammals[, values],
       by = mammals[, keys],
       FUN = function(x) mean(x, na.rm = TRUE)
     )
+
+    averaged_aspen <- averaged$term == "pAspen" &
+      averaged$ref_part %in% c("presence", "abundance")
+
+    for (v in located) {
+      averaged[[v]][averaged_aspen] <- from_slope(
+        averaged[[v]][averaged_aspen],
+        averaged$ref_part[averaged_aspen]
+      )
+    }
     averaged$seasons <- stats::aggregate(
       mammals$season, by = mammals[, keys],
       FUN = function(x) paste(sort(unique(x)), collapse = "+")

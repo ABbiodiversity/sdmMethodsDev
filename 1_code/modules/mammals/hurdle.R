@@ -22,6 +22,9 @@
 #     probability), abundance (Coef.agp, on the response scale)
 #     and total (Coef.mean). Seasons are averaged later, by the
 #     comparison, as v2 averages them into its `.all` tables.
+#   - In the south, presence and abundance also carry `pAspen`,
+#     the best model's slope as v2 publishes it (plogis, exp);
+#     v2's map needs it. Added 2026-10-27 for spatial prediction.
 #   - Cutblock convergence is applied per season. It is linear,
 #     so converging each season and then averaging equals v2's
 #     averaging and then converging.
@@ -243,6 +246,19 @@ mammal_v2_habitat_tables <- function(selected, data, grid,
   spread$mean[c("Bare", "Water")] <- 0
   coef_agp[c("Bare", "Water")] <- 0
   coef_agp_se[c("Bare", "Water")] <- 0
+
+  # The south's pAspen slopes, which v2's map applies to presence
+  # and abundance (make-species-predictions.R:581-583). Published
+  # as Climate is: plogis and exp of the best model's slope, 0.5
+  # and 1 when it has none (south-models/03_basic-models.R:
+  # 564-572, 642-650). Their SEs are left NA, as the estimate is
+  # not on the slope's scale.
+  if (has_aspen) {
+    spread$pa[["pAspen"]] <- stats::plogis(mammal_aspen_slope(pa))
+    spread$pa_se[["pAspen"]] <- NA_real_
+    coef_agp[["pAspen"]] <- exp(mammal_aspen_slope(agp))
+    coef_agp_se[["pAspen"]] <- NA_real_
+  }
 
   table_of <- function(values, se = NA_real_) {
     data.frame(
@@ -608,7 +624,23 @@ mammal_total_calibration <- function(pa, agp, data, at_constants,
   mean(p_obs_total) / mean(t_p_pa * exp(t_p_agp))
 }
 
-## 4.8 mammal_cutblock_convergence() ----
+## 4.8 mammal_aspen_slope() ----
+
+#' A Hurdle Half's pAspen Slope, as v2 Stores It
+#'
+#' @param model A fitted GLM.
+#' @return The pAspen coefficient on the model's link scale, or 0
+#'   when the model has no pAspen term.
+#'
+#' @example # Example usage of the function
+#' # mammal_aspen_slope(pa)
+mammal_aspen_slope <- function(model) {
+  terms <- attr(stats::terms(model), "term.labels")
+
+  if ("pAspen" %in% terms) stats::coef(model)[["pAspen"]] else 0
+}
+
+## 4.9 mammal_cutblock_convergence() ----
 
 #' Converge Young Cutblocks onto Natural Stands (v2 6.11)
 #'

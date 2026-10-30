@@ -187,4 +187,30 @@ parity_verdict <- function(
   if (passes) "pass" else "fail"
 }
 
+# 6. prediction_parity_targets() ----
+
+#' The Proposed Targets for the Spatial Prediction Checks
+#'
+#' Layer A, the port check, is a gate: the predict step and a
+#' line-by-line transcription of v2's map scripts, given the same
+#' coefficients, must agree to floating point. Layer B, the
+#' model check, compares harness-fitted maps with maps of v2's
+#' published coefficients; its targets are indicative and not
+#' gated while coefficient parity is a trial
+#' (docs/prediction_design.md section 4).
+#'
+#' @return A named list of thresholds.
+#'
+#' @example # Example usage of the function
+#' # prediction_parity_targets()$port_relative_difference
+prediction_parity_targets <- function() {
+  list(
+    # Layer A: larger is a port bug, not arithmetic
+    port_relative_difference = 1e-8,
+    # Layer B, indicative only
+    min_spearman = 0.95,
+    harness_total_vs_v2_range = c(0.9, 1.1)
+  )
+}
+
 # End of script ----

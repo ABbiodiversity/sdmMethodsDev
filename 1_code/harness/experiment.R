@@ -58,6 +58,9 @@ library(data.table) # run log writing (version: 1.16.4)
 #' @param plant_bootstrap Character. Passed to standard_specs().
 #' @param workers Integer. Species fitted at once.
 #' @param unit_predictions Character. "none", "oob" or "all".
+#' @param prediction A prediction_config() (predict_spatial.R).
+#'   Off by default; `prediction_config(enabled = TRUE)` maps
+#'   every fitted species onto the prediction grid after fitting.
 #' @param baseline Character. The experiment every result is
 #'   compared with, by id; NULL for none. Ignored by the baseline
 #'   itself.
@@ -94,6 +97,7 @@ experiment_config <- function(
   plant_bootstrap = "spatial_block",
   workers = 1L,
   unit_predictions = "none",
+  prediction = prediction_config(),
   baseline = "exp_000_parity_v2",
   v2_bootstraps = 100L,
   regions = NULL,
@@ -289,6 +293,27 @@ experiment_config <- function(
     )
   }
 
+  # Step 5b: The prediction settings, and a grid to predict onto
+  if (!inherits(prediction, "prediction_config")) {
+    problem("`prediction` must be made by prediction_config().")
+  } else if (isTRUE(prediction$enabled)) {
+    tryCatch(
+      prediction_grid_dir(prediction$grid_dir),
+      error = function(e) problem(conditionMessage(e))
+    )
+
+    unmapped <- names(specs)[vapply(
+      specs, function(s) is.null(s$spatial), logical(1)
+    )]
+
+    if (length(unmapped) > 0) {
+      message(
+        "Note: ", paste(unmapped, collapse = ", "), " have no ",
+        "`spatial` settings and will not be mapped."
+      )
+    }
+  }
+
   # Step 6: Every spec as it will run, and the covariates it
   # names, checked before any data is read
   for (key in names(specs)) {
@@ -348,6 +373,7 @@ experiment_config <- function(
       hooks = getOption("sdm.hook_files"),
       workers = as.integer(workers),
       unit_predictions = unit_predictions,
+      prediction = prediction,
       # The baseline does not compare with itself
       baseline = if (identical(baseline, id)) NULL else baseline,
       project_root = project_root,
@@ -426,6 +452,7 @@ print.experiment_config <- function(x, ...) {
         "\n", sep = "")
   }
   cat("  workers:  ", x$workers, "\n", sep = "")
+  cat("  predict:  ", prediction_label(x$prediction), "\n", sep = "")
   cat("  baseline: ", x$baseline %||% "none (this is the baseline)",
       "\n", sep = "")
   cat("  writes:   ", x$pipeline_dir, "\n            ", x$out_dir,
@@ -442,6 +469,10 @@ print.experiment_config <- function(x, ...) {
 #' @param config An experiment_config().
 #' @param fit Logical. FALSE skips fitting and re-summarizes the
 #'   stores already in pipeline_dir.
+#' @param predict Logical or NULL. Map the stored models onto the
+#'   prediction grid (run_spatial_predictions()). NULL follows
+#'   `config$prediction$enabled`; with `fit = FALSE` this re-maps
+#'   existing stores without refitting.
 #' @param steps Named list of functions, run in order after the
 #'   summary tables are written. Each takes `config` and
 #'   `results` and returns `results`, which it may add to.
@@ -457,11 +488,20 @@ print.experiment_config <- function(x, ...) {
 run_experiment <- function(
   config,
   fit = TRUE,
+  predict = NULL,
   steps = list(),
   translate = list(),
   record = TRUE
 ) {
   started <- Sys.time()
+  predict <- predict %||% isTRUE(config$prediction$enabled)
+
+  # Asked for here but off in the config: predict with its other
+  # settings
+  if (predict) {
+    config$prediction$enabled <- TRUE
+  }
+
   print(config)
 
   # Step 1: Fit
@@ -479,7 +519,10 @@ run_experiment <- function(
       metrics = config$metrics,
       boot_seed = config$seed,
       workers = config$workers,
-      unit_predictions = config$unit_predictions
+      unit_predictions = config$unit_predictions,
+      # Engines without coefficients keep their fitted objects,
+      # so they can be mapped (predict_spatial.R)
+      save_models = isTRUE(config$prediction$enabled)
     )
 
     fwrite(run_log, file.path(config$pipeline_dir, "run_log.csv"),
@@ -493,11 +536,20 @@ run_experiment <- function(
     print(table(run_log$taxon, run_log$status))
   }
 
+  # Step 1b: Map the fitted models onto the prediction grid
+  prediction <- NULL
+
+  if (predict) {
+    cat("\n== predict ==\n")
+    prediction <- run_spatial_predictions(config)
+  }
+
   # Step 2: Summarize the stores
   results <- collect_results(
     config$pipeline_dir, config$data_dir, translate = translate
   )
   results$run_log <- run_log
+  results$prediction <- prediction
   write_summaries(results, config$out_dir)
 
   # Step 3: Compare with the baseline, for every experiment but
@@ -603,8 +655,17 @@ record_config <- function(config, run_log = NULL) {
     engines = stage_values("engine"),
     selection = stage_values("selection"),
     compared_with = config$baseline %||% "none (baseline)",
-    data_dir = published_label(config$data_dir)
+    data_dir = published_label(config$data_dir),
+    prediction = prediction_label(config$prediction %||%
+                                    prediction_config())
   )
+
+  # The grid a mapping read, when there was one
+  if (isTRUE(config$prediction$enabled)) {
+    out$prediction_grid <- published_label(
+      prediction_grid_dir(config$prediction$grid_dir, check = FALSE)
+    )
+  }
 
   # Record failures, or a run that lost jobs looks complete
   if (!is.null(run_log)) {

@@ -53,6 +53,10 @@
 #'   session; more start background R sessions.
 #' @param unit_predictions Character. "none", "oob" or "all"; see
 #'   result_store().
+#' @param save_models Logical. Save each stage's fitted object
+#'   when it has no coefficients (an engine such as xgboost), so
+#'   the predict step can map it; see predict_spatial.R. Stores
+#'   are unchanged either way.
 #' @param verbose Logical. Report progress.
 #' @return A data frame, one row per spec, species, region and
 #'   draw, recording what happened.
@@ -72,6 +76,7 @@ run_specs <- function(
   boot_seed = NULL,
   workers = 1L,
   unit_predictions = c("none", "oob", "all"),
+  save_models = FALSE,
   verbose = TRUE
 ) {
   unit_predictions <- match.arg(unit_predictions)
@@ -89,9 +94,17 @@ run_specs <- function(
       run_dir = file.path(pipeline_dir, key), species = species,
       regions = regions, iterations = iterations,
       stage_models = stage_models, metrics = metrics,
-      boot_seed = boot_seed, unit_predictions = unit_predictions
+      boot_seed = boot_seed, unit_predictions = unit_predictions,
+      save_models = save_models
     )
   })
+
+  # Fitted objects from an earlier fit would not match the new
+  # stores, so they go whether or not this fit saves any
+  for (p in prepared) {
+    unlink(file.path(p$run_dir, names(p$regions), "_models"),
+           recursive = TRUE)
+  }
 
   # Step 2: One job per spec and species
   jobs <- unlist(lapply(prepared, function(p) {
@@ -159,6 +172,7 @@ run_spec <- function(spec, data_dir, run_dir, ...) {
 #' @param species,regions,iterations,stage_models,metrics,boot_seed
 #'   As in run_specs().
 #' @param unit_predictions Character.
+#' @param save_models Logical. See run_specs().
 #' @return A list: the spec, its regions (each with its data,
 #'   grid and species), the province-wide data, the species to
 #'   fit, and the run settings a worker needs.
@@ -168,7 +182,7 @@ run_spec <- function(spec, data_dir, run_dir, ...) {
 prepare_spec <- function(
   spec, key, data_dir, run_dir, species = NULL, regions = NULL,
   iterations = 1:100, stage_models = NULL, metrics = NULL,
-  boot_seed = NULL, unit_predictions = "none"
+  boot_seed = NULL, unit_predictions = "none", save_models = FALSE
 ) {
   # Before any read, so covariates follow the replacement sets
   spec <- apply_stage_models(spec, stage_models)
@@ -235,7 +249,8 @@ prepare_spec <- function(
     iterations = iterations,
     base_seed = base_seed,
     metrics = metrics,
-    unit_predictions = unit_predictions
+    unit_predictions = unit_predictions,
+    save_models = isTRUE(save_models)
   )
 }
 
@@ -743,7 +758,12 @@ fit_species <- function(species, p) {
         store = shard, species = species, region = region$name,
         boot = boot, grid = region$grid, metrics = p$metrics,
         fixed = fixed,
-        validation_frame = province$frame
+        validation_frame = province$frame,
+        # In the final store's folder: shards are deleted
+        models_dir = if (isTRUE(p$save_models)) {
+          file.path(p$run_dir, region$name, "_models",
+                    safe_name(species))
+        }
       )
     })
 
@@ -1071,6 +1091,9 @@ carry_values <- function(selected, data, stage) {
 #'   already fitted at province scope, or NULL.
 #' @param validation_frame The province-wide frame, or NULL;
 #'   passed to the spec's `validate` function.
+#' @param models_dir Character or NULL. Where to save the fitted
+#'   object of each stage without coefficients, as
+#'   `<boot>__<stage>.rds`; NULL saves nothing.
 #' @return A one-row data frame recording the outcome.
 #'
 #' @example # Example usage of the function
@@ -1078,7 +1101,7 @@ carry_values <- function(selected, data, stage) {
 #' #              NULL)
 run_one_draw <- function(
   spec, frame, draw, store, species, region, boot, grid,
-  metrics, fixed = NULL, validation_frame = NULL
+  metrics, fixed = NULL, validation_frame = NULL, models_dir = NULL
 ) {
   outcome <- function(status, note = NA_character_) {
     data.frame(
@@ -1103,6 +1126,7 @@ run_one_draw <- function(
     carried <- NULL
     last <- NULL
     stage_coefficients <- list()
+    stage_selected <- list()
 
     for (stage in spec$stages) {
       # Carried stage as a column (v2's `Climate` term)
@@ -1144,10 +1168,12 @@ run_one_draw <- function(
         stage_coefficients[[stage$name]] <- selected$coefficients
       }
 
+      stage_selected[[stage$name]] <- selected
       last <- list(selected = selected, stage = stage)
     }
 
     last$stage_coefficients <- stage_coefficients
+    last$stage_selected <- stage_selected
     last$frame <- frame
 
     last
@@ -1183,6 +1209,23 @@ run_one_draw <- function(
       result$stage_coefficients[[stage_name]],
       stage = stage_name
     )
+  }
+
+  # A stage the stores cannot carry (no coefficients) keeps its
+  # fitted object, for the predict step
+  if (!is.null(models_dir)) {
+    for (stage_name in names(result$stage_selected)) {
+      selected <- result$stage_selected[[stage_name]]
+      no_coefficients <- is.null(selected$coefficients) &&
+        is.null(selected$outputs)
+
+      if (no_coefficients) {
+        dir.create(models_dir, recursive = TRUE, showWarnings = FALSE)
+        saveRDS(selected, file.path(
+          models_dir, paste0(boot, "__", stage_name, ".rds")
+        ))
+      }
+    }
   }
 
   in_bag <- frame$survey_unit_id %in% draw

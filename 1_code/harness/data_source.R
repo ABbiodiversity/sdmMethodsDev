@@ -8,14 +8,17 @@
 #     //ABMI-DATA2/science/sdmMethodsDev/0_data/
 #       test_dataset/<version>/  the frozen test dataset
 #       v2_results/<version>/    the v2 parity references
-#   - SDM_TEST_DATASET and SDM_V2_RESULTS, optional, folders to
-#     read instead
+#       prediction_grid/<version>/  the unified prediction grid
+#   - SDM_TEST_DATASET, SDM_V2_RESULTS and SDM_PREDICTION_GRID,
+#     optional, folders to read instead
 # outputs: none; returns the folder to read
 # notes:
 #   - Runs read the copies published by
-#     _setup/08_publish_datasets.R, so only maintainers run
-#     _setup/. sdm_published$versions pins the version read;
-#     published versions are never overwritten.
+#     _setup/08_publish_datasets.R and
+#     _prediction_grid/03_publish_prediction_grid.R, so only
+#     maintainers run those folders. sdm_published$versions pins
+#     the version read; published versions are never
+#     overwritten.
 #   - The environment variables redirect to a local copy or to
 #     fresh _setup/ output in 0_data/.
 #   - Each call checks presence and size against checksums.csv
@@ -34,15 +37,18 @@ sdm_published <- list(
   root = "//ABMI-DATA2/science/sdmMethodsDev/0_data",
   versions = c(
     test_dataset = "2026-10-05",
-    v2_results = "2026-10-05"
+    v2_results = "2026-10-05",
+    prediction_grid = "kgrid22_bf7hfi2021_1km_v1"
   ),
   env = c(
     test_dataset = "SDM_TEST_DATASET",
-    v2_results = "SDM_V2_RESULTS"
+    v2_results = "SDM_V2_RESULTS",
+    prediction_grid = "SDM_PREDICTION_GRID"
   ),
   marker = c(
     test_dataset = "lookup/dataset_manifest.csv",
-    v2_results = "abmiexplorer/v2_results.csv"
+    v2_results = "abmiexplorer/v2_results.csv",
+    prediction_grid = "cells.rds"
   )
 )
 
@@ -53,7 +59,7 @@ sdm_published <- list(
 #' Precedence: `dir`, then the dataset's environment variable,
 #' then the pinned published version.
 #'
-#' @param name Character. "test_dataset" or "v2_results".
+#' @param name Character. A name in `sdm_published$versions`.
 #' @param dir Character or NULL. A folder to use as is.
 #' @param check Logical. Check the folder before returning it.
 #' @return Character. The folder, with forward slashes.
@@ -92,7 +98,7 @@ published_dir <- function(name, dir = NULL, check = TRUE) {
   dir
 }
 
-# 3. test_dataset_dir() and v2_results_dir() ----
+# 3. test_dataset_dir(), v2_results_dir(), prediction_grid_dir() ----
 
 #' Resolve the Test Dataset Folder
 #'
@@ -122,6 +128,21 @@ test_dataset_dir <- function(data_dir = NULL, check = TRUE) {
 #' # file.path(v2_results_dir(), "abmiexplorer", "v2_results.csv")
 v2_results_dir <- function(dir = NULL, check = TRUE) {
   published_dir("v2_results", dir, check)
+}
+
+#' Resolve the Prediction Grid Folder
+#'
+#' The unified 1 km grid from _prediction_grid/: cells.rds and
+#' the landcover_<region>_<scenario>.rds matrices.
+#'
+#' @param dir Character or NULL. A folder to use as is.
+#' @param check Logical. Check the folder before returning it.
+#' @return Character. The folder.
+#'
+#' @example # Example usage of the function
+#' # readRDS(file.path(prediction_grid_dir(), "cells.rds"))
+prediction_grid_dir <- function(dir = NULL, check = TRUE) {
+  published_dir("prediction_grid", dir, check)
 }
 
 # 4. check_published() ----

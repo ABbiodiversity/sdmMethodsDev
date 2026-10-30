@@ -53,6 +53,7 @@ load_harness <- function(
     "selection.R",
     "eval_metrics.R",
     "predict_grid.R",
+    "predict_spatial.R",
     "result.R",
     "run_record.R",
     "run_model.R",

@@ -236,6 +236,32 @@ plant_group_spec <- function(
     # prediction from the published coefficient tables
     final_prediction = plant_v2_full_prediction,
 
+    # How the model is mapped onto the prediction grid, as v2's
+    # 04c_prediction-comparison.R maps it: Climate added per
+    # class, then mixed, which differs from the site formula of
+    # plant_v2_full_prediction()
+    spatial = list(
+      link = "logit",
+      climate_stage = "climate",
+      # 04c:119-122, 237-240
+      climate_cap = 0.99,
+      combine = "mixture",
+      habitat_stages = "habitat",
+      climate_term = "Climate",
+      # 04c:243
+      aspen = list(south = "paspen"),
+      class_map = "1_code/modules/_shared/plant_spatial_classes.csv",
+      # A species in one region keeps that region's prediction,
+      # capped, then NA outside it (04c:440-468)
+      single_region = "na_by_nr",
+      region_mask = list(
+        north = ~ NrName != "Grassland",
+        south = ~ NrName %in% c("Grassland", "Parkland")
+      ),
+      # 04c:431-436
+      final_cap = 0.99
+    ),
+
     use_protocol = use_protocol,
     protocol_is_v2 = identical(use_protocol, protocol_in_v2),
 
