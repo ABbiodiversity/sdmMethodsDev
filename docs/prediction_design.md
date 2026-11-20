@@ -467,6 +467,7 @@ prediction = prediction_config(
   scenarios = "current",      # v2.0 live scripts: current only
   draws     = "median",       # "median" | "all" | integer vector
   extent    = NULL,           # NULL = province, or a filter
+  regions   = "v2",           # regions v2 published; NULL = all
   outputs   = c("table", "raster"), # + "png"
   summaries = c("province", "natural_region"),
   sample_cells = 10000,       # median-draw selection sample
@@ -482,12 +483,30 @@ prediction = prediction_config(
     crosses Grassland, Parkland, and Boreal, so it covers both regions
     and the blend zone.
   - Caps still come from the full province (§2.2).
+- **Regions** (added 2026-11-18). By default, `regions = "v2"`,
+  every experiment maps each species only from the habitat regions
+  v2 published coefficients for, read from the pinned ABMIexploreR
+  `v2_results.csv` (`v2_published_regions()`). The region not
+  published is not read, so the taxon's single-region rule
+  applies, and no region v2 did not model is blended in. Many v2
+  species have one region only (for example 59 birds north only
+  and 21 south only).
+  - `regions = NULL` maps every fitted region.
+  - A data.frame of `taxon`, `species` and `region` limits the
+    species it lists; unlisted species map every fitted region.
+  - A pooled name such as `"Moose"` covers its season runs.
+  - Species not found in v2's table (by taxon and name) map every
+    fitted region.
+  - `experiment_config()` checks that v2's results can be read
+    when prediction is on with the default.
 - **Grid version.** It isn't an experiment setting: it comes from the
   `data_source.R` pin. Experiments select from the grid and never
   rebuild it.
 - **exp_000_parity_v2.** It sets `prediction_config(enabled = TRUE)`,
-  with every other setting at its default. Its parity steps add the
-  checks in §4.
+  with every other setting at its default, so each species is
+  mapped from the regions v2 published. Its parity steps add the
+  checks in §4, and the port check gives the transcription the
+  same regions.
 - **`_template/`.** It gets a commented `prediction = prediction_config(...)`
   block listing every key and its default.
 
@@ -656,7 +675,7 @@ v2's published coefficients:**
 | --- | --- |
 | Mammals | Moose and Coyote agree within 3e-14 |
 | Birds | AMRO: Spearman 0.997, totals 1.05. YEWA: 0.996, 0.88 |
-| Plants | Galium, Vicia, Ceratozetes and Ceratodon: Spearman ≥ 0.997, totals 1.01 to 1.05. Physcia: 0.999, 1.11. Cladonia: 0.978, 1.69. Trhypochthonius: 0.87, 0.83 on the cells v2 maps (see below) |
+| Plants | Galium, Vicia, Ceratozetes and Ceratodon: Spearman ≥ 0.997, totals 1.01 to 1.05. Physcia: 0.999, 1.11. Cladonia: 0.978, 1.69. Trhypochthonius, mapped from v2's published south region only (2026-11-18): 0.997, 0.89 (see below) |
 | Bryum.All | Not compared; v2 publishes no coefficients for it |
 
 Mammals agree because draw 1 is v2's single fit, and the median
@@ -684,6 +703,17 @@ any draw resembles:
   - the gap left comes from the Parkland, where the harness blends
     its north model (mean weight wN 0.68) and v2 maps the south
     model alone.
+
+  Fixed 2026-11-18: prediction now maps only the regions v2
+  published, by default (`prediction_config(regions = "v2")`,
+  section 3), so the harness maps
+  Trhypochthonius from its south model alone, as v2 does (values
+  on the 8,253 Grassland and Parkland strip cells, NA elsewhere).
+  Rerun on the Phase 5 stores, no refit: layer A passes (4.3e-16);
+  layer B has Spearman 0.997, total 0.895, and 99.98% of cells
+  within 20%. The total is just under the indicative 0.9, which
+  is the median construction effect seen in the other plants.
+  Ceratozetes, which v2 published in both regions, is unchanged.
 
   Why v2 has no north model for this species is a
   `TODO: confirm with mite lead`. It has 546 north detections, so

@@ -1,6 +1,6 @@
 # exp_000_parity_v2
 
-Generated 2026-10-14 10:16:53
+Generated 2026-11-20 03:44:04
 
 **Trial run.** 14 focal species, 100 of 100 draws. Its parity numbers show the pipeline ran; they are not a parity read.
 
@@ -123,7 +123,7 @@ fixes at a placeholder are left out of the reachable scores.
 | bird | south | habitat | median | 2 | 46 | 100 | 100.000 | 40 | 100.000 | 0.000 | 0.000 | 0.000 | 0 | 1.000 | 1.000 | not gated (trial run) | pass |
 | bryophyte | south | habitat | median | 1 | 19 | 100 | 100.000 | 19 | 100.000 | 0.047 | 0.021 | 0.060 | 0 | 0.993 | 1.042 | not gated (trial run) | pass |
 | lichen | south | habitat | median | 2 | 40 | 100 | 100.000 | 40 | 100.000 | 0.088 | 0.029 | 0.278 | 1 | 0.994 | 0.961 | not gated (trial run) | pass |
-| mammal | south | habitat | iteration 1 | 2 | 126 | 100 | 100.000 | 120 | 100.000 | 0.000 | 0.000 | 0.000 | 0 | 1.000 | - | not gated (trial run) | pass |
+| mammal | south | habitat | iteration 1 | 2 | 130 | 100 | 100.000 | 124 | 100.000 | 0.000 | 0.000 | 0.000 | 0 | 1.000 | - | not gated (trial run) | pass |
 | mite | south | habitat | median | 2 | 40 | 100 | 100.000 | 40 | 100.000 | 0.068 | 0.024 | 0.464 | 1 | 0.991 | 0.975 | not gated (trial run) | pass |
 | vascular_plant | south | habitat | median | 2 | 40 | 100 | 100.000 | 40 | 100.000 | 0.074 | 0.027 | 0.184 | 0 | 0.997 | 1.021 | not gated (trial run) | pass |
 

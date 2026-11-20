@@ -20,6 +20,6 @@ vascular_plant,north,habitat,median,2,188,100,100,188,100,0.108,0.022,0.125,0,0.
 bird,south,habitat,median,2,46,100,100,40,100,0,0,5.61e-11,0,1,1,not gated (trial run),pass
 bryophyte,south,habitat,median,1,19,100,100,19,100,0.047,0.021,0.0601,0,0.993,1.042,not gated (trial run),pass
 lichen,south,habitat,median,2,40,100,100,40,100,0.088,0.029,0.278,1,0.994,0.961,not gated (trial run),pass
-mammal,south,habitat,iteration 1,2,126,100,100,120,100,0,0,5.33e-15,0,1,,not gated (trial run),pass
+mammal,south,habitat,iteration 1,2,130,100,100,124,100,0,0,5.33e-15,0,1,,not gated (trial run),pass
 mite,south,habitat,median,2,40,100,100,40,100,0.068,0.024,0.464,1,0.991,0.975,not gated (trial run),pass
 vascular_plant,south,habitat,median,2,40,100,100,40,100,0.074,0.027,0.184,0,0.997,1.021,not gated (trial run),pass

@@ -6,15 +6,15 @@ Written by `run_record()`. The result stores this describes are gitignored; this
 
 _Volatile. Excluded from cross-run comparison._
 
-- **git_commit**: 49a10153fbed84f24261647611e8b426326ef7de
-- **git_uncommitted_code**: none
+- **git_commit**: b38d76146797288b1126fca4a0087ac0dcda0fb3
+- **git_uncommitted_code**: 8 file(s) under 1_code/ differ
 - **hooks**: none
 - **packages**: data.table 1.18.0
 - **pipeline_dir**: D:/local_projects/active/sdmMethodsDev/2_pipeline/exp_000_parity_v2
 - **platform**: x86_64-w64-mingw32
 - **r_version**: 4.5.0
 - **session_info**: D:/local_projects/active/sdmMethodsDev/2_pipeline/exp_000_parity_v2/session_info.txt
-- **written_at**: 2026-10-14 16:16:53
+- **written_at**: 2026-11-20 10:44:05
 
 ## Configuration
 
@@ -23,7 +23,7 @@ _Volatile. Excluded from cross-run comparison._
 - **compare_metrics**: oob_auc, oob_deviance_explained, oob_rmse, oob_spearman, oob_calibration_slope
 - **compared_with**: none (baseline)
 - **covariate_files**: none
-- **data_dir**: local (D:/local_projects/active/sdmMethodsDev/0_data/test_dataset)
+- **data_dir**: published 2026-11-20 (//ABMI-DATA2/science/sdmMethodsDev/0_data/test_dataset/2026-11-20)
 - **engines**: bayesglm, glm
 - **focal_species**: bird=AMRO, bird=YEWA, bryophyte=Bryum.All, bryophyte=Ceratodon.purpureus, lichen=Cladonia.chlorophaea, lichen=Physcia.adscendens, mammal=Coyote_Summer, mammal=Coyote_Winter, mammal=Moose_Summer, mammal=Moose_Winter, mite=Ceratozetes.gracilis, mite=Trhypochthonius.tectorum, vascular_plant=Galium.boreale, vascular_plant=Vicia.americana
 - **hooks**: none
@@ -33,6 +33,8 @@ _Volatile. Excluded from cross-run comparison._
 - **metrics**: all registered
 - **n_bootstraps**: 100
 - **plant_bootstrap**: spatial_block
+- **prediction**: draws median; scenarios current; extent province (caps from province); regions v2 published
+- **prediction_grid**: published kgrid22_bf7hfi2021_1km_v1 (//ABMI-DATA2/science/sdmMethodsDev/0_data/prediction_grid/kgrid22_bf7hfi2021_1km_v1)
 - **regions**: all
 - **selection**: aic_average, hurdle, ivw_grid, staged_bic
 - **species_file**: species.csv
@@ -52,9 +54,9 @@ _Volatile. Excluded from cross-run comparison._
 | lichen | north | 2 | 100 | 22000 | 5600 | 8600 |
 | lichen | south | 2 | 100 | 7800 | 5600 | 3200 |
 | mammal_summer | north | 2 | 100 | 44630 | 2800 | 9000 |
-| mammal_summer | south | 2 | 100 | 14800 | 2800 | 4000 |
+| mammal_summer | south | 2 | 100 | 15200 | 2800 | 4000 |
 | mammal_winter | north | 2 | 100 | 45098 | 2800 | 9000 |
-| mammal_winter | south | 2 | 100 | 14800 | 2800 | 4000 |
+| mammal_winter | south | 2 | 100 | 15200 | 2800 | 4000 |
 | mite | north | 2 | 100 | 21800 | 5600 | 8600 |
 | mite | south | 2 | 100 | 7600 | 5600 | 3200 |
 | vascular_plant | north | 2 | 100 | 21800 | 5600 | 8600 |

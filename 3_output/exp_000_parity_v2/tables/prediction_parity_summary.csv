@@ -1,0 +1,13 @@
+taxon,species,scenario,port_check,cells,pearson,spearman,harness_total_vs_v2,cells_within_20pct,target
+bird,AMRO,current,pass,664762,0.996,0.997,1.05,99.5,met
+bird,YEWA,current,pass,664762,0.991,0.997,0.89,94.3,not met (total)
+bryophyte,Bryum.All,current,pass,,,,,,not compared: no published v2 coefficients
+bryophyte,Ceratodon.purpureus,current,pass,664762,0.997,0.997,1.06,99.9,met
+lichen,Cladonia.chlorophaea,current,pass,664762,0.983,0.984,1.68,10.3,not met (total)
+lichen,Physcia.adscendens,current,pass,664762,0.998,0.999,1.1,87.7,not met (total)
+mammal,Coyote,current,pass,664762,1,1,1,100,met
+mammal,Moose,current,pass,664762,1,1,1,100,met
+mite,Ceratozetes.gracilis,current,pass,664762,1,1,1.01,100,met
+mite,Trhypochthonius.tectorum,current,pass,156703,0.999,0.998,0.9,99.9,met
+vascular_plant,Galium.boreale,current,pass,664762,1,1,1,100,met
+vascular_plant,Vicia.americana,current,pass,664762,1,1,1.01,100,met
