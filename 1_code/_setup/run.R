@@ -45,14 +45,14 @@
 # finished dataset, 05 reads 03's bryophyte draws.
 steps <- c(
   "00_mirror_setup_inputs.R" = FALSE,
-  "01_harmonize_model_ready_v2.R" = TRUE,
-  "04_harmonize_bird_translation_lookup.R" = TRUE,
-  "07_harmonize_lookups.R" = TRUE,
-  "02_validate_test_dataset.R" = TRUE,
+  "01_harmonize_model_ready_v2.R" = FALSE,
+  "04_harmonize_bird_translation_lookup.R" = FALSE,
+  "07_harmonize_lookups.R" = FALSE,
+  "02_validate_test_dataset.R" = FALSE,
   "03_rerun_bryophyte_v2_reference.R" = FALSE,
-  "05_harmonize_v2_plant_bootstrap_ids.R" = TRUE,
-  "06_harmonize_abmiexplorer_results.R" = TRUE,
-  "08_publish_datasets.R" = FALSE
+  "05_harmonize_v2_plant_bootstrap_ids.R" = FALSE,
+  "06_harmonize_abmiexplorer_results.R" = FALSE,
+  "08_publish_datasets.R" = TRUE
 )
 
 ## 1.3 Check the paths ----

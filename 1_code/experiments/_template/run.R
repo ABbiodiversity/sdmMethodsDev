@@ -123,6 +123,8 @@ config <- experiment_config(
   #                                 # list(LufName = "Lower Peace");
   #                                 # list(bbox = c(xmin, xmax,
   #                                 #               ymin, ymax))
+  #     regions = "v2",             # regions v2 published; NULL:
+  #                                 # every fitted region
   #     caps_from = "province",     # "extent": quicker, not v2's
   #     outputs = c("table", "raster"),  # and/or "png"
   #     summaries = c("province", "natural_region"),

@@ -36,7 +36,8 @@ library(data.table) # reads checksums.csv (version: 1.16.4)
 sdm_published <- list(
   root = "//ABMI-DATA2/science/sdmMethodsDev/0_data",
   versions = c(
-    test_dataset = "2026-10-05",
+    # 2026-11-20 adds the mammal province table (`province_key`)
+    test_dataset = "2026-11-20",
     v2_results = "2026-10-05",
     prediction_grid = "kgrid22_bf7hfi2021_1km_v1"
   ),

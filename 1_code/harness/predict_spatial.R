@@ -32,6 +32,11 @@
 #     Sources: birds 09.Predict.R, mammals
 #     make-species-predictions.R, plants 04c_prediction-
 #     comparison.R. Taxon differences are module settings.
+#   - Regions: by default (`regions = "v2"`) each species is
+#     mapped only from the habitat regions v2 published, so a
+#     region v2 did not model is never blended in; the taxon's
+#     single-region rule covers the other. `regions = NULL` maps
+#     every fitted region.
 #   - Caps are quantiles over every computed cell. With
 #     `caps_from = "province"` (the default) every cell is
 #     computed and only the extent is written, so a subset keeps
@@ -76,6 +81,15 @@ library(Matrix) # sparse land-cover matrices (version: 1.7.3)
 #'   of cell-table filters such as `list(LufName = "Lower
 #'   Peace")`, or `list(bbox = c(xmin, xmax, ymin, ymax))` in
 #'   EPSG:3400.
+#' @param regions The habitat regions to map. "v2" (default) maps
+#'   each species from the regions v2 published a habitat model
+#'   for (v2_published_regions()), so no region v2 did not model
+#'   is blended in. NULL maps every region a species was fitted
+#'   in. A data.frame of `taxon`, `species` and `region` limits
+#'   the species it lists to those regions. A region left out is
+#'   not read, so the taxon's single-region rule applies. Species
+#'   not listed map every fitted region. A pooled species (e.g.
+#'   "Moose") covers its season runs.
 #' @param caps_from Character. "province" computes every cell so
 #'   the caps are v2's, and writes only the extent; "extent"
 #'   computes and caps only the extent, which is quicker and is
@@ -102,6 +116,7 @@ prediction_config <- function(
   scenarios = "current",
   draws = "median",
   extent = NULL,
+  regions = "v2",
   caps_from = "province",
   outputs = c("table", "raster"),
   summaries = c("province", "natural_region"),
@@ -113,7 +128,8 @@ prediction_config <- function(
   out <- structure(
     list(
       enabled = enabled, species = species, scenarios = scenarios,
-      draws = draws, extent = extent, caps_from = caps_from,
+      draws = draws, extent = extent, regions = regions,
+      caps_from = caps_from,
       outputs = outputs, summaries = summaries,
       sample_cells = sample_cells, chunk_cells = chunk_cells,
       workers = workers, grid_dir = grid_dir
@@ -199,6 +215,18 @@ check_prediction_config <- function(x) {
     problem("`extent$bbox` must be c(xmin, xmax, ymin, ymax).")
   }
 
+  regions_ok <- is.null(x$regions) || identical(x$regions, "v2") ||
+    (is.data.frame(x$regions) &&
+       all(c("taxon", "species", "region") %in% names(x$regions)) &&
+       !anyNA(x$regions[, c("taxon", "species", "region")]))
+
+  if (!regions_ok) {
+    problem(
+      "`regions` must be \"v2\", NULL, or a data.frame of taxon, ",
+      "species and region, with no NAs."
+    )
+  }
+
   if (!identical(x$caps_from, "province") &&
         !identical(x$caps_from, "extent")) {
     problem("`caps_from` must be \"province\" or \"extent\".")
@@ -264,7 +292,16 @@ prediction_label <- function(x) {
   paste0(
     "draws ", paste(x$draws, collapse = ","), "; scenarios ",
     paste(x$scenarios, collapse = ","), "; extent ",
-    extent_label(x$extent), " (caps from ", x$caps_from, ")"
+    extent_label(x$extent), " (caps from ", x$caps_from, ")",
+    if (is.null(x$regions)) {
+      "; every fitted region"
+    } else if (identical(x$regions, "v2")) {
+      "; regions v2 published"
+    } else {
+      paste0("; regions as listed for ",
+             nrow(unique(x$regions[, c("taxon", "species")])),
+             " species")
+    }
   )
 }
 
@@ -758,7 +795,74 @@ season_free_name <- function(x) {
   sub("_(Summer|Winter)$", "", x)
 }
 
-## 5.3 member_draws() ----
+## 5.4 v2_published_regions() ----
+
+#' The Habitat Regions v2 Published, by Species
+#'
+#' v2 did not publish both regional habitat models for every
+#' species (Trhypochthonius.tectorum has a south model only),
+#' while the harness fits every region a species qualifies for.
+#' A region counts as published when v2's published coefficients
+#' (the pinned ABMIexploreR copy) have habitat rows for it; v2's
+#' saved map files are not read. Read once per session.
+#'
+#' @param dir Character or NULL. The folder holding
+#'   v2_results.csv; NULL reads the pinned ABMIexploreR copy.
+#' @return A data.frame of `taxon`, `species` and `region`, one
+#'   row per published habitat region.
+#'
+#' @example # Example usage of the function
+#' # v2_published_regions()
+v2_published_regions <- function(dir = NULL) {
+  dir <- dir %||% file.path(v2_results_dir(), "abmiexplorer")
+  path <- file.path(dir, "v2_results.csv")
+
+  if (!file.exists(path)) {
+    stop("v2 results not found: ", path, call. = FALSE)
+  }
+
+  cached_read(path, function(p) {
+    v2 <- fread(p, select = c("taxon", "species", "stage",
+                              "region"))
+    habitat <- v2[v2$stage == "habitat",
+                  c("taxon", "species", "region")]
+    as.data.frame(unique(habitat))
+  }, tag = "v2_published_regions")
+}
+
+## 5.5 mapped_regions() ----
+
+#' The Regions to Map for One Species
+#'
+#' @param regions The prediction_config() `regions`: "v2", NULL
+#'   or a table.
+#' @param taxon,species Character. A run's taxon and species; a
+#'   season run also matches its pooled name.
+#' @return Character regions, or NULL for every fitted region.
+#'
+#' @example # Example usage of the function
+#' # mapped_regions(config$prediction$regions, "mite",
+#' #                "Trhypochthonius.tectorum")
+mapped_regions <- function(regions, taxon, species) {
+  if (is.null(regions)) {
+    return(NULL)
+  }
+
+  if (identical(regions, "v2")) {
+    regions <- v2_published_regions()
+  }
+
+  hit <- regions$taxon == taxon &
+    regions$species %in% c(species, season_free_name(species))
+
+  if (!any(hit)) {
+    return(NULL)
+  }
+
+  unique(as.character(regions$region[hit]))
+}
+
+## 5.6 member_draws() ----
 
 #' One Run's Coefficient Sets for a Species, by Draw
 #'
@@ -783,8 +887,14 @@ member_draws <- function(member, config) {
   regions <- list()
   climate <- NULL
   models <- list()
+  mapped <- mapped_regions(config$prediction$regions, spec$taxon,
+                           sp)
 
   for (region in names(spec$regions)) {
+    # A region the config leaves out keeps its climate copy but is
+    # not mapped, so the taxon's single-region rule applies (e.g.
+    # v2 published only one region)
+    keep <- is.null(mapped) || region %in% mapped
     dir <- file.path(config$pipeline_dir, member$run, region)
     rows <- read_store_coefficients(dir)
 
@@ -795,7 +905,7 @@ member_draws <- function(member, config) {
     # Saved fitted objects, for stages without coefficients
     model_dir <- file.path(dir, "_models", safe_name(sp))
 
-    if (dir.exists(model_dir)) {
+    if (keep && dir.exists(model_dir)) {
       models[[region]] <- model_dir
     }
 
@@ -807,6 +917,10 @@ member_draws <- function(member, config) {
     # same copy; v2 reads the north one where there is one
     if (is.null(climate)) {
       climate <- rows[rows$stage == climate_stage, , drop = FALSE]
+    }
+
+    if (!keep) {
+      next
     }
 
     if (is.function(spatial$habitat_coefficients)) {
@@ -846,7 +960,7 @@ member_draws <- function(member, config) {
   stats::setNames(sets, boots)
 }
 
-## 5.4 split_stages() ----
+## 5.7 split_stages() ----
 
 #' A Region's Habitat Rows as Named Vectors, by Stage
 #'
@@ -876,7 +990,7 @@ split_stages <- function(rows, stages) {
   if (all(vapply(out, is.null, logical(1)))) NULL else out
 }
 
-## 5.5 pool_seasons() ----
+## 5.8 pool_seasons() ----
 
 #' Average Two Seasons' Coefficient Sets, Draw by Draw
 #'

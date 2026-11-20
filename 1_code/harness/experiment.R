@@ -302,6 +302,15 @@ experiment_config <- function(
       error = function(e) problem(conditionMessage(e))
     )
 
+    # The default maps only the regions v2 published, so v2's
+    # results must be readable before anything is fitted
+    if (identical(prediction$regions, "v2")) {
+      tryCatch(
+        v2_published_regions(),
+        error = function(e) problem(conditionMessage(e))
+      )
+    }
+
     unmapped <- names(specs)[vapply(
       specs, function(s) is.null(s$spatial), logical(1)
     )]

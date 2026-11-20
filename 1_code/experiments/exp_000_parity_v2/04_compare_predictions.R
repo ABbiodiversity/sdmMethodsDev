@@ -9,7 +9,12 @@
 #   - the prediction grid and the published v2 results
 #     (harness/data_source.R)
 # outputs:
-#   - 3_output/exp_000_parity_v2/tables/prediction_parity.csv
+#   - 3_output/exp_000_parity_v2/tables/prediction_parity.csv,
+#     every comparison
+#   - 3_output/exp_000_parity_v2/tables/
+#     prediction_parity_summary.csv, one row per species: the
+#     port check, the model check and why a species misses its
+#     indicative target
 #   - `results$prediction_parity`
 # notes:
 #   - docs/prediction_design.md section 4, two layers:
@@ -207,7 +212,14 @@ if (!isTRUE(settings$enabled)) {
                    species = job$species, scenario = scenario, ...)
       }
 
-      # Step 1: Layer A, the port check
+      # Step 1: Layer A, the port check. The transcription gets
+      # only the regions the stage mapped (config `regions`)
+      mapped_by_v2 <- mapped_regions(settings$regions, job$taxon,
+                                     job$species)
+      unmapped <- function(region) {
+        !is.null(mapped_by_v2) && !region %in% mapped_by_v2
+      }
+
       port <- tryCatch({
         transcribed <- switch(
           if (job$taxon == "bird") {
@@ -220,6 +232,8 @@ if (!isTRUE(settings$enabled)) {
           bird = {
             i <- v2_bird_inputs(config$pipeline_dir, config$data_dir,
                                 job$species, boot)
+            if (unmapped("north")) i$joint_n <- NULL
+            if (unmapped("south")) i$joint_s <- NULL
             m <- v2_bird_map(i$climate.i, i$joint_n, i$joint_s,
                              species_final_cap(job$spatial,
                                                job$species),
@@ -229,6 +243,8 @@ if (!isTRUE(settings$enabled)) {
           mammal = {
             i <- v2_mammal_inputs(config$pipeline_dir, job$species,
                                   boot)
+            if (unmapped("north")) i$north <- NULL
+            if (unmapped("south")) i$south <- NULL
             m <- v2_mammal_map(i$climate_coefs, i$north, i$south,
                                frames)
             list(climate = m$Climate, map = m$Combined)
@@ -236,6 +252,8 @@ if (!isTRUE(settings$enabled)) {
           plant = {
             i <- v2_plant_inputs(config$pipeline_dir, job$label,
                                  job$species, boot)
+            if (unmapped("north")) i$spp.veg <- NULL
+            if (unmapped("south")) i$spp.soil <- NULL
             m <- v2_plant_map(i$spp.clim, i$spp.veg, i$spp.soil,
                               frames)
             list(climate = m$Climate, map = m$NewPred)
@@ -331,6 +349,46 @@ if (!isTRUE(settings$enabled)) {
                           harness_total_vs_v2, 3),
                         status)]
     print(shown, nrows = 200)
+
+    # Step 3: One row per species: the port check, and the model
+    # check of the mapped (median) draw, with why it misses
+    port <- parity[layer == "A", .(
+      port_check = if (all(status == "pass")) "pass" else "fail"
+    ), by = .(taxon, species, scenario)]
+
+    model <- parity[layer == "B" & (
+      compare == "median_draw vs v2 published" |
+        compare == "model check failed"
+    )]
+    model[, target := fifelse(
+      compare == "model check failed",
+      paste0("not compared: ", surface),
+      {
+        low_rank <- is.na(spearman) | spearman < targets$min_spearman
+        off_total <- is.na(harness_total_vs_v2) |
+          harness_total_vs_v2 < targets$harness_total_vs_v2_range[1] |
+          harness_total_vs_v2 > targets$harness_total_vs_v2_range[2]
+        fifelse(low_rank & off_total, "not met (spearman and total)",
+                fifelse(low_rank, "not met (spearman)",
+                        fifelse(off_total, "not met (total)", "met")))
+      }
+    )]
+
+    summary <- merge(
+      port,
+      model[, .(taxon, species, scenario, cells,
+                pearson = round(pearson, 3),
+                spearman = round(spearman, 3),
+                harness_total_vs_v2 = round(harness_total_vs_v2, 2),
+                cells_within_20pct = round(100 * share_within_20pct,
+                                           1),
+                target)],
+      by = c("taxon", "species", "scenario"), all = TRUE
+    )
+    fwrite(summary,
+           file.path(tables, "prediction_parity_summary.csv"))
+    cat("\nPrediction parity by species:\n")
+    print(summary, nrows = 200)
   }
 
   results$prediction_parity <- parity

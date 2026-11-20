@@ -25,6 +25,56 @@ test_that("prediction_config() checks its settings", {
   expect_match(prediction_label(prediction_config()), "off")
 })
 
+test_that("`regions` limits only the species it lists", {
+  regions <- data.frame(
+    taxon = c("mite", "mammal"),
+    species = c("Trhypochthonius.tectorum", "Moose"),
+    region = c("south", "north")
+  )
+  expect_equal(prediction_config(regions = regions)$regions, regions)
+  expect_error(prediction_config(regions = regions[, 1:2]),
+               "regions")
+  expect_error(prediction_config(regions = "v3"), "regions")
+  # The default is v2's published regions; NULL maps every region
+  expect_equal(prediction_config()$regions, "v2")
+  expect_match(prediction_label(prediction_config(enabled = TRUE)),
+               "regions v2 published")
+  expect_match(
+    prediction_label(prediction_config(enabled = TRUE,
+                                       regions = NULL)),
+    "every fitted region"
+  )
+  expect_match(
+    prediction_label(prediction_config(enabled = TRUE,
+                                       regions = regions)),
+    "regions as listed for 2 species"
+  )
+
+  expect_equal(mapped_regions(regions, "mite",
+                              "Trhypochthonius.tectorum"), "south")
+  # A season run matches its pooled name
+  expect_equal(mapped_regions(regions, "mammal", "Moose_Summer"),
+               "north")
+  # Unlisted species and no table map every fitted region
+  expect_null(mapped_regions(regions, "mite",
+                             "Ceratozetes.gracilis"))
+  expect_null(mapped_regions(NULL, "mite",
+                             "Trhypochthonius.tectorum"))
+})
+
+test_that("\"v2\" reads the regions v2 published", {
+  skip_if_not(
+    file.exists(file.path(v2_results_dir(check = FALSE),
+                          "abmiexplorer", "v2_results.csv")),
+    "v2 results not reachable"
+  )
+
+  expect_equal(mapped_regions("v2", "mite",
+                              "Trhypochthonius.tectorum"), "south")
+  expect_setequal(mapped_regions("v2", "mammal", "Moose_Winter"),
+                  c("north", "south"))
+})
+
 test_that("every mapped spec's spatial settings validate", {
   for (key in names(standard_specs())) {
     spatial <- standard_specs()[[key]]$spatial

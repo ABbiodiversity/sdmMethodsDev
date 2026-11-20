@@ -82,7 +82,8 @@ config <- experiment_config(
 
   # Map every fitted species onto the prediction grid, with the
   # v2 rule and the harness defaults (harness/predict_spatial.R):
-  # the median draw, current land cover, the whole province
+  # the median draw, current land cover, the whole province, and
+  # only the regions v2 published for each species
   prediction = prediction_config(enabled = TRUE)
 )
 

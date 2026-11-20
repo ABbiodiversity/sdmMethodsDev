@@ -71,6 +71,7 @@ vignettes/*.pdf
 # Spatial prediction summaries; the maps and rasters stay ignored
 !3_output/**/tables/prediction_summary.csv
 !3_output/**/tables/prediction_parity.csv
+!3_output/**/tables/prediction_parity_summary.csv
 
 AGENTS.md
 CLAUDE.md
